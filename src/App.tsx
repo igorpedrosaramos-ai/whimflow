@@ -87,21 +87,16 @@ export const App: React.FC = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  // Atualizar quadro ativo com histórico
-  const updateActiveBoard = useCallback((updater: (board: Board) => Board, recordHistory: boolean = true) => {
+  // Atualizar quadro ativo de forma robusta e imediata
+  const updateActiveBoard = useCallback((updater: (board: Board) => Board, _pushHistory: boolean = true) => {
     setBoards(prevBoards => {
-      const current = prevBoards.find(b => b.id === activeBoard.id);
+      const current = prevBoards.find(b => b.id === activeBoardId) || prevBoards[0];
       if (!current) return prevBoards;
 
-      if (recordHistory) {
-        setHistory(prev => [...prev.slice(0, historyIndex + 1), JSON.parse(JSON.stringify(current))]);
-        setHistoryIndex(prev => prev + 1);
-      }
-
       const updated = updater(current);
-      return prevBoards.map(b => b.id === activeBoard.id ? { ...updated, updatedAt: new Date().toISOString() } : b);
+      return prevBoards.map(b => b.id === current.id ? { ...updated, updatedAt: new Date().toISOString() } : b);
     });
-  }, [activeBoard.id, historyIndex]);
+  }, [activeBoardId]);
 
   // Desfazer / Refazer
   const handleUndo = () => {
@@ -387,10 +382,24 @@ export const App: React.FC = () => {
   // ATUALIZAR ESTILO (COR, BORDA, LINHA)
   const handleUpdateNodeStyle = (nodeId: string, updates: Partial<MindMapNode>) => {
     updateActiveBoard(board => {
-      // Se mudou a cor, propaga para os ramos-filhos também se desejado
+      // Se mudou a cor, propaga harmoniosamente para os nós descendentes
+      const toUpdate = new Set<string>([nodeId]);
+      if (updates.color) {
+        const gatherDescendants = (id: string) => {
+          const target = board.mindMapNodes.find(n => n.id === id);
+          if (target && target.childrenIds) {
+            target.childrenIds.forEach(cid => {
+              toUpdate.add(cid);
+              gatherDescendants(cid);
+            });
+          }
+        };
+        gatherDescendants(nodeId);
+      }
+
       return {
         ...board,
-        mindMapNodes: board.mindMapNodes.map(n => n.id === nodeId ? { ...n, ...updates } : n)
+        mindMapNodes: board.mindMapNodes.map(n => toUpdate.has(n.id) ? { ...n, ...updates } : n)
       };
     });
   };
@@ -709,6 +718,9 @@ export const App: React.FC = () => {
           onCreateBoard={handleCreateNewBoard}
           onDuplicateBoard={handleDuplicateBoard}
           onDeleteBoard={handleDeleteBoard}
+          onRenameBoard={(id, newTitle) => {
+            setBoards(prev => prev.map(b => b.id === id ? { ...b, title: newTitle, updatedAt: new Date().toISOString() } : b));
+          }}
         />
 
         {/* Toolbar Flutuante */}

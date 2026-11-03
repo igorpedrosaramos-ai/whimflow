@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Palette, 
   ArrowUp, 
   ArrowDown, 
   Plus, 
@@ -8,8 +7,9 @@ import {
   Trash2, 
   Spline, 
   Minus, 
-  Square,
-  Check
+  Square, 
+  Check, 
+  ChevronDown 
 } from 'lucide-react';
 import { MindMapNode } from '../types';
 
@@ -27,7 +27,7 @@ export const EXECUTIVE_PALETTE = [
 
 interface NodeContextMenuProps {
   node: MindMapNode;
-  position: { x: number; y: number; width: number };
+  position: { x: number; y: number; width: number; height: number };
   onUpdateColor: (color: string) => void;
   onUpdateBorderStyle: (style: 'accent' | 'border' | 'fill') => void;
   onUpdateLineStyle: (style: 'bezier' | 'straight') => void;
@@ -59,137 +59,217 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
   const currentBorderStyle = node.borderStyle || 'accent';
   const currentLineStyle = node.lineStyle || 'bezier';
 
+  // Cores de acesso rápido direto
+  const QUICK_COLORS = ['#6366f1', '#0d9488', '#059669', '#ea580c', '#e11d48'];
+
+  const handleColorChange = (hex: string, e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    onUpdateColor(hex);
+    setShowPalette(false);
+  };
+
   return (
     <div
+      className="node-context-menu"
       style={{
         position: 'absolute',
         left: `${position.x + position.width / 2}px`,
-        top: `${position.y - 48}px`,
+        top: `${Math.max(10, position.y - 52)}px`,
         transform: 'translateX(-50%)',
-        backgroundColor: 'var(--bg-elevated)',
-        border: '1px solid var(--border-strong)',
+        backgroundColor: '#1e232d',
+        border: '1.5px solid #3d4556',
         borderRadius: '8px',
-        padding: '4px 6px',
+        padding: '5px 8px',
         display: 'flex',
         alignItems: 'center',
-        gap: '4px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-        zIndex: 100,
+        gap: '6px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.6)',
+        zIndex: 1000,
         pointerEvents: 'auto',
         userSelect: 'none'
       }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Seletor de Cores da Borda e Linha */}
-      <div style={{ position: 'relative' }}>
-        <button
-          onClick={() => setShowPalette(!showPalette)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            background: 'transparent',
-            border: 'none',
-            padding: '4px 6px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            color: 'var(--text-primary)'
-          }}
-          title="Alterar Cor da Borda e da Linha"
-        >
-          <div
+      {/* Botões Rápidos de Cores (Cores com 1 Toque) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        {QUICK_COLORS.map(hex => (
+          <button
+            key={hex}
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => handleColorChange(hex, e)}
             style={{
-              width: '18px',
-              height: '18px',
+              width: '20px',
+              height: '20px',
               borderRadius: '50%',
-              backgroundColor: currentColor,
-              border: '2px solid rgba(255,255,255,0.4)',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              backgroundColor: hex,
+              cursor: 'pointer',
+              border: hex === currentColor ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.25)',
+              boxShadow: hex === currentColor ? '0 0 6px ' + hex : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0
             }}
-          />
-        </button>
-
-        {/* Popover da Paleta de Cores */}
-        {showPalette && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '32px',
-              left: '0',
-              backgroundColor: 'var(--bg-elevated)',
-              border: '1px solid var(--border-strong)',
-              borderRadius: '8px',
-              padding: '8px',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '6px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-              zIndex: 110,
-              width: '110px'
-            }}
+            title={`Alterar Cor para ${hex}`}
           >
-            {EXECUTIVE_PALETTE.map(p => (
-              <div
-                key={p.hex}
-                onClick={() => {
-                  onUpdateColor(p.hex);
-                  setShowPalette(false);
-                }}
-                style={{
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '50%',
-                  backgroundColor: p.hex,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  border: p.hex === currentColor ? '2px solid #ffffff' : '1px solid rgba(0,0,0,0.2)'
-                }}
-                title={p.label}
-              >
-                {p.hex === currentColor && <Check size={14} color="#ffffff" />}
-              </div>
-            ))}
-          </div>
-        )}
+            {hex === currentColor && <Check size={11} color="#ffffff" />}
+          </button>
+        ))}
+
+        {/* Botão de Paleta Completa */}
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowPalette(!showPalette);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '22px',
+              height: '22px',
+              borderRadius: '4px',
+              background: '#282e3b',
+              border: '1px solid #3f4758',
+              cursor: 'pointer',
+              color: '#cbd5e1',
+              padding: 0
+            }}
+            title="Mais Cores"
+          >
+            <ChevronDown size={13} />
+          </button>
+
+          {showPalette && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '30px',
+                left: '-40px',
+                backgroundColor: '#1c2028',
+                border: '1.5px solid #3f4758',
+                borderRadius: '8px',
+                padding: '8px',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '8px',
+                boxShadow: '0 12px 36px rgba(0,0,0,0.7)',
+                zIndex: 1010,
+                width: '120px'
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {EXECUTIVE_PALETTE.map(p => (
+                <button
+                  key={p.hex}
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => handleColorChange(p.hex, e)}
+                  style={{
+                    width: '26px',
+                    height: '26px',
+                    borderRadius: '50%',
+                    backgroundColor: p.hex,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: p.hex === currentColor ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
+                    padding: 0
+                  }}
+                  title={p.label}
+                >
+                  {p.hex === currentColor && <Check size={14} color="#ffffff" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-subtle)', margin: '0 2px' }} />
+      <div style={{ width: '1px', height: '18px', backgroundColor: '#333a48', margin: '0 2px' }} />
 
-      {/* Alternar Estilo de Borda (Destaque Lateral, Borda Completa, Preenchido) */}
+      {/* Alternar Estilo de Borda */}
       <button
-        onClick={() => {
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
           const next = currentBorderStyle === 'accent' ? 'border' : currentBorderStyle === 'border' ? 'fill' : 'accent';
           onUpdateBorderStyle(next);
         }}
-        className="tool-button"
-        style={{ width: '28px', height: '28px' }}
+        style={{
+          width: '26px',
+          height: '26px',
+          borderRadius: '4px',
+          background: 'transparent',
+          border: 'none',
+          color: '#cbd5e1',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
         title={`Estilo do Card: ${currentBorderStyle === 'accent' ? 'Destaque Lateral' : currentBorderStyle === 'border' ? 'Borda Completa' : 'Preenchido'}`}
       >
         <Square size={15} />
       </button>
 
-      {/* Alternar Estilo da Linha (Curva Bézier vs Linha Reta) */}
+      {/* Alternar Estilo da Linha (Curva Bézier vs Reta) */}
       <button
-        onClick={() => {
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
           onUpdateLineStyle(currentLineStyle === 'bezier' ? 'straight' : 'bezier');
         }}
-        className="tool-button"
-        style={{ width: '28px', height: '28px' }}
+        style={{
+          width: '26px',
+          height: '26px',
+          borderRadius: '4px',
+          background: 'transparent',
+          border: 'none',
+          color: '#cbd5e1',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
         title={`Estilo da Linha: ${currentLineStyle === 'bezier' ? 'Curva Bézier Suave' : 'Linha Reta'}`}
       >
         {currentLineStyle === 'bezier' ? <Spline size={15} /> : <Minus size={15} />}
       </button>
 
-      <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-subtle)', margin: '0 2px' }} />
+      <div style={{ width: '1px', height: '18px', backgroundColor: '#333a48', margin: '0 2px' }} />
 
       {/* Reordenar Irmãos: Subir ↑ */}
       {canMoveUp && (
         <button
-          onClick={onMoveUp}
-          className="tool-button"
-          style={{ width: '28px', height: '28px' }}
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveUp();
+          }}
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '4px',
+            background: 'transparent',
+            border: 'none',
+            color: '#cbd5e1',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
           title="Mover Quadrado para Cima (Reordenar)"
         >
           <ArrowUp size={15} />
@@ -199,23 +279,53 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
       {/* Reordenar Irmãos: Descer ↓ */}
       {canMoveDown && (
         <button
-          onClick={onMoveDown}
-          className="tool-button"
-          style={{ width: '28px', height: '28px' }}
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveDown();
+          }}
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '4px',
+            background: 'transparent',
+            border: 'none',
+            color: '#cbd5e1',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
           title="Mover Quadrado para Baixo (Reordenar)"
         >
           <ArrowDown size={15} />
         </button>
       )}
 
-      <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-subtle)', margin: '0 2px' }} />
+      <div style={{ width: '1px', height: '18px', backgroundColor: '#333a48', margin: '0 2px' }} />
 
-      {/* Criar Ramo Filho */}
+      {/* Criar Ramo Filho (+) */}
       <button
-        onClick={onAddChild}
-        className="tool-button"
-        style={{ width: '28px', height: '28px', color: currentColor }}
-        title="Adicionar Ramo Filho com Linha (Tab)"
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onAddChild();
+        }}
+        style={{
+          width: '26px',
+          height: '26px',
+          borderRadius: '4px',
+          background: 'transparent',
+          border: 'none',
+          color: currentColor,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+        title="Criar Quadrado Filho com Linha (Tab)"
       >
         <Plus size={16} />
       </button>
@@ -223,22 +333,52 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
       {/* Duplicar */}
       {node.side !== 'root' && (
         <button
-          onClick={onDuplicate}
-          className="tool-button"
-          style={{ width: '28px', height: '28px' }}
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDuplicate();
+          }}
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '4px',
+            background: 'transparent',
+            border: 'none',
+            color: '#cbd5e1',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
           title="Duplicar Nó"
         >
           <Copy size={14} />
         </button>
       )}
 
-      {/* Excluir */}
+      {/* Excluir Nó (Trash) com ação garantida */}
       {node.side !== 'root' && (
         <button
-          onClick={onDelete}
-          className="tool-button"
-          style={{ width: '28px', height: '28px', color: 'var(--accent-danger)' }}
-          title="Excluir Nó e Linha (Delete)"
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          style={{
+            width: '26px',
+            height: '26px',
+            borderRadius: '4px',
+            background: '#37181f',
+            border: '1px solid #5c202b',
+            color: '#f87171',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title="Excluir Quadrado e Linha (Delete)"
         >
           <Trash2 size={14} />
         </button>

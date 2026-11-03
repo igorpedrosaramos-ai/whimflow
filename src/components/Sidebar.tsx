@@ -6,8 +6,9 @@ import {
   Copy, 
   Search,
   HardDriveDownload,
-  Folder,
-  Layers
+  Pencil,
+  Check,
+  X
 } from 'lucide-react';
 import { Board } from '../types';
 
@@ -19,7 +20,7 @@ interface SidebarProps {
   onCreateBoard: (title?: string) => void;
   onDuplicateBoard: (id: string) => void;
   onDeleteBoard: (id: string) => void;
-  onLoadTemplate?: (templateName: string) => void;
+  onRenameBoard: (id: string, newTitle: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -30,15 +31,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCreateBoard,
   onDuplicateBoard,
   onDeleteBoard,
-  onLoadTemplate
+  onRenameBoard
 }) => {
   const [search, setSearch] = useState('');
+  const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
 
   if (!isOpen) return null;
 
   const filteredBoards = boards.filter(b => 
     b.title.toLowerCase().includes(search.toLowerCase())
   );
+
+  const startRename = (board: Board, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingBoardId(board.id);
+    setEditingTitle(board.title);
+  };
+
+  const saveRename = (boardId: string) => {
+    if (editingTitle.trim()) {
+      onRenameBoard(boardId, editingTitle.trim());
+    }
+    setEditingBoardId(null);
+  };
 
   return (
     <aside className="sidebar-panel">
@@ -106,14 +122,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           letterSpacing: '0.05em',
           padding: '4px 6px',
           textTransform: 'uppercase',
-          marginBottom: '4px'
+          marginBottom: '6px'
         }}>
-          Meus Quadros ({filteredBoards.length})
+          Meus Projetos / Quadros ({filteredBoards.length})
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           {filteredBoards.map(board => {
             const isSelected = board.id === activeBoardId;
+            const isEditing = editingBoardId === board.id;
+
             return (
               <div
                 key={board.id}
@@ -131,57 +149,138 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   borderLeft: isSelected ? '3px solid var(--accent-purple)' : '3px solid transparent'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
-                  <Network size={15} color={isSelected ? 'var(--accent-purple-light)' : 'var(--text-muted)'} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {board.title}
-                  </span>
-                </div>
-
-                {/* Ações: Duplicar e Excluir */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => onDuplicateBoard(board.id)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--text-muted)',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      display: 'flex'
-                    }}
-                    title="Duplicar quadro"
+                {/* Título ou Campo de Edição de Nome */}
+                {isEditing ? (
+                  <div 
+                    style={{ display: 'flex', alignItems: 'center', gap: '4px', flex: 1 }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    <Copy size={13} />
-                  </button>
-                  {boards.length > 1 && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`Excluir quadro "${board.title}" permanentemente?`)) {
-                          onDeleteBoard(board.id);
-                        }
+                    <input
+                      autoFocus
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveRename(board.id);
+                        if (e.key === 'Escape') setEditingBoardId(null);
                       }}
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'flex'
+                        width: '100%',
+                        padding: '3px 6px',
+                        fontSize: '12.5px',
+                        background: 'var(--bg-canvas)',
+                        border: '1.5px solid var(--accent-purple)',
+                        borderRadius: '4px',
+                        color: 'var(--text-primary)',
+                        outline: 'none'
                       }}
-                      title="Excluir quadro"
+                    />
+                    <button
+                      onClick={() => saveRename(board.id)}
+                      style={{ background: 'none', border: 'none', color: 'var(--accent-teal-light)', cursor: 'pointer', padding: '2px' }}
+                      title="Salvar Nome"
                     >
-                      <Trash2 size={13} />
+                      <Check size={14} />
                     </button>
-                  )}
-                </div>
+                    <button
+                      onClick={() => setEditingBoardId(null)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                      title="Cancelar"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div 
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}
+                    onDoubleClick={(e) => startRename(board, e)}
+                    title="Clique duas vezes para editar o nome"
+                  >
+                    <Network size={15} color={isSelected ? 'var(--accent-purple-light)' : 'var(--text-muted)'} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isSelected ? 600 : 400 }}>
+                      {board.title}
+                    </span>
+                  </div>
+                )}
+
+                {/* BOTÕES DE AÇÃO: RENOMEAR, DUPLICAR E EXCLUIR */}
+                {!isEditing && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
+                    {/* Botão de Editar Nome (Lápis com alta visibilidade) */}
+                    <button
+                      type="button"
+                      onClick={(e) => startRename(board, e)}
+                      style={{
+                        background: 'var(--bg-canvas)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--accent-purple-light)',
+                        cursor: 'pointer',
+                        padding: '4px 6px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '11px',
+                        fontWeight: 500
+                      }}
+                      title="Renomear Projeto (Editar Nome)"
+                    >
+                      <Pencil size={12} />
+                      <span style={{ fontSize: '10.5px' }}>Renomear</span>
+                    </button>
+
+                    {/* Botão Duplicar */}
+                    <button
+                      type="button"
+                      onClick={() => onDuplicateBoard(board.id)}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        padding: '4px 6px',
+                        borderRadius: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      title="Duplicar Projeto"
+                    >
+                      <Copy size={12} />
+                    </button>
+
+                    {/* Botão Excluir */}
+                    {boards.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Excluir o projeto "${board.title}" permanentemente?`)) {
+                            onDeleteBoard(board.id);
+                          }
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: '1px solid #7f1d1d',
+                          color: '#f87171',
+                          cursor: 'pointer',
+                          padding: '4px 6px',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Excluir Projeto"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Rodapé com Status e Persistência */}
+      {/* Rodapé */}
       <div style={{
         padding: '12px 14px',
         borderTop: '1px solid var(--border-subtle)',
