@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Plus, X, ChevronRight, CornerDownRight } from 'lucide-react';
 import { MindMapNode } from '../types';
+import { calculateMindMapLayout, getBezierPath, estimateNodeDimensions } from '../utils/treeLayout';
 
 interface MindMapCanvasProps {
   nodes: MindMapNode[];
@@ -29,11 +30,27 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [editingText, setEditingText] = useState('');
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const nodeMap = new Map<string, MindMapNode>();
-  nodes.forEach(n => nodeMap.set(n.id, n));
+  const nodeMap = useMemo(() => {
+    const map = new Map<string, MindMapNode>();
+    nodes.forEach(n => map.set(n.id, n));
+    return map;
+  }, [nodes]);
 
-  // Determina se um nó está visível (se nenhum de seus ancestrais está colapsado)
+  // Calcula layout tidy da árvore (sem sobreposição, linhas perfeitas)
+  const layoutMap = useMemo(() => {
+    const root = nodes.find(n => n.side === 'root') || nodes[0];
+    if (!root) return new Map();
+    return calculateMindMapLayout(nodes, root.id, {
+      horizontalGap: 72,
+      verticalGap: 16,
+      rootX: root.x || 0,
+      rootY: root.y || 0
+    });
+  }, [nodes]);
+
+  // Determina se o nó está visível (nenhum ancestral colapsado)
   const isNodeVisible = (node: MindMapNode): boolean => {
     let current = node;
     while (current.parentId) {
@@ -45,11 +62,20 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     return true;
   };
 
-  // Conta total de descendentes para exibir no badge
+  // Conta total de descendentes recursivamente para o badge
   const countDescendants = (nodeId: string): number => {
     const node = nodeMap.get(nodeId);
     if (!node || node.childrenIds.length === 0) return 0;
-    let count = node.childrenIds.length;
+    let count = 0;
+    const stack = [...node.childrenIds];
+    while (stack.length > 0) {
+      const cid = stack.pop()!;
+      count++;
+      const child = nodeMap.get(cid);
+      if (child && child.childrenIds.length > 0) {
+        stack.push(...child.childrenIds);
+      }
+    }
     return count;
   };
 
@@ -71,9 +97,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       handleCommitEdit();
-      if (node.parentId) {
-        onAddSiblingNode(node.id);
-      }
+      onAddSiblingNode(node.id);
     } else if (e.key === 'Tab') {
       e.preventDefault();
       handleCommitEdit();
@@ -83,10 +107,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }
   };
 
-  // Iniciar arraste do nó
+  useEffect(() => {
+    if (editingId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [editingId]);
+
+  // Arraste manual de nós
   const handleMouseDown = (node: MindMapNode, e: React.MouseEvent) => {
     if (editingId === node.id) return;
-    if (e.button !== 0) return; // Apenas botão esquerdo
+    if (e.button !== 0) return;
     e.stopPropagation();
     onSelectNode(node.id);
     setDraggingNodeId(node.id);
@@ -117,7 +148,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     };
   }, [draggingNodeId, onMoveNode]);
 
-  // Gerar linhas Bézier de conexão
+  // RENDERIZAÇÃO DAS LINHAS EMBUTIDAS (SPLINES / BÉZIER)
   const renderConnectors = () => {
     const paths: React.ReactElement[] = [];
 
@@ -126,39 +157,40 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       const parent = nodeMap.get(child.parentId);
       if (!parent || parent.collapsed) return;
 
-      const pWidth = parent.width || (parent.side === 'root' ? 240 : 160);
-      const pHeight = parent.height || (parent.side === 'root' ? 56 : 38);
-      const cWidth = child.width || 150;
-      const cHeight = child.height || 36;
+      const pLayout = layoutMap.get(parent.id);
+      const cLayout = layoutMap.get(child.id);
 
-      const isRight = child.x >= parent.x;
+      // Coordenadas calculadas pelo motor Tidy Tree
+      const startX = pLayout ? pLayout.x + pLayout.width : parent.x + (parent.width || 180);
+      const startY = pLayout ? pLayout.y + pLayout.height / 2 : parent.y + 20;
+      const endX = cLayout ? cLayout.x : child.x;
+      const endY = cLayout ? cLayout.y + cLayout.height / 2 : child.y + 20;
 
-      const startX = isRight ? parent.x + pWidth : parent.x;
-      const startY = parent.y + pHeight / 2;
-      const endX = isRight ? child.x : child.x + cWidth;
-      const endY = child.y + cHeight / 2;
-
-      const deltaX = Math.abs(endX - startX);
-      const curvature = Math.max(deltaX * 0.45, 40);
-
-      const cp1X = isRight ? startX + curvature : startX - curvature;
-      const cp1Y = startY;
-      const cp2X = isRight ? endX - curvature : endX + curvature;
-      const cp2Y = endY;
-
-      const pathData = `M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
+      const pathData = getBezierPath(startX, startY, endX, endY);
       const strokeColor = child.color || parent.color || 'var(--accent-purple)';
 
       paths.push(
-        <path
-          key={`conn-${child.id}`}
-          d={pathData}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          style={{ opacity: 0.85, transition: 'all 0.15s ease' }}
-        />
+        <g key={`conn-group-${child.id}`}>
+          {/* Sombra de destaque no hover do nó conectado */}
+          <path
+            d={pathData}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth={selectedNodeId === child.id ? "3.5" : "2.2"}
+            strokeLinecap="round"
+            style={{
+              opacity: selectedNodeId === child.id ? 1 : 0.85,
+              transition: 'stroke-width 0.15s ease, opacity 0.15s ease'
+            }}
+          />
+          {/* Ponto de ancoragem na junção do nó filho */}
+          <circle
+            cx={endX}
+            cy={endY}
+            r={selectedNodeId === child.id ? 3.5 : 2.5}
+            fill={strokeColor}
+          />
+        </g>
       );
     });
 
@@ -171,7 +203,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           width: '100%',
           height: '100%',
           pointerEvents: 'none',
-          overflow: 'visible'
+          overflow: 'visible',
+          zIndex: 10
         }}
       >
         {paths}
@@ -192,17 +225,32 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const childCount = countDescendants(node.id);
         const hasChildren = node.childrenIds.length > 0;
 
+        // Posição calculada com precisão pelo Tidy Tree
+        const computed = layoutMap.get(node.id);
+        const posX = computed ? computed.x : node.x;
+        const posY = computed ? computed.y : node.y;
+        const width = computed ? computed.width : (node.width || 160);
+        const height = computed ? computed.height : (node.height || 38);
+
+        const nodeColor = node.color || '#6366f1';
+
         return (
           <div
             key={node.id}
             id={`node-${node.id}`}
             className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''}`}
             style={{
-              left: `${node.x}px`,
-              top: `${node.y}px`,
-              backgroundColor: isRoot ? '#1e293b' : (node.color || '#6366f1'),
-              borderLeft: !isRoot ? `4px solid ${node.color || '#818cf8'}` : undefined,
-              zIndex: isSelected ? 30 : 20
+              left: `${posX}px`,
+              top: `${posY}px`,
+              minWidth: `${width}px`,
+              minHeight: `${height}px`,
+              backgroundColor: isRoot ? 'var(--bg-elevated)' : 'var(--bg-surface)',
+              border: isRoot 
+                ? '2px solid var(--border-strong)' 
+                : `1.5px solid ${isSelected ? nodeColor : 'var(--border-subtle)'}`,
+              borderLeft: !isRoot ? `5px solid ${nodeColor}` : '2px solid var(--border-strong)',
+              zIndex: isSelected ? 35 : 20,
+              padding: isRoot ? '12px 22px' : '8px 14px'
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -211,89 +259,170 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             onDoubleClick={(e) => handleStartEdit(node, e)}
             onMouseDown={(e) => handleMouseDown(node, e)}
           >
+            {/* Texto do Nó ou Campo de Edição */}
             {isEditing ? (
               <input
-                autoFocus
+                ref={inputRef}
                 type="text"
                 value={editingText}
                 onChange={(e) => setEditingText(e.target.value)}
                 onBlur={handleCommitEdit}
                 onKeyDown={(e) => handleKeyDown(e, node)}
                 style={{
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  border: '1px solid #ffffff',
-                  color: '#ffffff',
+                  background: 'var(--bg-canvas)',
+                  border: `1.5px solid ${nodeColor}`,
+                  color: 'var(--text-primary)',
                   borderRadius: '4px',
-                  padding: '2px 6px',
+                  padding: '3px 8px',
                   fontSize: isRoot ? '16px' : '13.5px',
                   fontWeight: isRoot ? 700 : 500,
                   outline: 'none',
-                  minWidth: '140px'
+                  width: '100%'
                 }}
               />
             ) : (
-              <span style={{ whiteSpace: 'nowrap', userSelect: 'none' }}>
+              <span style={{ 
+                whiteSpace: 'normal', 
+                wordBreak: 'break-word',
+                userSelect: 'none',
+                color: 'var(--text-primary)',
+                fontSize: isRoot ? '16px' : '13.5px',
+                fontWeight: isRoot ? 700 : 500,
+                lineHeight: 1.35
+              }}>
                 {node.text}
               </span>
             )}
 
-            {/* Contador numérico de ramos ocultos (Badge circular idêntico ao Whimsical) */}
+            {/* Badge Contador de Ramos Recolhidos (exatamente como Whimsical) */}
             {hasChildren && node.collapsed && (
               <div
                 className="branch-counter-badge"
+                style={{ backgroundColor: nodeColor }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleCollapse(node.id);
                 }}
-                title={`Expandir ${childCount} ramos`}
+                title={`Expandir ${childCount} ramos conectados`}
               >
                 {childCount}
               </div>
             )}
 
-            {/* Botão de recolher quando expandido */}
+            {/* Indicador de Recolhimento quando expandido */}
             {hasChildren && !node.collapsed && !isRoot && (
               <div
                 className="branch-counter-badge"
-                style={{ width: '18px', height: '18px', fontSize: '11px', opacity: 0.6 }}
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  fontSize: '11px',
+                  backgroundColor: 'var(--border-strong)',
+                  color: 'var(--text-secondary)'
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleCollapse(node.id);
                 }}
-                title="Recolher ramos"
+                title="Recolher ramos deste nó"
               >
-                -
+                −
               </div>
             )}
 
-            {/* Botão rápido de adicionar ramo filho ao passar o mouse */}
+            {/* BOTÕES DE CRIAÇÃO RÁPIDA EMBUTIDOS NO NÓ (Aparecem quando selecionado) */}
             {isSelected && !isEditing && (
-              <div
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddChildNode(node.id);
-                }}
-                style={{
-                  position: 'absolute',
-                  right: '-14px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--accent-purple-light)',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-                  zIndex: 35
-                }}
-                title="Adicionar ramo filho (Atalho: Tab)"
-              >
-                <Plus size={15} />
-              </div>
+              <>
+                {/* Botão + Filho: Cria um quadrado com linha embutida na hora! */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddChildNode(node.id);
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: '-28px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    backgroundColor: nodeColor,
+                    color: '#ffffff',
+                    border: '2px solid var(--bg-surface)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    zIndex: 40
+                  }}
+                  title="Criar Quadrado Filho com Linha Embutida (Atalho: Tab)"
+                >
+                  <Plus size={15} />
+                </button>
+
+                {/* Botão + Irmão: Cria um quadrado irmão no mesmo nível com linha embutida */}
+                {!isRoot && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddSiblingNode(node.id);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      bottom: '-24px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--bg-elevated)',
+                      color: nodeColor,
+                      border: `1.5px solid ${nodeColor}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                      zIndex: 40
+                    }}
+                    title="Criar Quadrado Irmão no Mesmo Nível (Atalho: Enter)"
+                  >
+                    <CornerDownRight size={12} />
+                  </button>
+                )}
+
+                {/* Botão Excluir */}
+                {!isRoot && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteNode(node.id);
+                    }}
+                    style={{
+                      position: 'absolute',
+                      top: '-10px',
+                      right: '-10px',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--accent-danger)',
+                      color: '#ffffff',
+                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                      zIndex: 40
+                    }}
+                    title="Excluir Nó e Sub-ramos (Delete)"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </>
             )}
           </div>
         );
