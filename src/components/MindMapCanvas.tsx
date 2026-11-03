@@ -242,12 +242,15 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     return (
       <svg
+        width="10000"
+        height="10000"
+        viewBox="-5000 -5000 10000 10000"
         style={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
+          top: -5000,
+          left: -5000,
+          width: 10000,
+          height: 10000,
           pointerEvents: 'none',
           overflow: 'visible',
           zIndex: 5
