@@ -132,8 +132,7 @@ html, body, #root {
   border-color: rgba(255, 255, 255, 0.3);
 }
 .mindmap-node-card.selected {
-  outline: 2px solid var(--accent-purple-light);
-  outline-offset: 2px;
+  /* Outline e glow definidos dinamicamente de acordo com a cor escolhida pelo usuário */
 }
 .mindmap-node-card.root {
   font-size: 17px;

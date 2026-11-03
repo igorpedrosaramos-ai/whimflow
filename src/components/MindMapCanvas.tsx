@@ -242,15 +242,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     return (
       <svg
-        width="60000"
-        height="60000"
-        viewBox="-30000 -30000 60000 60000"
         style={{
           position: 'absolute',
-          top: -30000,
-          left: -30000,
-          width: 60000,
-          height: 60000,
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
           pointerEvents: 'none',
           overflow: 'visible',
           zIndex: 5
@@ -349,8 +346,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               backgroundColor: bg,
               border: border,
               borderLeft: borderLeft,
-              outline: isDropTarget ? '3px dashed var(--accent-teal)' : undefined,
-              outlineOffset: '4px',
+              outline: isSelected ? `2.5px solid ${nodeColor}` : (isDropTarget ? '3px dashed var(--accent-teal)' : undefined),
+              outlineOffset: '2px',
+              boxShadow: isSelected ? `0 0 16px ${nodeColor}66` : '0 4px 12px rgba(0, 0, 0, 0.25)',
               zIndex: isSelected ? 35 : 20,
               padding: isRoot ? '12px 24px' : '8px 16px',
               whiteSpace: 'nowrap',

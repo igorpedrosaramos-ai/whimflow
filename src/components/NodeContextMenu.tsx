@@ -74,7 +74,7 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
       style={{
         position: 'absolute',
         left: `${position.x + position.width / 2}px`,
-        top: `${Math.max(10, position.y - 52)}px`,
+        top: `${position.y - 48}px`,
         transform: 'translateX(-50%)',
         backgroundColor: '#1e232d',
         border: '1.5px solid #3d4556',
