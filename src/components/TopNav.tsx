@@ -3,68 +3,82 @@ import {
   Sidebar as SidebarIcon, 
   Share2, 
   Play, 
-  Sparkles, 
-  Download, 
+  Plus, 
+  Undo2, 
+  Redo2, 
   Sun, 
   Moon, 
-  Check, 
   ChevronRight,
-  FolderOpen
+  FolderOpen,
+  LayoutGrid
 } from 'lucide-react';
-import { Workspace } from '../types';
+import { Board } from '../types';
 
 interface TopNavProps {
   boardTitle: string;
   onUpdateTitle: (title: string) => void;
-  workspaces: Workspace[];
-  currentWorkspaceId: string;
-  onSelectWorkspace: (id: string) => void;
+  boards: Board[];
+  activeBoardId: string;
+  onSelectBoard: (id: string) => void;
+  onCreateNewBoard: () => void;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
-  onOpenAI: () => void;
-  onOpenExport: () => void;
+  onOpenShare: () => void;
   onStartPresentation: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   totalObjects: number;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
   boardTitle,
   onUpdateTitle,
-  workspaces,
-  currentWorkspaceId,
-  onSelectWorkspace,
+  boards,
+  activeBoardId,
+  onSelectBoard,
+  onCreateNewBoard,
   sidebarOpen,
   onToggleSidebar,
-  onOpenAI,
-  onOpenExport,
+  onOpenShare,
   onStartPresentation,
   theme,
   onToggleTheme,
-  totalObjects
+  totalObjects,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo
 }) => {
-  const currentWs = workspaces.find(w => w.id === currentWorkspaceId) || workspaces[0];
-
   return (
     <header className="top-navbar">
-      {/* Left: Sidebar toggle, Workspace & Breadcrumbs */}
+      {/* Esquerda: Toggle Sidebar, Seletor de Quadros e Título */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <button
           className="tool-button"
           onClick={onToggleSidebar}
-          title={sidebarOpen ? "Ocultar Barra Lateral" : "Exibir Barra Lateral"}
+          title={sidebarOpen ? "Ocultar Painel de Projetos" : "Exibir Painel de Projetos"}
           style={{ width: '32px', height: '32px' }}
         >
           <SidebarIcon size={18} />
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13.5px' }}>
+          {/* Seletor de Quadros */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-secondary)' }}>
             <FolderOpen size={16} color="var(--accent-purple-light)" />
             <select
-              value={currentWorkspaceId}
-              onChange={(e) => onSelectWorkspace(e.target.value)}
+              value={activeBoardId}
+              onChange={(e) => {
+                if (e.target.value === 'NEW') {
+                  onCreateNewBoard();
+                } else {
+                  onSelectBoard(e.target.value);
+                }
+              }}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -75,16 +89,20 @@ export const TopNav: React.FC<TopNavProps> = ({
                 outline: 'none'
               }}
             >
-              {workspaces.map(ws => (
-                <option key={ws.id} value={ws.id} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
-                  {ws.name}
+              {boards.map(b => (
+                <option key={b.id} value={b.id} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
+                  {b.title}
                 </option>
               ))}
+              <option value="NEW" style={{ background: 'var(--bg-surface)', color: 'var(--accent-purple-light)', fontWeight: 700 }}>
+                + Novo Quadro em Branco...
+              </option>
             </select>
           </div>
 
           <ChevronRight size={14} color="var(--text-muted)" />
 
+          {/* Edição Rápida do Título */}
           <input
             type="text"
             value={boardTitle}
@@ -94,45 +112,52 @@ export const TopNav: React.FC<TopNavProps> = ({
               border: 'none',
               borderBottom: '1px dashed transparent',
               color: 'var(--text-primary)',
-              fontWeight: 600,
+              fontWeight: 700,
               fontSize: '14px',
               padding: '2px 6px',
               borderRadius: '4px',
               outline: 'none',
+              minWidth: '160px',
               maxWidth: '320px'
             }}
             onFocus={(e) => e.target.style.borderBottomColor = 'var(--accent-purple)'}
             onBlur={(e) => e.target.style.borderBottomColor = 'transparent'}
-            title="Clique para renomear este quadro"
+            title="Clique para renomear este projeto"
           />
         </div>
       </div>
 
-      {/* Right Controls: Objects counter, AI, Presentation, Export, Theme */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {/* Unlimited objects pill */}
-        <div 
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            backgroundColor: 'var(--bg-canvas)',
-            border: '1px solid var(--border-subtle)',
-            padding: '4px 10px',
-            borderRadius: '20px',
-            fontSize: '12px',
-            fontWeight: 600,
-            color: 'var(--accent-teal-light)'
-          }}
-          title="Seu sistema pessoal é 100% ilimitado! Sem a trava de 50 objetos do Whimsical comercial."
-        >
-          <span style={{ fontSize: '14px', fontWeight: 700 }}>∞</span>
-          <span>{totalObjects} objetos (Uso Pessoal Ilimitado)</span>
-        </div>
+      {/* Centro: Desfazer / Refazer */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        {onUndo && (
+          <button
+            onClick={onUndo}
+            disabled={!canUndo}
+            className="tool-button"
+            style={{ width: '30px', height: '30px', opacity: canUndo ? 1 : 0.4 }}
+            title="Desfazer (Ctrl+Z)"
+          >
+            <Undo2 size={15} />
+          </button>
+        )}
+        {onRedo && (
+          <button
+            onClick={onRedo}
+            disabled={!canRedo}
+            className="tool-button"
+            style={{ width: '30px', height: '30px', opacity: canRedo ? 1 : 0.4 }}
+            title="Refazer (Ctrl+Y)"
+          >
+            <Redo2 size={15} />
+          </button>
+        )}
+      </div>
 
-        {/* AI Generator Button */}
+      {/* Direita: Criar Novo, Compartilhar, Apresentar, Tema */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {/* Botão + Novo Quadro */}
         <button
-          onClick={onOpenAI}
+          onClick={onCreateNewBoard}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -144,16 +169,38 @@ export const TopNav: React.FC<TopNavProps> = ({
             borderRadius: '6px',
             cursor: 'pointer',
             fontSize: '13px',
-            fontWeight: 600,
-            transition: 'background-color 0.15s'
+            fontWeight: 600
           }}
-          title="Assistente de Ideias e Desdobramento de Ramos"
+          title="Criar um Novo Quadro 100% Limpo (Do Zero)"
         >
-          <Sparkles size={15} />
-          <span>Expandir com IA</span>
+          <Plus size={15} />
+          <span>Novo Quadro</span>
         </button>
 
-        {/* Presentation Button */}
+        {/* Compartilhar Link */}
+        <button
+          onClick={onOpenShare}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            backgroundColor: 'var(--accent-purple)',
+            color: '#ffffff',
+            border: 'none',
+            padding: '6px 14px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 600,
+            boxShadow: '0 2px 6px rgba(99, 102, 241, 0.35)'
+          }}
+          title="Compartilhar Link do Projeto ou Exportar"
+        >
+          <Share2 size={15} />
+          <span>Compartilhar</span>
+        </button>
+
+        {/* Apresentar */}
         <button
           onClick={onStartPresentation}
           style={{
@@ -175,44 +222,15 @@ export const TopNav: React.FC<TopNavProps> = ({
           <span>Apresentar</span>
         </button>
 
-        {/* Export / Backup Button */}
-        <button
-          onClick={onOpenExport}
-          className="tool-button"
-          title="Exportar / Backup / Importar"
-          style={{ width: '34px', height: '34px' }}
-        >
-          <Download size={17} />
-        </button>
-
-        {/* Theme Toggle Button */}
+        {/* Alternador de Tema */}
         <button
           onClick={onToggleTheme}
           className="tool-button"
-          title={theme === 'dark' ? "Alternar para Tema Claro" : "Alternar para Tema Escuro"}
+          title={theme === 'dark' ? "Mudar para Tema Claro" : "Mudar para Tema Escuro"}
           style={{ width: '34px', height: '34px' }}
         >
           {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
-
-        {/* User avatar indicator */}
-        <div
-          style={{
-            width: '30px',
-            height: '30px',
-            borderRadius: '50%',
-            backgroundColor: 'var(--accent-purple)',
-            color: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: '13px'
-          }}
-          title="Conta Pessoal Offline & Local"
-        >
-          M
-        </div>
       </div>
     </header>
   );

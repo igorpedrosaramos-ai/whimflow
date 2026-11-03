@@ -2,10 +2,8 @@ export type ToolType =
   | 'select' 
   | 'hand' 
   | 'mindmap' 
-  | 'flowchart' 
   | 'sticky' 
   | 'wireframe' 
-  | 'text' 
   | 'draw' 
   | 'present';
 
@@ -14,12 +12,18 @@ export interface MindMapNode {
   text: string;
   x: number;
   y: number;
+  offsetX?: number; // Deslocamento manual livre via arraste
+  offsetY?: number; // Deslocamento manual livre via arraste
   width?: number;
   height?: number;
   parentId?: string | null;
   childrenIds: string[];
   collapsed?: boolean;
-  color?: string; // hex or color class
+  color?: string; // Cor principal da linha e do nó
+  borderColor?: string;
+  borderStyle?: 'accent' | 'border' | 'fill';
+  lineStyle?: 'bezier' | 'straight';
+  fontSize?: 'small' | 'medium' | 'large';
   side?: 'left' | 'right' | 'root';
 }
 
@@ -54,7 +58,7 @@ export interface StickyNote {
   width: number;
   height: number;
   text: string;
-  color: string; // yellow, cyan, pink, green, dark, purple
+  color: string;
   author?: string;
 }
 
@@ -98,6 +102,7 @@ export interface Board {
   id: string;
   title: string;
   workspaceId: string;
+  createdAt: string;
   updatedAt: string;
   mindMapNodes: MindMapNode[];
   shapes: FlowShape[];

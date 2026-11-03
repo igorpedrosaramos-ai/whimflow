@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { INITIAL_BOARDS, INITIAL_WORKSPACES, INITIAL_BOARD, ONEGAI_BOARD } from './constants/initialData';
+import { INITIAL_BOARDS, BLANK_BOARD } from './constants/initialData';
 import { Board, ToolType, MindMapNode, StickyNote, WireframeItem, DrawingStroke } from './types';
 import { TopNav } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
@@ -9,26 +9,15 @@ import { StickyNotesCanvas } from './components/StickyNotesCanvas';
 import { FreehandCanvas } from './components/FreehandCanvas';
 import { ZoomControls } from './components/ZoomControls';
 import { AIModal } from './components/AIModal';
-import { ExportModal } from './components/ExportModal';
+import { ShareModal } from './components/ShareModal';
 import { PresentationView } from './components/PresentationView';
+import { EXECUTIVE_PALETTE } from './components/NodeContextMenu';
 
-const STORAGE_KEY = 'whimflow_boards_v3';
+const STORAGE_KEY = 'whimflow_boards_v5';
 const THEME_KEY = 'whimflow_theme';
 
-const BRANCH_PALETTE = [
-  '#f97316', // Laranja (como Os Mais Pedidos Onegai)
-  '#0d9488', // Teal (como O Melhor Hot Roll)
-  '#3b82f6', // Azul (como Segundo Temaki)
-  '#ec4899', // Magenta (como Combinados)
-  '#059669', // Verde Esmeralda (como Yakissoba)
-  '#eab308', // Âmbar / Dourado (como Mini Pokes)
-  '#ef4444', // Vermelho (como Pokes Grandes)
-  '#8b5cf6', // Violeta
-  '#6366f1'  // Índigo
-];
-
 export const App: React.FC = () => {
-  // Estado dos Quadros & Áreas de Trabalho
+  // Estado dos Quadros
   const [boards, setBoards] = useState<Board[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -37,14 +26,18 @@ export const App: React.FC = () => {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {
-      console.warn('Iniciando com quadros padrões');
+      console.warn('Iniciando com quadro limpo');
     }
     return INITIAL_BOARDS;
   });
 
-  const [activeBoardId, setActiveBoardId] = useState<string>('board-turbine');
-  const [workspaces, setWorkspaces] = useState(INITIAL_WORKSPACES);
-  const [currentWorkspaceId, setCurrentWorkspaceId] = useState('ws-main');
+  const [activeBoardId, setActiveBoardId] = useState<string>(() => {
+    return boards[0]?.id || BLANK_BOARD.id;
+  });
+
+  // Pilha de Histórico para Desfazer / Refazer
+  const [history, setHistory] = useState<Board[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   // Interface & Ferramentas
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -54,7 +47,7 @@ export const App: React.FC = () => {
   });
 
   // Canvas Pan & Zoom
-  const [pan, setPan] = useState({ x: 260, y: 340 });
+  const [pan, setPan] = useState({ x: 300, y: 350 });
   const [zoom, setZoom] = useState(1.0);
   const [isPanning, setIsPanning] = useState(false);
   const isSpacePressed = useRef(false);
@@ -66,7 +59,7 @@ export const App: React.FC = () => {
 
   // Modais
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
 
   // Desenho livre
@@ -74,13 +67,6 @@ export const App: React.FC = () => {
   const currentStrokeRef = useRef<DrawingStroke | null>(null);
 
   const activeBoard = boards.find(b => b.id === activeBoardId) || boards[0];
-
-  // Sincronizar workspace selecionado com o board ativo
-  useEffect(() => {
-    if (activeBoard && activeBoard.workspaceId !== currentWorkspaceId) {
-      setCurrentWorkspaceId(activeBoard.workspaceId);
-    }
-  }, [activeBoardId]);
 
   // Salvar no localStorage continuamente
   useEffect(() => {
@@ -101,17 +87,110 @@ export const App: React.FC = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  const updateActiveBoard = useCallback((updater: (board: Board) => Board) => {
-    setBoards(prevBoards => prevBoards.map(b => {
-      if (b.id === activeBoard.id) {
-        const updated = updater(b);
-        return { ...updated, updatedAt: new Date().toISOString() };
-      }
-      return b;
-    }));
-  }, [activeBoard.id]);
+  // Atualizar quadro ativo com histórico
+  const updateActiveBoard = useCallback((updater: (board: Board) => Board, recordHistory: boolean = true) => {
+    setBoards(prevBoards => {
+      const current = prevBoards.find(b => b.id === activeBoard.id);
+      if (!current) return prevBoards;
 
-  // Gestão de Texto dos Nós
+      if (recordHistory) {
+        setHistory(prev => [...prev.slice(0, historyIndex + 1), JSON.parse(JSON.stringify(current))]);
+        setHistoryIndex(prev => prev + 1);
+      }
+
+      const updated = updater(current);
+      return prevBoards.map(b => b.id === activeBoard.id ? { ...updated, updatedAt: new Date().toISOString() } : b);
+    });
+  }, [activeBoard.id, historyIndex]);
+
+  // Desfazer / Refazer
+  const handleUndo = () => {
+    if (historyIndex >= 0) {
+      const previousState = history[historyIndex];
+      setBoards(prev => prev.map(b => b.id === previousState.id ? previousState : b));
+      setHistoryIndex(prev => prev - 1);
+    }
+  };
+
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const nextIndex = historyIndex + 1;
+      const nextState = history[nextIndex];
+      setBoards(prev => prev.map(b => b.id === nextState.id ? nextState : b));
+      setHistoryIndex(nextIndex);
+    }
+  };
+
+  // CRIAR NOVO QUADRO 100% LIMPO
+  const handleCreateNewBoard = (title: string = 'Novo Projeto') => {
+    const newBoardId = `board-${Date.now()}`;
+    const newBoard: Board = {
+      id: newBoardId,
+      title: title,
+      workspaceId: 'ws-default',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      mindMapNodes: [
+        {
+          id: 'root',
+          text: 'Ideia Central',
+          x: 0,
+          y: 0,
+          width: 220,
+          height: 52,
+          parentId: null,
+          childrenIds: [],
+          collapsed: false,
+          color: '#6366f1',
+          borderStyle: 'accent',
+          lineStyle: 'bezier',
+          side: 'root'
+        }
+      ],
+      shapes: [],
+      connectors: [],
+      stickies: [],
+      wireframes: [],
+      texts: [],
+      drawings: []
+    };
+
+    setBoards(prev => [newBoard, ...prev]);
+    setActiveBoardId(newBoardId);
+    setSelectedNodeId('root');
+    setPan({ x: 300, y: 350 });
+    setZoom(1.0);
+  };
+
+  // DUPLICAR QUADRO
+  const handleDuplicateBoard = (id: string) => {
+    const target = boards.find(b => b.id === id);
+    if (!target) return;
+    const duplicated: Board = {
+      ...JSON.parse(JSON.stringify(target)),
+      id: `board-${Date.now()}`,
+      title: `${target.title} (Cópia)`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    setBoards(prev => [duplicated, ...prev]);
+    setActiveBoardId(duplicated.id);
+  };
+
+  // EXCLUIR QUADRO
+  const handleDeleteBoard = (id: string) => {
+    if (boards.length <= 1) {
+      alert('Você precisa manter pelo menos um quadro ativo.');
+      return;
+    }
+    const remaining = boards.filter(b => b.id !== id);
+    setBoards(remaining);
+    if (activeBoardId === id) {
+      setActiveBoardId(remaining[0].id);
+    }
+  };
+
+  // GESTÃO DE TEXTO DO NÓ
   const handleUpdateNodeText = (id: string, text: string) => {
     updateActiveBoard(board => ({
       ...board,
@@ -119,7 +198,7 @@ export const App: React.FC = () => {
     }));
   };
 
-  // Recolher / Expandir Ramo
+  // RECOLHER / EXPANDIR RAMO
   const handleToggleCollapse = (id: string) => {
     updateActiveBoard(board => ({
       ...board,
@@ -136,9 +215,9 @@ export const App: React.FC = () => {
     
     // Determina a cor do ramo
     let branchColor = parent.color;
-    if (parent.side === 'root' || !branchColor || branchColor === '#ffffff' || branchColor === '#1e293b') {
-      const paletteIndex = parent.childrenIds.length % BRANCH_PALETTE.length;
-      branchColor = BRANCH_PALETTE[paletteIndex];
+    if (parent.side === 'root' || !branchColor) {
+      const paletteIndex = parent.childrenIds.length % EXECUTIVE_PALETTE.length;
+      branchColor = EXECUTIVE_PALETTE[paletteIndex].hex;
     }
 
     const newNode: MindMapNode = {
@@ -150,6 +229,8 @@ export const App: React.FC = () => {
       childrenIds: [],
       collapsed: false,
       color: branchColor,
+      borderStyle: parent.borderStyle || 'accent',
+      lineStyle: parent.lineStyle || 'bezier',
       side: 'right'
     };
 
@@ -159,7 +240,7 @@ export const App: React.FC = () => {
         ...board.mindMapNodes.map(n => n.id === parentId ? { 
           ...n, 
           childrenIds: [...n.childrenIds, newId],
-          collapsed: false // Força expansão para que o novo nó e a linha fiquem visíveis imediatamente!
+          collapsed: false
         } : n),
         newNode
       ]
@@ -191,6 +272,8 @@ export const App: React.FC = () => {
       childrenIds: [],
       collapsed: false,
       color: sibling.color || parent.color || '#6366f1',
+      borderStyle: sibling.borderStyle || 'accent',
+      lineStyle: sibling.lineStyle || 'bezier',
       side: sibling.side
     };
 
@@ -218,19 +301,133 @@ export const App: React.FC = () => {
     setSelectedNodeId(newId);
   };
 
-  // AÇÃO DO BOTÃO PRINCIPAL DA TOOLBAR (+ Quadrado com Linha)
-  const handleAddConnectedNode = () => {
-    if (selectedNodeId) {
-      handleAddChildNode(selectedNodeId);
-    } else {
-      const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root') || activeBoard.mindMapNodes[0];
-      if (rootNode) {
-        handleAddChildNode(rootNode.id);
-      }
-    }
+  // REORDENAR NÓS IRMÃOS (SUBIR ↑ / DESCER ↓)
+  const handleReorderNode = (nodeId: string, direction: 'up' | 'down') => {
+    const node = activeBoard.mindMapNodes.find(n => n.id === nodeId);
+    if (!node || !node.parentId) return;
+
+    const parent = activeBoard.mindMapNodes.find(n => n.id === node.parentId);
+    if (!parent) return;
+
+    const curIndex = parent.childrenIds.indexOf(nodeId);
+    if (curIndex === -1) return;
+
+    const targetIndex = direction === 'up' ? curIndex - 1 : curIndex + 1;
+    if (targetIndex < 0 || targetIndex >= parent.childrenIds.length) return;
+
+    const newChildren = [...parent.childrenIds];
+    newChildren[curIndex] = newChildren[targetIndex];
+    newChildren[targetIndex] = nodeId;
+
+    updateActiveBoard(board => ({
+      ...board,
+      mindMapNodes: board.mindMapNodes.map(n => n.id === parent.id ? { ...n, childrenIds: newChildren } : n)
+    }));
   };
 
-  // Excluir Nó e toda a sua subárvore
+  // REPARENTALIZAR NÓ (MUDAR DE NÓ-PAI VIA ARRASTE)
+  const handleReparentNode = (childId: string, newParentId: string) => {
+    const child = activeBoard.mindMapNodes.find(n => n.id === childId);
+    const newParent = activeBoard.mindMapNodes.find(n => n.id === newParentId);
+    if (!child || !newParent || child.id === newParent.id) return;
+
+    // Evita ciclos (não pode reparentalizar para um de seus próprios descendentes)
+    const isDescendant = (checkId: string, targetId: string): boolean => {
+      const n = activeBoard.mindMapNodes.find(item => item.id === checkId);
+      if (!n || !n.childrenIds) return false;
+      if (n.childrenIds.includes(targetId)) return true;
+      return n.childrenIds.some(cid => isDescendant(cid, targetId));
+    };
+
+    if (isDescendant(childId, newParentId)) {
+      return; // Ciclo proibido
+    }
+
+    const oldParentId = child.parentId;
+
+    updateActiveBoard(board => {
+      return {
+        ...board,
+        mindMapNodes: board.mindMapNodes.map(n => {
+          if (oldParentId && n.id === oldParentId) {
+            return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== childId) };
+          }
+          if (n.id === newParentId) {
+            return { ...n, childrenIds: [...n.childrenIds, childId], collapsed: false };
+          }
+          if (n.id === childId) {
+            return {
+              ...n,
+              parentId: newParentId,
+              color: newParent.color || n.color,
+              offsetX: 0,
+              offsetY: 0
+            };
+          }
+          return n;
+        })
+      };
+    });
+
+    setSelectedNodeId(childId);
+  };
+
+  // ARRASTE LIVRE DE QUADRADO (OFFSET MANUAL)
+  const handleMoveNodeOffset = (nodeId: string, dx: number, dy: number) => {
+    updateActiveBoard(board => ({
+      ...board,
+      mindMapNodes: board.mindMapNodes.map(n => n.id === nodeId ? {
+        ...n,
+        offsetX: (n.offsetX || 0) + dx / zoom,
+        offsetY: (n.offsetY || 0) + dy / zoom
+      } : n)
+    }), false); // Não polui histórico durante arraste contínuo
+  };
+
+  // ATUALIZAR ESTILO (COR, BORDA, LINHA)
+  const handleUpdateNodeStyle = (nodeId: string, updates: Partial<MindMapNode>) => {
+    updateActiveBoard(board => {
+      // Se mudou a cor, propaga para os ramos-filhos também se desejado
+      return {
+        ...board,
+        mindMapNodes: board.mindMapNodes.map(n => n.id === nodeId ? { ...n, ...updates } : n)
+      };
+    });
+  };
+
+  // DUPLICAR NÓ
+  const handleDuplicateNode = (nodeId: string) => {
+    const node = activeBoard.mindMapNodes.find(n => n.id === nodeId);
+    if (!node || !node.parentId) return;
+
+    const parent = activeBoard.mindMapNodes.find(n => n.id === node.parentId);
+    if (!parent) return;
+
+    const newId = `node-${Date.now()}`;
+    const duplicated: MindMapNode = {
+      ...JSON.parse(JSON.stringify(node)),
+      id: newId,
+      text: `${node.text} (Cópia)`,
+      childrenIds: [],
+      offsetX: (node.offsetX || 0) + 20,
+      offsetY: (node.offsetY || 0) + 40
+    };
+
+    updateActiveBoard(board => ({
+      ...board,
+      mindMapNodes: [
+        ...board.mindMapNodes.map(n => n.id === parent.id ? {
+          ...n,
+          childrenIds: [...n.childrenIds, newId]
+        } : n),
+        duplicated
+      ]
+    }));
+
+    setSelectedNodeId(newId);
+  };
+
+  // EXCLUIR NÓ E SUB-RAMOS
   const handleDeleteNode = (id: string) => {
     const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root');
     if (rootNode && id === rootNode.id) return;
@@ -260,21 +457,26 @@ export const App: React.FC = () => {
     setSelectedNodeId(null);
   };
 
-  const handleMoveNode = (id: string, dx: number, dy: number) => {
-    updateActiveBoard(board => ({
-      ...board,
-      mindMapNodes: board.mindMapNodes.map(n => n.id === id ? { ...n, x: n.x + dx / zoom, y: n.y + dy / zoom } : n)
-    }));
+  // BOTÃO PRINCIPAL DA TOOLBAR (+ Quadrado com Linha)
+  const handleAddConnectedNode = () => {
+    if (selectedNodeId) {
+      handleAddChildNode(selectedNodeId);
+    } else {
+      const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root') || activeBoard.mindMapNodes[0];
+      if (rootNode) {
+        handleAddChildNode(rootNode.id);
+      }
+    }
   };
 
-  // Expansão com IA
+  // IA: Inserir ramos gerados
   const handleAddGeneratedBranches = (parentId: string, branchTexts: string[]) => {
     const parent = activeBoard.mindMapNodes.find(n => n.id === parentId);
     if (!parent) return;
 
     let branchColor = parent.color;
-    if (parent.side === 'root' || !branchColor || branchColor === '#ffffff' || branchColor === '#1e293b') {
-      branchColor = BRANCH_PALETTE[parent.childrenIds.length % BRANCH_PALETTE.length];
+    if (parent.side === 'root' || !branchColor) {
+      branchColor = EXECUTIVE_PALETTE[parent.childrenIds.length % EXECUTIVE_PALETTE.length].hex;
     }
 
     const newNodes: MindMapNode[] = [];
@@ -292,6 +494,8 @@ export const App: React.FC = () => {
         childrenIds: [],
         collapsed: false,
         color: branchColor,
+        borderStyle: 'accent',
+        lineStyle: 'bezier',
         side: 'right'
       });
     });
@@ -317,7 +521,7 @@ export const App: React.FC = () => {
       y: -pan.y / zoom + window.innerHeight / (2 * zoom) - 70,
       width: 180,
       height: 140,
-      text: 'Observação operacional...',
+      text: 'Nota de apoio...',
       color: '#fef08a'
     };
     updateActiveBoard(board => ({ ...board, stickies: [...board.stickies, newSticky] }));
@@ -332,16 +536,31 @@ export const App: React.FC = () => {
       y: -pan.y / zoom + window.innerHeight / (2 * zoom) - 60,
       width: 240,
       height: 120,
-      label: 'Card de Interface de Pedidos'
+      label: 'Bloco de Interface'
     };
     updateActiveBoard(board => ({ ...board, wireframes: [...board.wireframes, newWf] }));
   };
 
-  // Atalhos Globais de Teclado
+  // Atalhos de Teclado (Tab, Enter, Delete, Ctrl+Z, Ctrl+Y, Espaço)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
 
       if (e.code === 'Space' && !isInput && !isSpacePressed.current) {
         isSpacePressed.current = true;
@@ -383,7 +602,7 @@ export const App: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedNodeId, selectedStickyId]);
+  }, [selectedNodeId, selectedStickyId, historyIndex, history]);
 
   // Pan e Zoom no Canvas
   const handleWheel = (e: React.WheelEvent) => {
@@ -414,13 +633,11 @@ export const App: React.FC = () => {
         strokeWidth: 3
       };
     } else {
-      // Se clicou no fundo, desseleciona para permitir visualização limpa
       setSelectedNodeId(null);
       setSelectedStickyId(null);
     }
   };
 
-  // Duplo clique no canvas vazio cria um novo nó filho conectado por linha
   const handleDoubleClickCanvas = (e: React.MouseEvent) => {
     const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root') || activeBoard.mindMapNodes[0];
     if (rootNode) {
@@ -442,7 +659,7 @@ export const App: React.FC = () => {
       updateActiveBoard(b => ({
         ...b,
         drawings: [...b.drawings.filter(d => d.id !== currentStrokeRef.current?.id), { ...currentStrokeRef.current! }]
-      }));
+      }), false);
     }
   };
 
@@ -461,81 +678,40 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {/* Top Navigation */}
+      {/* Top Navigation com Seletor de Quadros e Ações */}
       <TopNav
         boardTitle={activeBoard.title}
         onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
-        workspaces={workspaces}
-        currentWorkspaceId={currentWorkspaceId}
-        onSelectWorkspace={(wsId) => {
-          setCurrentWorkspaceId(wsId);
-          const boardInWs = boards.find(b => b.workspaceId === wsId);
-          if (boardInWs) setActiveBoardId(boardInWs.id);
-        }}
+        boards={boards}
+        activeBoardId={activeBoard.id}
+        onSelectBoard={setActiveBoardId}
+        onCreateNewBoard={() => handleCreateNewBoard()}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        onOpenAI={() => setIsAIModalOpen(true)}
-        onOpenExport={() => setIsExportModalOpen(true)}
+        onOpenShare={() => setIsShareModalOpen(true)}
         onStartPresentation={() => setIsPresentationOpen(true)}
         theme={theme}
         onToggleTheme={toggleTheme}
         totalObjects={totalObjects}
+        canUndo={historyIndex >= 0}
+        canRedo={historyIndex < history.length - 1}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
       />
 
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        {/* Sidebar */}
+        {/* Painel Lateral com Lista de Projetos */}
         <Sidebar
           isOpen={sidebarOpen}
-          workspaces={workspaces}
-          currentWorkspaceId={currentWorkspaceId}
-          onSelectWorkspace={(wsId) => {
-            setCurrentWorkspaceId(wsId);
-            const boardInWs = boards.find(b => b.workspaceId === wsId);
-            if (boardInWs) setActiveBoardId(boardInWs.id);
-          }}
-          onAddWorkspace={(name) => setWorkspaces(prev => [...prev, { id: `ws-${Date.now()}`, name }])}
           boards={boards}
           activeBoardId={activeBoard.id}
           onSelectBoard={setActiveBoardId}
-          onCreateBoard={(title) => {
-            const newBoard: Board = {
-              id: `board-${Date.now()}`,
-              title,
-              workspaceId: currentWorkspaceId,
-              updatedAt: new Date().toISOString(),
-              mindMapNodes: [{
-                id: 'root',
-                text: title,
-                x: 0,
-                y: 0,
-                width: 200,
-                height: 52,
-                parentId: null,
-                childrenIds: [],
-                collapsed: false,
-                color: '#1e293b',
-                side: 'root'
-              }],
-              shapes: [],
-              connectors: [],
-              stickies: [],
-              wireframes: [],
-              texts: [],
-              drawings: []
-            };
-            setBoards(prev => [...prev, newBoard]);
-            setActiveBoardId(newBoard.id);
-          }}
-          onDeleteBoard={(id) => {
-            setBoards(prev => prev.filter(b => b.id !== id));
-            if (activeBoardId === id) {
-              const remaining = boards.filter(b => b.id !== id);
-              if (remaining.length > 0) setActiveBoardId(remaining[0].id);
-            }
-          }}
+          onCreateBoard={handleCreateNewBoard}
+          onDuplicateBoard={handleDuplicateBoard}
+          onDeleteBoard={handleDeleteBoard}
         />
 
-        {/* Toolbar com botão de Criação de Quadrado com Linha */}
+        {/* Toolbar Flutuante */}
         <Toolbar
           currentTool={currentTool}
           onSelectTool={setCurrentTool}
@@ -557,10 +733,10 @@ export const App: React.FC = () => {
           onMouseMove={handleMouseMoveCanvas}
           onMouseUp={handleMouseUpCanvas}
         >
-          {/* Fundo com Grade de Pontos Corporativa */}
+          {/* Fundo Pontilhado */}
           <div className="canvas-background" />
 
-          {/* Camada de Transformação do Canvas (Pan e Zoom) */}
+          {/* Camada Espacial do Canvas */}
           <div
             style={{
               position: 'absolute',
@@ -572,7 +748,7 @@ export const App: React.FC = () => {
             {/* Traços Livres */}
             <FreehandCanvas drawings={activeBoard.drawings} />
 
-            {/* Mapa Mental com Linhas Automáticas e Organização Tidy Tree */}
+            {/* Mapa Mental com Arraste Livre, Linhas Conectoras e Barra Contextual */}
             <MindMapCanvas
               nodes={activeBoard.mindMapNodes}
               selectedNodeId={selectedNodeId}
@@ -582,10 +758,14 @@ export const App: React.FC = () => {
               onAddChildNode={handleAddChildNode}
               onAddSiblingNode={handleAddSiblingNode}
               onDeleteNode={handleDeleteNode}
-              onMoveNode={handleMoveNode}
+              onMoveNodeOffset={handleMoveNodeOffset}
+              onReorderNode={handleReorderNode}
+              onReparentNode={handleReparentNode}
+              onUpdateNodeStyle={handleUpdateNodeStyle}
+              onDuplicateNode={handleDuplicateNode}
             />
 
-            {/* Post-its / Notas Adesivas */}
+            {/* Notas Adesivas */}
             <StickyNotesCanvas
               stickies={activeBoard.stickies}
               selectedId={selectedStickyId}
@@ -606,20 +786,20 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Controles de Zoom no Canto Inferior Direito */}
+        {/* Controles de Zoom */}
         <ZoomControls
           zoom={zoom}
           onZoomIn={() => setZoom(prev => Math.min(prev + 0.1, 2.5))}
           onZoomOut={() => setZoom(prev => Math.max(prev - 0.1, 0.2))}
           onResetZoom={() => {
             setZoom(1.0);
-            setPan({ x: 260, y: 340 });
+            setPan({ x: 300, y: 350 });
           }}
           onOpenAI={() => setIsAIModalOpen(true)}
         />
       </div>
 
-      {/* Modais */}
+      {/* Modal IA */}
       <AIModal
         isOpen={isAIModalOpen}
         onClose={() => setIsAIModalOpen(false)}
@@ -627,22 +807,14 @@ export const App: React.FC = () => {
         onAddGeneratedBranches={handleAddGeneratedBranches}
       />
 
-      <ExportModal
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
+      {/* Modal Compartilhar e Exportar */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
         activeBoard={activeBoard}
-        onImportBoard={(board) => {
-          setBoards(prev => [board, ...prev.filter(b => b.id !== board.id)]);
-          setActiveBoardId(board.id);
-        }}
-        onResetBoard={() => {
-          setBoards(INITIAL_BOARDS);
-          setActiveBoardId('board-turbine');
-          setZoom(1.0);
-          setPan({ x: 260, y: 340 });
-        }}
       />
 
+      {/* Modo Apresentação */}
       {isPresentationOpen && (
         <PresentationView
           board={activeBoard}

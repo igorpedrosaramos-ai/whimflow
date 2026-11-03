@@ -1,69 +1,75 @@
 import React, { useState } from 'react';
 import { 
-  FolderPlus, 
   FilePlus, 
-  Folder, 
   Network, 
   Trash2, 
-  ChevronDown, 
-  ChevronRight, 
+  Copy, 
   Search,
   HardDriveDownload,
-  Building2,
-  Lock
+  Folder,
+  Layers
 } from 'lucide-react';
-import { Board, Workspace } from '../types';
+import { Board } from '../types';
 
 interface SidebarProps {
   isOpen: boolean;
-  workspaces: Workspace[];
-  currentWorkspaceId: string;
-  onSelectWorkspace: (id: string) => void;
-  onAddWorkspace: (name: string) => void;
   boards: Board[];
   activeBoardId: string;
   onSelectBoard: (id: string) => void;
-  onCreateBoard: (title: string) => void;
+  onCreateBoard: (title?: string) => void;
+  onDuplicateBoard: (id: string) => void;
   onDeleteBoard: (id: string) => void;
+  onLoadTemplate?: (templateName: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
-  workspaces,
-  currentWorkspaceId,
-  onSelectWorkspace,
-  onAddWorkspace,
   boards,
   activeBoardId,
   onSelectBoard,
   onCreateBoard,
-  onDeleteBoard
+  onDuplicateBoard,
+  onDeleteBoard,
+  onLoadTemplate
 }) => {
   const [search, setSearch] = useState('');
-  const [newBoardName, setNewBoardName] = useState('');
-  const [showNewBoardInput, setShowNewBoardInput] = useState(false);
-  const [expandedTeams, setExpandedTeams] = useState(true);
 
   if (!isOpen) return null;
 
-  const currentBoards = boards.filter(b => 
-    b.workspaceId === currentWorkspaceId &&
+  const filteredBoards = boards.filter(b => 
     b.title.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleCreateBoard = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newBoardName.trim()) {
-      onCreateBoard(newBoardName.trim());
-      setNewBoardName('');
-      setShowNewBoardInput(false);
-    }
-  };
-
   return (
     <aside className="sidebar-panel">
-      {/* Search Bar */}
+      {/* Botão Principal: Criar Novo Quadro do Zero */}
       <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-subtle)' }}>
+        <button
+          onClick={() => onCreateBoard()}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            backgroundColor: 'var(--accent-purple)',
+            color: '#ffffff',
+            border: 'none',
+            padding: '9px 14px',
+            borderRadius: '6px',
+            fontWeight: 600,
+            fontSize: '13px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(99, 102, 241, 0.35)'
+          }}
+        >
+          <FilePlus size={16} />
+          <span>+ Novo Quadro em Branco</span>
+        </button>
+      </div>
+
+      {/* Busca */}
+      <div style={{ padding: '8px 14px' }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -76,7 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <Search size={14} color="var(--text-muted)" />
           <input
             type="text"
-            placeholder="Pesquisar quadros..."
+            placeholder="Buscar projetos..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
@@ -91,201 +97,91 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 8px' }}>
-        {/* Section: RECENT */}
-        <div style={{ marginBottom: '16px' }}>
-          <div style={{
-            fontSize: '11px',
-            fontWeight: 700,
-            color: 'var(--text-muted)',
-            letterSpacing: '0.05em',
-            padding: '4px 10px',
-            textTransform: 'uppercase'
-          }}>
-            Recentes
-          </div>
-          {boards.slice(0, 3).map(board => (
-            <div
-              key={board.id}
-              onClick={() => onSelectBoard(board.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '7px 10px',
-                borderRadius: '6px',
-                fontSize: '13.5px',
-                cursor: 'pointer',
-                color: board.id === activeBoardId ? 'var(--accent-purple-light)' : 'var(--text-secondary)',
-                backgroundColor: board.id === activeBoardId ? 'var(--bg-surface-hover)' : 'transparent',
-                fontWeight: board.id === activeBoardId ? 600 : 400
-              }}
-            >
-              <Network size={16} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {board.title}
-              </span>
-            </div>
-          ))}
+      {/* Lista de Quadros do Usuário */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }}>
+        <div style={{
+          fontSize: '11px',
+          fontWeight: 700,
+          color: 'var(--text-muted)',
+          letterSpacing: '0.05em',
+          padding: '4px 6px',
+          textTransform: 'uppercase',
+          marginBottom: '4px'
+        }}>
+          Meus Quadros ({filteredBoards.length})
         </div>
 
-        {/* Section: TEAMS / WORKSPACES */}
-        <div>
-          <div 
-            onClick={() => setExpandedTeams(!expandedTeams)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '11px',
-              fontWeight: 700,
-              color: 'var(--text-muted)',
-              letterSpacing: '0.05em',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              textTransform: 'uppercase'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {expandedTeams ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-              <span>Áreas de Trabalho (Equipes)</span>
-            </div>
-          </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          {filteredBoards.map(board => {
+            const isSelected = board.id === activeBoardId;
+            return (
+              <div
+                key={board.id}
+                onClick={() => onSelectBoard(board.id)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '7px 10px',
+                  borderRadius: '6px',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  color: isSelected ? 'var(--accent-purple-light)' : 'var(--text-primary)',
+                  backgroundColor: isSelected ? 'var(--bg-surface-hover)' : 'transparent',
+                  borderLeft: isSelected ? '3px solid var(--accent-purple)' : '3px solid transparent'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1 }}>
+                  <Network size={15} color={isSelected ? 'var(--accent-purple-light)' : 'var(--text-muted)'} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {board.title}
+                  </span>
+                </div>
 
-          {expandedTeams && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
-              {workspaces.map(ws => {
-                const isSelected = ws.id === currentWorkspaceId;
-                return (
-                  <div key={ws.id}>
-                    <div
-                      onClick={() => onSelectWorkspace(ws.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        fontSize: '13px',
-                        cursor: 'pointer',
-                        color: isSelected ? 'var(--accent-purple-light)' : 'var(--text-secondary)',
-                        backgroundColor: isSelected ? 'var(--bg-surface-hover)' : 'transparent',
-                        fontWeight: isSelected ? 600 : 500
+                {/* Ações: Duplicar e Excluir */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => onDuplicateBoard(board.id)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex'
+                    }}
+                    title="Duplicar quadro"
+                  >
+                    <Copy size={13} />
+                  </button>
+                  {boards.length > 1 && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Excluir quadro "${board.title}" permanentemente?`)) {
+                          onDeleteBoard(board.id);
+                        }
                       }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: '2px',
+                        display: 'flex'
+                      }}
+                      title="Excluir quadro"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {ws.isPrivate ? <Lock size={15} /> : <Building2 size={15} />}
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>
-                          {ws.name}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Sub-boards if selected */}
-                    {isSelected && (
-                      <div style={{ paddingLeft: '22px', marginTop: '2px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        {currentBoards.map(board => (
-                          <div
-                            key={board.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '5px 8px',
-                              borderRadius: '4px',
-                              fontSize: '12.5px',
-                              cursor: 'pointer',
-                              color: board.id === activeBoardId ? 'var(--accent-purple-light)' : 'var(--text-secondary)',
-                              backgroundColor: board.id === activeBoardId ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                              borderLeft: board.id === activeBoardId ? '2px solid var(--accent-purple)' : '2px solid transparent'
-                            }}
-                          >
-                            <div 
-                              onClick={() => onSelectBoard(board.id)}
-                              style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, overflow: 'hidden' }}
-                            >
-                              <Network size={14} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {board.title}
-                              </span>
-                            </div>
-                            {boards.length > 1 && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (confirm(`Excluir quadro "${board.title}"?`)) {
-                                    onDeleteBoard(board.id);
-                                  }
-                                }}
-                                style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: 'var(--text-muted)',
-                                  cursor: 'pointer',
-                                  padding: '2px',
-                                  display: 'flex'
-                                }}
-                                title="Excluir quadro"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-
-                        {showNewBoardInput ? (
-                          <form onSubmit={handleCreateBoard} style={{ marginTop: '6px' }}>
-                            <input
-                              autoFocus
-                              type="text"
-                              placeholder="Nome do quadro..."
-                              value={newBoardName}
-                              onChange={(e) => setNewBoardName(e.target.value)}
-                              onBlur={() => !newBoardName && setShowNewBoardInput(false)}
-                              style={{
-                                width: '100%',
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                background: 'var(--bg-canvas)',
-                                border: '1px solid var(--accent-purple)',
-                                borderRadius: '4px',
-                                color: 'var(--text-primary)',
-                                outline: 'none'
-                              }}
-                            />
-                          </form>
-                        ) : (
-                          <button
-                            onClick={() => setShowNewBoardInput(true)}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              background: 'transparent',
-                              border: 'none',
-                              color: 'var(--text-muted)',
-                              fontSize: '12px',
-                              padding: '6px 8px',
-                              cursor: 'pointer',
-                              borderRadius: '4px',
-                              marginTop: '2px'
-                            }}
-                          >
-                            <FilePlus size={13} />
-                            <span>Novo Quadro</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Footer Info */}
+      {/* Rodapé com Status e Persistência */}
       <div style={{
         padding: '12px 14px',
         borderTop: '1px solid var(--border-subtle)',
@@ -297,9 +193,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <HardDriveDownload size={13} color="var(--accent-teal-light)" />
-          <span>Salvamento local contínuo ativo</span>
+          <span>Salvamento local ativo e contínuo</span>
         </div>
-        <div>Uso pessoal corporativo • 100% Livre</div>
+        <div>WhimFlow Pro • Alta Fidelidade</div>
       </div>
     </aside>
   );
