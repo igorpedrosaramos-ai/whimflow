@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, X, ChevronRight, CornerDownRight } from 'lucide-react';
+import { Plus, X, CornerDownRight } from 'lucide-react';
 import { MindMapNode } from '../types';
-import { calculateMindMapLayout, getBezierPath, estimateNodeDimensions } from '../utils/treeLayout';
+import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
 
 interface MindMapCanvasProps {
   nodes: MindMapNode[];
@@ -28,6 +28,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -38,19 +39,19 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     return map;
   }, [nodes]);
 
-  // Calcula layout tidy da árvore (sem sobreposição, linhas perfeitas)
+  // Calcula layout tidy da árvore
   const layoutMap = useMemo(() => {
     const root = nodes.find(n => n.side === 'root') || nodes[0];
     if (!root) return new Map();
     return calculateMindMapLayout(nodes, root.id, {
-      horizontalGap: 72,
-      verticalGap: 16,
+      horizontalGap: 80,
+      verticalGap: 18,
       rootX: root.x || 0,
       rootY: root.y || 0
     });
   }, [nodes]);
 
-  // Determina se o nó está visível (nenhum ancestral colapsado)
+  // Verifica se o nó está visível (se nenhum pai está colapsado)
   const isNodeVisible = (node: MindMapNode): boolean => {
     let current = node;
     while (current.parentId) {
@@ -62,17 +63,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     return true;
   };
 
-  // Conta total de descendentes recursivamente para o badge
+  // Contagem recursiva de filhos recolhidos
   const countDescendants = (nodeId: string): number => {
     const node = nodeMap.get(nodeId);
-    if (!node || node.childrenIds.length === 0) return 0;
+    if (!node || !node.childrenIds || node.childrenIds.length === 0) return 0;
     let count = 0;
     const stack = [...node.childrenIds];
     while (stack.length > 0) {
       const cid = stack.pop()!;
       count++;
       const child = nodeMap.get(cid);
-      if (child && child.childrenIds.length > 0) {
+      if (child && child.childrenIds && child.childrenIds.length > 0) {
         stack.push(...child.childrenIds);
       }
     }
@@ -114,7 +115,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }
   }, [editingId]);
 
-  // Arraste manual de nós
+  // Arraste manual
   const handleMouseDown = (node: MindMapNode, e: React.MouseEvent) => {
     if (editingId === node.id) return;
     if (e.button !== 0) return;
@@ -148,7 +149,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     };
   }, [draggingNodeId, onMoveNode]);
 
-  // RENDERIZAÇÃO DAS LINHAS EMBUTIDAS (SPLINES / BÉZIER)
+  // RENDERIZAÇÃO DAS LINHAS (BÉZIER CÚBICA NO VIEWBOX GLOBAL)
   const renderConnectors = () => {
     const paths: React.ReactElement[] = [];
 
@@ -160,34 +161,34 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       const pLayout = layoutMap.get(parent.id);
       const cLayout = layoutMap.get(child.id);
 
-      // Coordenadas calculadas pelo motor Tidy Tree
-      const startX = pLayout ? pLayout.x + pLayout.width : parent.x + (parent.width || 180);
+      const startX = pLayout ? pLayout.x + pLayout.width : parent.x + 200;
       const startY = pLayout ? pLayout.y + pLayout.height / 2 : parent.y + 20;
       const endX = cLayout ? cLayout.x : child.x;
       const endY = cLayout ? cLayout.y + cLayout.height / 2 : child.y + 20;
 
       const pathData = getBezierPath(startX, startY, endX, endY);
-      const strokeColor = child.color || parent.color || 'var(--accent-purple)';
+      const strokeColor = child.color || parent.color || '#6366f1';
+      const isSelected = selectedNodeId === child.id || selectedNodeId === parent.id;
 
       paths.push(
-        <g key={`conn-group-${child.id}`}>
-          {/* Sombra de destaque no hover do nó conectado */}
+        <g key={`conn-${child.id}`}>
+          {/* Linha principal com alta visibilidade e contraste */}
           <path
             d={pathData}
             fill="none"
             stroke={strokeColor}
-            strokeWidth={selectedNodeId === child.id ? "3.5" : "2.2"}
+            strokeWidth={isSelected ? "3.5" : "2.5"}
             strokeLinecap="round"
             style={{
-              opacity: selectedNodeId === child.id ? 1 : 0.85,
+              opacity: isSelected ? 1 : 0.88,
               transition: 'stroke-width 0.15s ease, opacity 0.15s ease'
             }}
           />
-          {/* Ponto de ancoragem na junção do nó filho */}
+          {/* Ponto de junção elegante na entrada do filho */}
           <circle
             cx={endX}
             cy={endY}
-            r={selectedNodeId === child.id ? 3.5 : 2.5}
+            r={isSelected ? 4 : 3}
             fill={strokeColor}
           />
         </g>
@@ -196,15 +197,18 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     return (
       <svg
+        width="60000"
+        height="60000"
+        viewBox="-30000 -30000 60000 60000"
         style={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
+          top: -30000,
+          left: -30000,
+          width: 60000,
+          height: 60000,
           pointerEvents: 'none',
           overflow: 'visible',
-          zIndex: 10
+          zIndex: 5
         }}
       >
         {paths}
@@ -214,23 +218,25 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
   return (
     <>
+      {/* Camada Vetorial Global de Linhas */}
       {renderConnectors()}
 
+      {/* Camada de Nós / Quadrados */}
       {nodes.map(node => {
         if (!isNodeVisible(node)) return null;
 
         const isRoot = node.side === 'root';
         const isSelected = selectedNodeId === node.id;
+        const isHovered = hoveredNodeId === node.id;
         const isEditing = editingId === node.id;
         const childCount = countDescendants(node.id);
-        const hasChildren = node.childrenIds.length > 0;
+        const hasChildren = node.childrenIds && node.childrenIds.length > 0;
 
-        // Posição calculada com precisão pelo Tidy Tree
         const computed = layoutMap.get(node.id);
         const posX = computed ? computed.x : node.x;
         const posY = computed ? computed.y : node.y;
-        const width = computed ? computed.width : (node.width || 160);
-        const height = computed ? computed.height : (node.height || 38);
+        const nodeWidth = computed ? computed.width : 160;
+        const nodeHeight = computed ? computed.height : 40;
 
         const nodeColor = node.color || '#6366f1';
 
@@ -242,24 +248,27 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             style={{
               left: `${posX}px`,
               top: `${posY}px`,
-              minWidth: `${width}px`,
-              minHeight: `${height}px`,
+              minWidth: `${nodeWidth}px`,
+              minHeight: `${nodeHeight}px`,
               backgroundColor: isRoot ? 'var(--bg-elevated)' : 'var(--bg-surface)',
               border: isRoot 
                 ? '2px solid var(--border-strong)' 
                 : `1.5px solid ${isSelected ? nodeColor : 'var(--border-subtle)'}`,
               borderLeft: !isRoot ? `5px solid ${nodeColor}` : '2px solid var(--border-strong)',
               zIndex: isSelected ? 35 : 20,
-              padding: isRoot ? '12px 22px' : '8px 14px'
+              padding: isRoot ? '12px 24px' : '8px 16px',
+              whiteSpace: 'nowrap'
             }}
             onClick={(e) => {
               e.stopPropagation();
               onSelectNode(node.id);
             }}
             onDoubleClick={(e) => handleStartEdit(node, e)}
+            onMouseEnter={() => setHoveredNodeId(node.id)}
+            onMouseLeave={() => setHoveredNodeId(null)}
             onMouseDown={(e) => handleMouseDown(node, e)}
           >
-            {/* Texto do Nó ou Campo de Edição */}
+            {/* Texto ou Input de Edição */}
             {isEditing ? (
               <input
                 ref={inputRef}
@@ -277,24 +286,22 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   fontSize: isRoot ? '16px' : '13.5px',
                   fontWeight: isRoot ? 700 : 500,
                   outline: 'none',
-                  width: '100%'
+                  minWidth: '160px'
                 }}
               />
             ) : (
               <span style={{ 
-                whiteSpace: 'normal', 
-                wordBreak: 'break-word',
                 userSelect: 'none',
                 color: 'var(--text-primary)',
                 fontSize: isRoot ? '16px' : '13.5px',
                 fontWeight: isRoot ? 700 : 500,
-                lineHeight: 1.35
+                letterSpacing: '-0.01em'
               }}>
                 {node.text}
               </span>
             )}
 
-            {/* Badge Contador de Ramos Recolhidos (exatamente como Whimsical) */}
+            {/* Badge de Ramos Recolhidos (Idêntico ao Whimsical com número exato) */}
             {hasChildren && node.collapsed && (
               <div
                 className="branch-counter-badge"
@@ -303,13 +310,13 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   e.stopPropagation();
                   onToggleCollapse(node.id);
                 }}
-                title={`Expandir ${childCount} ramos conectados`}
+                title={`Expandir ${childCount} ramos conectados com linha`}
               >
                 {childCount}
               </div>
             )}
 
-            {/* Indicador de Recolhimento quando expandido */}
+            {/* Botão de Recolher quando expandido */}
             {hasChildren && !node.collapsed && !isRoot && (
               <div
                 className="branch-counter-badge"
@@ -330,10 +337,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </div>
             )}
 
-            {/* BOTÕES DE CRIAÇÃO RÁPIDA EMBUTIDOS NO NÓ (Aparecem quando selecionado) */}
-            {isSelected && !isEditing && (
+            {/* BOTÃO + LATERAL VISÍVEL NO HOVER OU SELEÇÃO: CRIA QUADRADO COM LINHA INSTANTÂNEA */}
+            {(isSelected || isHovered) && !isEditing && (
               <>
-                {/* Botão + Filho: Cria um quadrado com linha embutida na hora! */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -344,8 +350,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     right: '-28px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    width: '24px',
-                    height: '24px',
+                    width: '26px',
+                    height: '26px',
                     borderRadius: '50%',
                     backgroundColor: nodeColor,
                     color: '#ffffff',
@@ -354,16 +360,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                    zIndex: 40
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+                    zIndex: 40,
+                    transition: 'transform 0.15s ease'
                   }}
-                  title="Criar Quadrado Filho com Linha Embutida (Atalho: Tab)"
+                  title="Criar Quadrado Filho com Linha Conectada (Tab)"
                 >
-                  <Plus size={15} />
+                  <Plus size={16} />
                 </button>
 
-                {/* Botão + Irmão: Cria um quadrado irmão no mesmo nível com linha embutida */}
-                {!isRoot && (
+                {/* Botão + Irmão no mesmo nível */}
+                {!isRoot && isSelected && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -371,11 +378,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     }}
                     style={{
                       position: 'absolute',
-                      bottom: '-24px',
+                      bottom: '-26px',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      width: '22px',
-                      height: '22px',
+                      width: '24px',
+                      height: '24px',
                       borderRadius: '50%',
                       backgroundColor: 'var(--bg-elevated)',
                       color: nodeColor,
@@ -384,17 +391,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                       zIndex: 40
                     }}
-                    title="Criar Quadrado Irmão no Mesmo Nível (Atalho: Enter)"
+                    title="Criar Quadrado Irmão no Mesmo Nível (Enter)"
                   >
-                    <CornerDownRight size={12} />
+                    <CornerDownRight size={13} />
                   </button>
                 )}
 
                 {/* Botão Excluir */}
-                {!isRoot && (
+                {!isRoot && isSelected && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -417,7 +424,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                       boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
                       zIndex: 40
                     }}
-                    title="Excluir Nó e Sub-ramos (Delete)"
+                    title="Excluir Nó e Linha (Delete)"
                   >
                     <X size={12} />
                   </button>

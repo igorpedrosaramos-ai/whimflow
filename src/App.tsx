@@ -12,7 +12,7 @@ import { AIModal } from './components/AIModal';
 import { ExportModal } from './components/ExportModal';
 import { PresentationView } from './components/PresentationView';
 
-const STORAGE_KEY = 'whimflow_boards_v2';
+const STORAGE_KEY = 'whimflow_boards_v3';
 const THEME_KEY = 'whimflow_theme';
 
 const BRANCH_PALETTE = [
@@ -54,7 +54,7 @@ export const App: React.FC = () => {
   });
 
   // Canvas Pan & Zoom
-  const [pan, setPan] = useState({ x: 340, y: 320 });
+  const [pan, setPan] = useState({ x: 260, y: 340 });
   const [zoom, setZoom] = useState(1.0);
   const [isPanning, setIsPanning] = useState(false);
   const isSpacePressed = useRef(false);
@@ -134,10 +134,9 @@ export const App: React.FC = () => {
 
     const newId = `node-${Date.now()}`;
     
-    // Determina a cor do ramo:
-    // Se o pai for a raiz, escolhe uma cor viva do catálogo sequencialmente
+    // Determina a cor do ramo
     let branchColor = parent.color;
-    if (parent.side === 'root' || !branchColor) {
+    if (parent.side === 'root' || !branchColor || branchColor === '#ffffff' || branchColor === '#1e293b') {
       const paletteIndex = parent.childrenIds.length % BRANCH_PALETTE.length;
       branchColor = BRANCH_PALETTE[paletteIndex];
     }
@@ -146,7 +145,7 @@ export const App: React.FC = () => {
       id: newId,
       text: 'Novo Quadrado',
       x: parent.x + 240,
-      y: parent.y + parent.childrenIds.length * 40,
+      y: parent.y + parent.childrenIds.length * 45,
       parentId: parent.id,
       childrenIds: [],
       collapsed: false,
@@ -175,7 +174,6 @@ export const App: React.FC = () => {
     if (!sibling) return;
 
     if (!sibling.parentId) {
-      // Se for a raiz, cria um ramo filho
       handleAddChildNode(sibling.id);
       return;
     }
@@ -197,7 +195,6 @@ export const App: React.FC = () => {
     };
 
     updateActiveBoard(board => {
-      // Insere o novo irmão logo após o nó de referência
       const curIndex = parent.childrenIds.indexOf(siblingId);
       const newChildren = [...parent.childrenIds];
       if (curIndex >= 0) {
@@ -226,7 +223,6 @@ export const App: React.FC = () => {
     if (selectedNodeId) {
       handleAddChildNode(selectedNodeId);
     } else {
-      // Se nenhum nó estiver selecionado, conecta diretamente ao nó-raiz principal!
       const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root') || activeBoard.mindMapNodes[0];
       if (rootNode) {
         handleAddChildNode(rootNode.id);
@@ -234,10 +230,10 @@ export const App: React.FC = () => {
     }
   };
 
-  // Excluir Nó e toda a sua subárvore com segurança
+  // Excluir Nó e toda a sua subárvore
   const handleDeleteNode = (id: string) => {
     const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root');
-    if (rootNode && id === rootNode.id) return; // Raiz protegida
+    if (rootNode && id === rootNode.id) return;
 
     updateActiveBoard(board => {
       const toDelete = new Set<string>();
@@ -277,7 +273,7 @@ export const App: React.FC = () => {
     if (!parent) return;
 
     let branchColor = parent.color;
-    if (parent.side === 'root' || !branchColor) {
+    if (parent.side === 'root' || !branchColor || branchColor === '#ffffff' || branchColor === '#1e293b') {
       branchColor = BRANCH_PALETTE[parent.childrenIds.length % BRANCH_PALETTE.length];
     }
 
@@ -418,8 +414,18 @@ export const App: React.FC = () => {
         strokeWidth: 3
       };
     } else {
+      // Se clicou no fundo, desseleciona para permitir visualização limpa
       setSelectedNodeId(null);
       setSelectedStickyId(null);
+    }
+  };
+
+  // Duplo clique no canvas vazio cria um novo nó filho conectado por linha
+  const handleDoubleClickCanvas = (e: React.MouseEvent) => {
+    const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root') || activeBoard.mindMapNodes[0];
+    if (rootNode) {
+      const targetParent = selectedNodeId || rootNode.id;
+      handleAddChildNode(targetParent);
     }
   };
 
@@ -450,7 +456,7 @@ export const App: React.FC = () => {
   const totalObjects = 
     activeBoard.mindMapNodes.length + 
     activeBoard.stickies.length + 
-    activeBoard.wireframes.length +
+    activeBoard.wireframes.length + 
     activeBoard.drawings.length;
 
   return (
@@ -547,6 +553,7 @@ export const App: React.FC = () => {
           className={`canvas-container ${isPanning || currentTool === 'hand' ? 'panning' : currentTool === 'draw' ? 'drawing' : ''}`}
           onWheel={handleWheel}
           onMouseDown={handleMouseDownCanvas}
+          onDoubleClick={handleDoubleClickCanvas}
           onMouseMove={handleMouseMoveCanvas}
           onMouseUp={handleMouseUpCanvas}
         >
@@ -606,7 +613,7 @@ export const App: React.FC = () => {
           onZoomOut={() => setZoom(prev => Math.max(prev - 0.1, 0.2))}
           onResetZoom={() => {
             setZoom(1.0);
-            setPan({ x: 340, y: 320 });
+            setPan({ x: 260, y: 340 });
           }}
           onOpenAI={() => setIsAIModalOpen(true)}
         />
@@ -632,7 +639,7 @@ export const App: React.FC = () => {
           setBoards(INITIAL_BOARDS);
           setActiveBoardId('board-turbine');
           setZoom(1.0);
-          setPan({ x: 340, y: 320 });
+          setPan({ x: 260, y: 340 });
         }}
       />
 
