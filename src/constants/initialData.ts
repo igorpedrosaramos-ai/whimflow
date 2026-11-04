@@ -1,4 +1,5 @@
 import { Board, Workspace } from '../types';
+import { ORION_SUSHI_BOARD } from './orionData';
 
 export const INITIAL_WORKSPACES: Workspace[] = [
   { id: 'ws-default', name: 'Meu Espaço de Trabalho' }
@@ -36,4 +37,6 @@ export const BLANK_BOARD: Board = {
   drawings: []
 };
 
-export const INITIAL_BOARDS: Board[] = [BLANK_BOARD];
+export { ORION_SUSHI_BOARD };
+
+export const INITIAL_BOARDS: Board[] = [BLANK_BOARD, ORION_SUSHI_BOARD];

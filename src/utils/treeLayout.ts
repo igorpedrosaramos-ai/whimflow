@@ -119,9 +119,9 @@ export function calculateMindMapLayout(
 }
 
 /**
- * Curva Bézier Cúbica Suave (Spline) idêntica ao Whimsical
- * Sai perfeitamente na horizontal da borda direita do pai
- * e entra perfeitamente na horizontal na borda esquerda do filho.
+ * Curva Bézier Cúbica Suave (Spline) orgânica idêntica ao Whimsical
+ * Suporta conexões tanto para a direita quanto para a esquerda (bi-direcional)
+ * com transições suaves e tangentes horizontais nas extremidades dos nós.
  */
 export function getBezierPath(
   startX: number,
@@ -129,10 +129,12 @@ export function getBezierPath(
   endX: number,
   endY: number
 ): string {
-  const dx = Math.max(endX - startX, 40);
-  const cp1X = startX + dx * 0.45;
+  const dx = Math.abs(endX - startX);
+  const direction = endX >= startX ? 1 : -1;
+  const cpDistance = Math.max(dx * 0.45, 30);
+  const cp1X = startX + cpDistance * direction;
   const cp1Y = startY;
-  const cp2X = endX - dx * 0.45;
+  const cp2X = endX - cpDistance * direction;
   const cp2Y = endY;
   return `M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
 }

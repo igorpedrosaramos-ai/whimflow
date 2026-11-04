@@ -200,9 +200,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       const pPos = getNodePos(parent);
       const cPos = getNodePos(child);
 
-      const startX = pPos.x + pPos.width;
+      const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
+      const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
       const startY = pPos.y + pPos.height / 2;
-      const endX = cPos.x;
+      const endX = isChildOnLeft ? cPos.x + cPos.width : cPos.x;
       const endY = cPos.y + cPos.height / 2;
 
       const strokeColor = child.color || parent.color || '#6366f1';
