@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Plus, X, CornerDownRight } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { Plus, Trash2, Copy, ChevronRight } from 'lucide-react';
 import { MindMapNode } from '../types';
 import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
 import { NodeContextMenu } from './NodeContextMenu';
@@ -15,7 +15,10 @@ interface MindMapCanvasProps {
   onAddChildNode: (parentId: string) => void;
   onAddSiblingNode: (nodeId: string) => void;
   onDeleteNode: (id: string) => void;
+  onDeleteMultipleNodes?: (ids: string[]) => void;
   onMoveNodeOffset?: (id: string, dx: number, dy: number) => void;
+  onMoveMultipleNodesOffset?: (ids: string[], dx: number, dy: number) => void;
+  onDuplicateMultipleNodes?: (ids: string[]) => void;
   onReorderNode: (nodeId: string, direction: 'up' | 'down') => void;
   onReparentNode: (childId: string, newParentId: string) => void;
   onReorderInsertNode?: (draggedId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
@@ -36,6 +39,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   onAddChildNode,
   onAddSiblingNode,
   onDeleteNode,
+  onDeleteMultipleNodes,
+  onMoveMultipleNodesOffset,
+  onDuplicateMultipleNodes,
   onReorderNode,
   onReparentNode,
   onReorderInsertNode,
@@ -51,8 +57,23 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [dropTargetNodeId, setDropTargetNodeId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside'>('inside');
   const [dragCursorPos, setDragCursorPos] = useState<{ x: number; y: number } | null>(null);
-  
+
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── Multi-seleção por arraste (lasso) ─────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionRect, setSelectionRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isLassoActiveRef = useRef(false);
+  // Arraste em grupo
+  const groupDragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const [isDraggingGroup, setIsDraggingGroup] = useState(false);
+
+  // Limpa multi-seleção quando seleção única muda
+  useEffect(() => {
+    if (selectedNodeId === null) return;
+    setSelectedIds(new Set());
+  }, [selectedNodeId]);
 
   // Sincroniza início de edição direta quando um novo nó é criado
   useEffect(() => {
@@ -238,6 +259,79 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     };
   }, [draggingNodeId, dropTargetNodeId, dropPosition, onReparentNode, onReorderInsertNode, pan, zoom, nodeMap]);
 
+  // ARRASTE EM GRUPO quando há multi-seleção
+  useEffect(() => {
+    const handleGroupMouseMove = (e: MouseEvent) => {
+      if (!groupDragStartRef.current || !isDraggingGroup) return;
+      const dx = e.clientX - groupDragStartRef.current.x;
+      const dy = e.clientY - groupDragStartRef.current.y;
+      groupDragStartRef.current = { x: e.clientX, y: e.clientY };
+      if (onMoveMultipleNodesOffset && selectedIds.size > 0) {
+        onMoveMultipleNodesOffset([...selectedIds], dx, dy);
+      }
+    };
+    const handleGroupMouseUp = () => {
+      setIsDraggingGroup(false);
+      groupDragStartRef.current = null;
+    };
+    if (isDraggingGroup) {
+      window.addEventListener('mousemove', handleGroupMouseMove);
+      window.addEventListener('mouseup', handleGroupMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleGroupMouseMove);
+      window.removeEventListener('mouseup', handleGroupMouseUp);
+    };
+  }, [isDraggingGroup, selectedIds, onMoveMultipleNodesOffset]);
+
+  // LASSO: detecta início no canvas (chamado de fora via props expostas no return)
+  const handleCanvasMouseDownLasso = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    isLassoActiveRef.current = true;
+    selectionStartRef.current = { x: e.clientX, y: e.clientY };
+    setSelectionRect({ x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY });
+    setSelectedIds(new Set());
+    onSelectNode(null);
+  }, [onSelectNode]);
+
+  const handleCanvasMouseMoveLasso = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isLassoActiveRef.current || !selectionStartRef.current) return;
+    setSelectionRect({
+      x1: selectionStartRef.current.x,
+      y1: selectionStartRef.current.y,
+      x2: e.clientX,
+      y2: e.clientY
+    });
+  }, []);
+
+  const handleCanvasMouseUpLasso = useCallback(() => {
+    if (!isLassoActiveRef.current) return;
+    isLassoActiveRef.current = false;
+    if (!selectionRect) { setSelectionRect(null); return; }
+
+    const minX = Math.min(selectionRect.x1, selectionRect.x2);
+    const maxX = Math.max(selectionRect.x1, selectionRect.x2);
+    const minY = Math.min(selectionRect.y1, selectionRect.y2);
+    const maxY = Math.max(selectionRect.y1, selectionRect.y2);
+
+    const hit = new Set<string>();
+    nodes.forEach(node => {
+      if (!isNodeVisible(node)) return;
+      const el = document.getElementById(`node-${node.id}`);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.right >= minX && r.left <= maxX && r.bottom >= minY && r.top <= maxY) {
+        hit.add(node.id);
+      }
+    });
+
+    if (hit.size > 0) {
+      setSelectedIds(hit);
+      onSelectNode(null);
+    }
+    setSelectionRect(null);
+  }, [selectionRect, nodes, onSelectNode]);
+
   // RENDERIZAÇÃO DAS LINHAS CONECTORAS (Bézier ou Retas, com portas distribuídas e cores do ramo)
   const renderConnectors = () => {
     const paths: React.ReactElement[] = [];
@@ -362,8 +456,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       {/* Camada Vetorial Global de Linhas */}
       {renderConnectors()}
 
-      {/* Menu Contextual Flutuante Superior */}
-      {selectedNode && selectedPos && (
+      {/* Menu Contextual Flutuante Superior — só quando NÃO há multi-seleção */}
+      {selectedNode && selectedPos && selectedIds.size === 0 && (
         <NodeContextMenu
           node={selectedNode}
           position={selectedPos}
@@ -381,12 +475,136 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         />
       )}
 
+      {/* Barra de Ações para Multi-Seleção */}
+      {selectedIds.size > 1 && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '28px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: 'var(--bg-elevated)',
+            border: '1.5px solid var(--border-strong)',
+            borderRadius: '12px',
+            padding: '10px 18px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
+          }}
+        >
+          <span style={{
+            fontSize: '13px',
+            fontWeight: 700,
+            color: 'var(--text-primary)',
+            marginRight: '8px',
+            letterSpacing: '-0.01em'
+          }}>
+            {selectedIds.size} quadrados selecionados
+          </span>
+          <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-subtle)', margin: '0 4px' }} />
+
+          {/* Arrastar grupo — instrução */}
+          <span style={{ fontSize: '12px', color: 'var(--text-muted)', userSelect: 'none' }}>
+            Arraste qualquer quadrado selecionado para mover o grupo
+          </span>
+          <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-subtle)', margin: '0 4px' }} />
+
+          {/* Duplicar */}
+          <button
+            onClick={() => {
+              if (onDuplicateMultipleNodes) onDuplicateMultipleNodes([...selectedIds]);
+              setSelectedIds(new Set());
+            }}
+            title="Duplicar selecionados"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '7px 14px', borderRadius: '8px', border: '1.5px solid var(--border-subtle)',
+              backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer'
+            }}
+          >
+            <Copy size={14} /> Copiar
+          </button>
+
+          {/* Excluir */}
+          <button
+            onClick={() => {
+              if (onDeleteMultipleNodes) onDeleteMultipleNodes([...selectedIds]);
+              setSelectedIds(new Set());
+              onSelectNode(null);
+            }}
+            title="Apagar selecionados"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '7px 14px', borderRadius: '8px', border: '1.5px solid #ef4444',
+              backgroundColor: 'transparent', color: '#ef4444',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer'
+            }}
+          >
+            <Trash2 size={14} /> Apagar
+          </button>
+
+          {/* Desmarcar */}
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            title="Desmarcar seleção"
+            style={{
+              padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--border-subtle)',
+              backgroundColor: 'transparent', color: 'var(--text-muted)',
+              fontSize: '13px', cursor: 'pointer'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Overlay de Lasso (retângulo de seleção) — fixo em coords de tela */}
+      {selectionRect && (() => {
+        const minX = Math.min(selectionRect.x1, selectionRect.x2);
+        const minY = Math.min(selectionRect.y1, selectionRect.y2);
+        const w = Math.abs(selectionRect.x2 - selectionRect.x1);
+        const h = Math.abs(selectionRect.y2 - selectionRect.y1);
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              left: minX,
+              top: minY,
+              width: w,
+              height: h,
+              border: '2px dashed var(--accent-purple, #6366f1)',
+              backgroundColor: 'rgba(99,102,241,0.08)',
+              borderRadius: '4px',
+              pointerEvents: 'none',
+              zIndex: 1500,
+            }}
+          />
+        );
+      })()}
+
+      {/* Elemento transparente captura eventos de lasso no fundo do canvas */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: '-5000px',
+          zIndex: 1,
+          cursor: selectionRect ? 'crosshair' : 'default',
+        }}
+        onMouseDown={handleCanvasMouseDownLasso}
+        onMouseMove={handleCanvasMouseMoveLasso}
+        onMouseUp={handleCanvasMouseUpLasso}
+      />
+
       {/* Renderização dos Nós */}
       {nodes.map(node => {
         if (!isNodeVisible(node)) return null;
 
         const isRoot = node.side === 'root';
         const isSelected = selectedNodeId === node.id;
+        const isMultiSelected = selectedIds.has(node.id);
         const isHovered = hoveredNodeId === node.id;
         const isEditing = editingId === node.id;
         const isDropTarget = dropTargetNodeId === node.id;
@@ -421,32 +639,59 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           <div
             key={node.id}
             id={`node-${node.id}`}
-            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''}`}
+            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isMultiSelected ? 'multi-selected' : ''}`}
             style={{
               left: `${pos.x}px`,
               top: `${pos.y}px`,
               minWidth: `${pos.width}px`,
               minHeight: `${pos.height}px`,
               backgroundColor: isDropTarget ? 'rgba(13, 148, 136, 0.25)' : bg,
-              border: border,
-              borderLeft: borderLeft,
-              outline: isDropTarget ? '3px dashed var(--accent-teal)' : (isSelected ? `2.5px solid ${nodeColor}` : undefined),
+              border: isMultiSelected ? `2px solid #6366f1` : border,
+              borderLeft: isMultiSelected ? undefined : borderLeft,
+              outline: isDropTarget
+                ? '3px dashed var(--accent-teal)'
+                : isMultiSelected
+                ? '2.5px solid rgba(99,102,241,0.7)'
+                : (isSelected ? `2.5px solid ${nodeColor}` : undefined),
               outlineOffset: isDropTarget ? '4px' : '2px',
-              boxShadow: isSelected ? `0 0 16px ${nodeColor}66` : '0 4px 12px rgba(0, 0, 0, 0.25)',
-              zIndex: isDropTarget ? 45 : (isSelected ? 35 : 20),
+              boxShadow: isMultiSelected
+                ? '0 0 0 3px rgba(99,102,241,0.25), 0 4px 12px rgba(0,0,0,0.25)'
+                : isSelected ? `0 0 16px ${nodeColor}66` : '0 4px 12px rgba(0, 0, 0, 0.25)',
+              zIndex: isDropTarget ? 45 : (isSelected || isMultiSelected ? 35 : 20),
               padding: isRoot ? '12px 24px' : '8px 16px',
               whiteSpace: 'nowrap',
               opacity: draggingNodeId === node.id ? 0.35 : 1,
-              cursor: isRoot ? 'default' : (draggingNodeId === node.id ? 'grabbing' : 'grab')
+              cursor: isRoot ? 'default' : isDraggingGroup ? 'grabbing' : (draggingNodeId === node.id ? 'grabbing' : 'grab')
             }}
             onClick={(e) => {
               e.stopPropagation();
-              onSelectNode(node.id);
+              // Ctrl/Cmd + clique: adiciona/remove da seleção múltipla
+              if (e.ctrlKey || e.metaKey) {
+                setSelectedIds(prev => {
+                  const next = new Set(prev);
+                  if (next.has(node.id)) next.delete(node.id);
+                  else next.add(node.id);
+                  return next;
+                });
+                onSelectNode(null);
+              } else {
+                setSelectedIds(new Set());
+                onSelectNode(node.id);
+              }
             }}
             onDoubleClick={(e) => handleStartEdit(node, e)}
             onMouseEnter={() => setHoveredNodeId(node.id)}
             onMouseLeave={() => setHoveredNodeId(null)}
-            onMouseDown={(e) => handleMouseDown(node, e)}
+            onMouseDown={(e) => {
+              // Se o nó faz parte da multi-seleção, inicia arraste em grupo
+              if (isMultiSelected && selectedIds.size > 1 && e.button === 0) {
+                e.stopPropagation();
+                groupDragStartRef.current = { x: e.clientX, y: e.clientY };
+                setIsDraggingGroup(true);
+                return;
+              }
+              handleMouseDown(node, e);
+            }}
           >
             {/* Indicador Visual de Inserção / Reordenação ao Arrastar */}
             {isDropTarget && dropPosition === 'before' && (

@@ -575,6 +575,85 @@ export const App: React.FC = () => {
     setSelectedNodeId(newId);
   };
 
+  // EXCLUIR MÚLTIPLOS NÓS
+  const handleDeleteMultipleNodes = (ids: string[]) => {
+    const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root');
+    const toDeleteInput = ids.filter(id => id !== rootNode?.id);
+    if (toDeleteInput.length === 0) return;
+
+    updateActiveBoard(board => {
+      const toDelete = new Set<string>();
+      const gather = (nodeId: string) => {
+        toDelete.add(nodeId);
+        const node = board.mindMapNodes.find(n => n.id === nodeId);
+        if (node) node.childrenIds.forEach(gather);
+      };
+      toDeleteInput.forEach(gather);
+
+      return {
+        ...board,
+        mindMapNodes: board.mindMapNodes
+          .filter(n => !toDelete.has(n.id))
+          .map(n => ({ ...n, childrenIds: n.childrenIds.filter(cid => !toDelete.has(cid)) }))
+      };
+    });
+    setSelectedNodeId(null);
+  };
+
+  // DUPLICAR MÚLTIPLOS NÓS
+  const handleDuplicateMultipleNodes = (ids: string[]) => {
+    const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root');
+    const toDup = ids.filter(id => id !== rootNode?.id);
+    if (toDup.length === 0) return;
+
+    updateActiveBoard(board => {
+      const newNodes: MindMapNode[] = [];
+      const idMap: Record<string, string> = {};
+
+      toDup.forEach(id => {
+        const node = board.mindMapNodes.find(n => n.id === id);
+        if (!node || !node.parentId) return;
+        const newId = `node-${Date.now()}-dup-${id}`;
+        idMap[id] = newId;
+        newNodes.push({
+          ...JSON.parse(JSON.stringify(node)),
+          id: newId,
+          text: `${node.text} (Cópia)`,
+          childrenIds: [],
+          offsetX: (node.offsetX || 0) + 24,
+          offsetY: (node.offsetY || 0) + 48,
+        });
+      });
+
+      let updatedNodes = [...board.mindMapNodes];
+      // Adiciona novos nós como filhos dos seus pais originais
+      newNodes.forEach(newNode => {
+        const originalId = Object.keys(idMap).find(k => idMap[k] === newNode.id)!;
+        const original = board.mindMapNodes.find(n => n.id === originalId);
+        if (!original || !original.parentId) return;
+        updatedNodes = updatedNodes.map(n =>
+          n.id === original.parentId
+            ? { ...n, childrenIds: [...n.childrenIds, newNode.id] }
+            : n
+        );
+      });
+
+      return { ...board, mindMapNodes: [...updatedNodes, ...newNodes] };
+    });
+  };
+
+  // MOVER MÚLTIPLOS NÓS (arraste em grupo)
+  const handleMoveMultipleNodesOffset = (ids: string[], dx: number, dy: number) => {
+    updateActiveBoard(board => ({
+      ...board,
+      mindMapNodes: board.mindMapNodes.map(n => ids.includes(n.id) ? {
+        ...n,
+        offsetX: (n.offsetX || 0) + dx / zoom,
+        offsetY: (n.offsetY || 0) + dy / zoom
+      } : n)
+    }), false);
+  };
+
   // EXCLUIR NÓ E SUB-RAMOS
   const handleDeleteNode = (id: string) => {
     const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root');
@@ -916,6 +995,9 @@ export const App: React.FC = () => {
               onAddChildNode={handleAddChildNode}
               onAddSiblingNode={handleAddSiblingNode}
               onDeleteNode={handleDeleteNode}
+              onDeleteMultipleNodes={handleDeleteMultipleNodes}
+              onDuplicateMultipleNodes={handleDuplicateMultipleNodes}
+              onMoveMultipleNodesOffset={handleMoveMultipleNodesOffset}
               onReorderNode={handleReorderNode}
               onReparentNode={handleReparentNode}
               onReorderInsertNode={handleReorderInsertNode}
