@@ -5,35 +5,37 @@ import { generateBoardSVG } from './exportImage';
 
 /**
  * Renderiza o SVG do mapa mental para uma imagem em base64 (Data URL PNG)
- * em escala Retina 2x para inserção de altíssima nitidez em PPTX e PDF.
+ * em escala Retina 2x para inserção com proporção exata em PPTX e PDF.
  */
-function renderBoardToDataUrl(board: Board): Promise<string> {
+function renderBoardToDataUrl(board: Board, theme: 'light' | 'dark' = 'light'): Promise<{ dataUrl: string; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     try {
-      const svg = generateBoardSVG(board);
+      const svg = generateBoardSVG(board, theme);
       const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const img = new Image();
 
       img.onload = () => {
         const scale = 2;
+        const w = img.width || 1200;
+        const h = img.height || 800;
         const canvas = document.createElement('canvas');
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
+        canvas.width = w * scale;
+        canvas.height = h * scale;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           reject(new Error('Canvas context não suportado'));
           return;
         }
 
-        ctx.fillStyle = '#0f1117';
+        ctx.fillStyle = theme === 'light' ? '#f8fafc' : '#0f1117';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.scale(scale, scale);
-        ctx.drawImage(img, 0, 0);
+        ctx.drawImage(img, 0, 0, w, h);
 
         const dataUrl = canvas.toDataURL('image/png');
         URL.revokeObjectURL(url);
-        resolve(dataUrl);
+        resolve({ dataUrl, width: w, height: h });
       };
 
       img.onerror = (e) => {
@@ -103,9 +105,10 @@ export async function exportBoardAsPPTX(board: Board): Promise<void> {
 
   // SLIDE 2: Visão Geral com o Diagrama Visual do Mapa
   try {
-    const dataUrl = await renderBoardToDataUrl(board);
+    const currentTheme = (localStorage.getItem('whimflow_theme') as 'light' | 'dark') || 'light';
+    const { dataUrl, width: imgW, height: imgH } = await renderBoardToDataUrl(board, currentTheme);
     const slideDiagram = pres.addSlide();
-    slideDiagram.background = { color: '0F1117' };
+    slideDiagram.background = { color: currentTheme === 'light' ? 'F8FAFC' : '0F1117' };
 
     slideDiagram.addText(`${board.title} — Visão Geral do Diagrama`, {
       x: 0.8,
@@ -114,16 +117,29 @@ export async function exportBoardAsPPTX(board: Board): Promise<void> {
       h: 0.5,
       fontSize: 18,
       bold: true,
-      color: 'F8FAFC',
+      color: currentTheme === 'light' ? '0F172A' : 'F8FAFC',
       fontFace: 'Arial'
     });
 
+    // Proporção matemática perfeita sem distorção
+    const maxW = 8.4;
+    const maxH = 4.3;
+    const ratio = (imgW && imgH) ? (imgW / imgH) : (16 / 9);
+    let fitW = maxW;
+    let fitH = maxW / ratio;
+    if (fitH > maxH) {
+      fitH = maxH;
+      fitW = maxH * ratio;
+    }
+    const posX = 0.8 + (maxW - fitW) / 2;
+    const posY = 1.1 + (maxH - fitH) / 2;
+
     slideDiagram.addImage({
       data: dataUrl,
-      x: 0.8,
-      y: 1.1,
-      w: 8.4,
-      h: 4.1
+      x: posX,
+      y: posY,
+      w: fitW,
+      h: fitH
     });
   } catch (err) {
     console.warn('Não foi possível renderizar imagem visual no PPTX:', err);
@@ -247,25 +263,44 @@ export async function exportBoardAsPDF(board: Board): Promise<void> {
     format: 'a4'
   });
 
+  const currentTheme = (localStorage.getItem('whimflow_theme') as 'light' | 'dark') || 'light';
+  const isLight = currentTheme === 'light';
+
   // PÁGINA 1: Diagrama Completo do Mapa Mental em Alta Definição
-  doc.setFillColor(15, 17, 23);
+  doc.setFillColor(isLight ? 248 : 15, isLight ? 250 : 17, isLight ? 252 : 23);
   doc.rect(0, 0, 297, 210, 'F');
 
   // Cabeçalho da página 1
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(isLight ? 15 : 255, isLight ? 23 : 255, isLight ? 42 : 255);
   doc.text(board.title, 15, 16);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.setTextColor(148, 163, 184);
+  doc.setTextColor(100, 116, 139);
   doc.text(`Mapa Mental Estratégico • ${board.mindMapNodes.length} Tópicos • Exportado em ${new Date().toLocaleDateString('pt-BR')}`, 15, 22);
 
   try {
-    const dataUrl = await renderBoardToDataUrl(board);
-    // Insere imagem centralizada na folha A4
-    doc.addImage(dataUrl, 'PNG', 15, 28, 267, 168, undefined, 'FAST');
+    const { dataUrl, width: imgW, height: imgH } = await renderBoardToDataUrl(board, currentTheme);
+    
+    // Calcula dimensões com proporção 100% matemática preservada (nunca estica nem achata)
+    const maxW = 267; // 297mm - 30mm de margens
+    const maxH = 165; // 210mm - 45mm de cabeçalho e margem inferior
+    const ratio = (imgW && imgH) ? (imgW / imgH) : (16 / 9);
+
+    let fitW = maxW;
+    let fitH = maxW / ratio;
+    if (fitH > maxH) {
+      fitH = maxH;
+      fitW = maxH * ratio;
+    }
+
+    // Centraliza com precisão milimétrica na área útil da página A4
+    const posX = 15 + (maxW - fitW) / 2;
+    const posY = 28 + (maxH - fitH) / 2;
+
+    doc.addImage(dataUrl, 'PNG', posX, posY, fitW, fitH, undefined, 'FAST');
   } catch (err) {
     console.warn('Erro ao inserir imagem no PDF:', err);
   }

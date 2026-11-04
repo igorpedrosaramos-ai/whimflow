@@ -34,6 +34,7 @@ interface NodeContextMenuProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onAddChild: () => void;
+  onAddSibling?: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
   canMoveUp: boolean;
@@ -49,6 +50,7 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
   onMoveUp,
   onMoveDown,
   onAddChild,
+  onAddSibling,
   onDuplicate,
   onDelete,
   canMoveUp,
@@ -249,86 +251,118 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
 
       <div style={{ width: '1px', height: '18px', backgroundColor: '#333a48', margin: '0 2px' }} />
 
-      {/* Reordenar Irmãos: Subir ↑ */}
-      {canMoveUp && (
-        <button
-          type="button"
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onMoveUp();
-          }}
-          style={{
-            width: '26px',
-            height: '26px',
-            borderRadius: '4px',
-            background: 'transparent',
-            border: 'none',
-            color: '#cbd5e1',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          title="Mover Quadrado para Cima (Reordenar)"
-        >
-          <ArrowUp size={15} />
-        </button>
-      )}
-
-      {/* Reordenar Irmãos: Descer ↓ */}
-      {canMoveDown && (
-        <button
-          type="button"
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onMoveDown();
-          }}
-          style={{
-            width: '26px',
-            height: '26px',
-            borderRadius: '4px',
-            background: 'transparent',
-            border: 'none',
-            color: '#cbd5e1',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}
-          title="Mover Quadrado para Baixo (Reordenar)"
-        >
-          <ArrowDown size={15} />
-        </button>
+      {/* Reordenar Irmãos: Subir ↑ / Descer ↓ */}
+      {(canMoveUp || canMoveDown) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: '5px', padding: '2px' }}>
+          <button
+            type="button"
+            disabled={!canMoveUp}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveUp();
+            }}
+            style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '4px',
+              background: 'transparent',
+              border: 'none',
+              color: canMoveUp ? '#cbd5e1' : '#475569',
+              cursor: canMoveUp ? 'pointer' : 'default',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title="Mover Quadrado para Cima (Reordenar)"
+          >
+            <ArrowUp size={15} />
+          </button>
+          <button
+            type="button"
+            disabled={!canMoveDown}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMoveDown();
+            }}
+            style={{
+              width: '24px',
+              height: '24px',
+              borderRadius: '4px',
+              background: 'transparent',
+              border: 'none',
+              color: canMoveDown ? '#cbd5e1' : '#475569',
+              cursor: canMoveDown ? 'pointer' : 'default',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            title="Mover Quadrado para Baixo (Reordenar)"
+          >
+            <ArrowDown size={15} />
+          </button>
+        </div>
       )}
 
       <div style={{ width: '1px', height: '18px', backgroundColor: '#333a48', margin: '0 2px' }} />
 
-      {/* Criar Ramo Filho (+) */}
-      <button
-        type="button"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onAddChild();
-        }}
-        style={{
-          width: '26px',
-          height: '26px',
-          borderRadius: '4px',
-          background: 'transparent',
-          border: 'none',
-          color: currentColor,
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-        title="Criar Quadrado Filho com Linha (Tab)"
-      >
-        <Plus size={16} />
-      </button>
+      {/* Botões Rápidos e Intuitivos de Adicionar Quadrados */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddChild();
+          }}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '3px 8px',
+            borderRadius: '5px',
+            backgroundColor: `${currentColor}25`,
+            border: `1.5px solid ${currentColor}`,
+            color: '#ffffff',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+          title="Criar Quadrado Filho com Linha (Atalho: Tab)"
+        >
+          <Plus size={14} />
+          <span>+ Filho</span>
+        </button>
+
+        {node.side !== 'root' && onAddSibling && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddSibling();
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '3px 8px',
+              borderRadius: '5px',
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              border: '1.5px solid rgba(255, 255, 255, 0.2)',
+              color: '#f8fafc',
+              fontSize: '12px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+            title="Criar Quadrado Irmão no Mesmo Nível (Atalho: Enter)"
+          >
+            <Plus size={14} />
+            <span>+ Irmão</span>
+          </button>
+        )}
+      </div>
 
       {/* Duplicar */}
       {node.side !== 'root' && (

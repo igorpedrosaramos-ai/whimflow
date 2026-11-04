@@ -18,6 +18,7 @@ interface MindMapCanvasProps {
   onMoveNodeOffset?: (id: string, dx: number, dy: number) => void;
   onReorderNode: (nodeId: string, direction: 'up' | 'down') => void;
   onReparentNode: (childId: string, newParentId: string) => void;
+  onReorderInsertNode?: (draggedId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
   onUpdateNodeStyle: (nodeId: string, updates: Partial<MindMapNode>) => void;
   onDuplicateNode: (nodeId: string) => void;
   pan?: { x: number; y: number };
@@ -37,6 +38,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   onDeleteNode,
   onReorderNode,
   onReparentNode,
+  onReorderInsertNode,
   onUpdateNodeStyle,
   onDuplicateNode,
   pan,
@@ -47,6 +49,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dropTargetNodeId, setDropTargetNodeId] = useState<string | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside'>('inside');
   const [dragCursorPos, setDragCursorPos] = useState<{ x: number; y: number } | null>(null);
   
   const inputRef = useRef<HTMLInputElement>(null);
@@ -174,26 +177,54 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       const canvasY = (e.clientY - (pan?.y || 0)) / (zoom || 1);
       setDragCursorPos({ x: canvasX, y: canvasY });
 
-      // Detecta sobre qual nó o cursor está passando para mudar de setor
+      // Detecta sobre qual nó o cursor está passando para mudar de setor ou reordenar
       const elements = document.elementsFromPoint(e.clientX, e.clientY);
       const targetCard = elements.find(el => 
         el.classList.contains('mindmap-node-card') && el.id !== `node-${draggingNodeId}`
       );
       if (targetCard) {
         const targetId = targetCard.id.replace('node-', '');
-        setDropTargetNodeId(targetId);
+        const targetNode = nodeMap.get(targetId);
+        const draggedNode = nodeMap.get(draggingNodeId);
+
+        if (targetNode && draggedNode) {
+          const rect = targetCard.getBoundingClientRect();
+          const relY = (e.clientY - rect.top) / rect.height;
+
+          if (targetNode.side === 'root') {
+            setDropTargetNodeId(targetId);
+            setDropPosition('inside');
+          } else if (relY < 0.32) {
+            // Parte superior do card: Reordenar para ANTES deste irmão
+            setDropTargetNodeId(targetId);
+            setDropPosition('before');
+          } else if (relY > 0.68) {
+            // Parte inferior do card: Reordenar para DEPOIS deste irmão
+            setDropTargetNodeId(targetId);
+            setDropPosition('after');
+          } else {
+            // Centro do card: Anexar como filho deste setor
+            setDropTargetNodeId(targetId);
+            setDropPosition('inside');
+          }
+        }
       } else {
         setDropTargetNodeId(null);
+        setDropPosition('inside');
       }
     };
 
     const handleMouseUp = () => {
       if (draggingNodeId && dropTargetNodeId && draggingNodeId !== dropTargetNodeId) {
-        // Soltou sobre outro nó -> Reparentaliza e formata a árvore responsivamente!
-        onReparentNode(draggingNodeId, dropTargetNodeId);
+        if (onReorderInsertNode) {
+          onReorderInsertNode(draggingNodeId, dropTargetNodeId, dropPosition);
+        } else {
+          onReparentNode(draggingNodeId, dropTargetNodeId);
+        }
       }
       setDraggingNodeId(null);
       setDropTargetNodeId(null);
+      setDropPosition('inside');
       setDragCursorPos(null);
     };
 
@@ -205,7 +236,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingNodeId, dropTargetNodeId, onReparentNode, pan, zoom]);
+  }, [draggingNodeId, dropTargetNodeId, dropPosition, onReparentNode, onReorderInsertNode, pan, zoom, nodeMap]);
 
   // RENDERIZAÇÃO DAS LINHAS CONECTORAS (Bézier ou Retas, com portas distribuídas e cores do ramo)
   const renderConnectors = () => {
@@ -342,6 +373,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           onMoveUp={() => onReorderNode(selectedNode.id, 'up')}
           onMoveDown={() => onReorderNode(selectedNode.id, 'down')}
           onAddChild={() => onAddChildNode(selectedNode.id)}
+          onAddSibling={() => onAddSiblingNode(selectedNode.id)}
           onDuplicate={() => onDuplicateNode(selectedNode.id)}
           onDelete={() => onDeleteNode(selectedNode.id)}
           canMoveUp={canMoveUp}
@@ -416,8 +448,72 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             onMouseLeave={() => setHoveredNodeId(null)}
             onMouseDown={(e) => handleMouseDown(node, e)}
           >
-            {/* Indicador de Setor de Destino */}
-            {isDropTarget && (
+            {/* Indicador Visual de Inserção / Reordenação ao Arrastar */}
+            {isDropTarget && dropPosition === 'before' && (
+              <div style={{
+                position: 'absolute',
+                top: '-7px',
+                left: '-12px',
+                right: '-12px',
+                height: '4px',
+                backgroundColor: 'var(--accent-teal-light)',
+                borderRadius: '3px',
+                boxShadow: '0 0 12px var(--accent-teal-light)',
+                zIndex: 100,
+                pointerEvents: 'none'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  bottom: '7px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: 'var(--accent-teal)',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                }}>
+                  ↑ Reordenar para antes deste
+                </div>
+              </div>
+            )}
+
+            {isDropTarget && dropPosition === 'after' && (
+              <div style={{
+                position: 'absolute',
+                bottom: '-7px',
+                left: '-12px',
+                right: '-12px',
+                height: '4px',
+                backgroundColor: 'var(--accent-teal-light)',
+                borderRadius: '3px',
+                boxShadow: '0 0 12px var(--accent-teal-light)',
+                zIndex: 100,
+                pointerEvents: 'none'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '7px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: 'var(--accent-teal)',
+                  color: '#ffffff',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  padding: '2px 8px',
+                  borderRadius: '4px',
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                }}>
+                  ↓ Reordenar para depois deste
+                </div>
+              </div>
+            )}
+
+            {isDropTarget && dropPosition === 'inside' && (
               <div style={{
                 position: 'absolute',
                 top: '-26px',
@@ -434,7 +530,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
                 zIndex: 60
               }}>
-                Mudar para este setor
+                ↳ Mudar para este setor
               </div>
             )}
 
@@ -500,35 +596,103 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </div>
             )}
 
-            {/* Botão Lateral Rápido + para criar filho conectado com linha */}
-            {(isSelected || isHovered) && !isEditing && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddChildNode(node.id);
-                }}
-                style={{
-                  position: 'absolute',
-                  right: '-28px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '26px',
-                  height: '26px',
-                  borderRadius: '50%',
-                  backgroundColor: nodeColor,
-                  color: '#ffffff',
-                  border: '2px solid var(--bg-surface)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
-                  zIndex: 40
-                }}
-                title="Criar Quadrado Filho com Linha Conectada (Tab)"
-              >
-                <Plus size={16} />
-              </button>
+            {/* Botões Rápidos e Intuitivos de Adicionar Quadrados no Nó */}
+            {(isSelected || isHovered) && !isEditing && !draggingNodeId && (
+              <>
+                {/* 1. Botão Adicionar Filho à Direita (+ com ponte de hover generosa) */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    right: '-46px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    width: '46px',
+                    height: '46px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 50
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddChildNode(node.id);
+                  }}
+                  title="Criar Quadrado Filho conectado por linha (Atalho: Tab)"
+                >
+                  <div
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      backgroundColor: nodeColor,
+                      color: '#ffffff',
+                      border: '2px solid var(--bg-surface)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+                      transition: 'transform 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                  </div>
+                </div>
+
+                {/* 2. Botão Adicionar Irmão Abaixo (+ no mesmo nível) */}
+                {!isRoot && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '-36px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: '46px',
+                      height: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 50
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddSiblingNode(node.id);
+                    }}
+                    title="Criar Quadrado Irmão no mesmo nível (Atalho: Enter)"
+                  >
+                    <div
+                      style={{
+                        width: '26px',
+                        height: '26px',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--bg-surface)',
+                        color: nodeColor,
+                        border: `2px solid ${nodeColor}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                        transition: 'transform 0.15s ease, background-color 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'scale(1.15)';
+                        e.currentTarget.style.backgroundColor = nodeColor;
+                        e.currentTarget.style.color = '#ffffff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.backgroundColor = 'var(--bg-surface)';
+                        e.currentTarget.style.color = nodeColor;
+                      }}
+                    >
+                      <Plus size={15} strokeWidth={2.5} />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         );

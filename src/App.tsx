@@ -362,6 +362,103 @@ export const App: React.FC = () => {
     }));
   };
 
+  // REORDENAR E INSERIR NÓS VIA ARRASTE (ANTES, DEPOIS OU DENTRO DE OUTRO NÓ)
+  const handleReorderInsertNode = (
+    draggedId: string, 
+    targetId: string, 
+    position: 'before' | 'after' | 'inside'
+  ) => {
+    if (draggedId === targetId) return;
+
+    updateActiveBoard(board => {
+      const draggedNode = board.mindMapNodes.find(n => n.id === draggedId);
+      const targetNode = board.mindMapNodes.find(n => n.id === targetId);
+      if (!draggedNode || !targetNode) return board;
+
+      // Impede ciclos (não pode soltar dentro de seus próprios descendentes)
+      const isDescendant = (checkId: string, searchTarget: string): boolean => {
+        const n = board.mindMapNodes.find(item => item.id === checkId);
+        if (!n || !n.childrenIds) return false;
+        if (n.childrenIds.includes(searchTarget)) return true;
+        return n.childrenIds.some(cid => isDescendant(cid, searchTarget));
+      };
+
+      if (isDescendant(draggedId, targetId)) {
+        return board;
+      }
+
+      if (position === 'inside') {
+        // Reparentaliza como filho de targetNode
+        const oldParentId = draggedNode.parentId;
+        return {
+          ...board,
+          mindMapNodes: board.mindMapNodes.map(n => {
+            if (oldParentId && n.id === oldParentId) {
+              return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== draggedId) };
+            }
+            if (n.id === targetId) {
+              return { ...n, childrenIds: [...n.childrenIds, draggedId], collapsed: false };
+            }
+            if (n.id === draggedId) {
+              return {
+                ...n,
+                parentId: targetId,
+                color: targetNode.color || n.color,
+                offsetX: 0,
+                offsetY: 0
+              };
+            }
+            return n;
+          })
+        };
+      }
+
+      // Reordenação 'before' ou 'after'
+      const newParentId = targetNode.parentId;
+      if (!newParentId) return board; // Não pode reordenar nó raiz
+
+      const newParent = board.mindMapNodes.find(n => n.id === newParentId);
+      if (!newParent) return board;
+
+      const oldParentId = draggedNode.parentId;
+
+      // Lista atualizada de filhos do novo pai
+      let newChildren = newParent.childrenIds.filter(cid => cid !== draggedId);
+      const targetIndex = newChildren.indexOf(targetId);
+      const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+
+      if (insertIndex >= 0) {
+        newChildren.splice(insertIndex, 0, draggedId);
+      } else {
+        newChildren.push(draggedId);
+      }
+
+      return {
+        ...board,
+        mindMapNodes: board.mindMapNodes.map(n => {
+          if (oldParentId && oldParentId !== newParentId && n.id === oldParentId) {
+            return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== draggedId) };
+          }
+          if (n.id === newParentId) {
+            return { ...n, childrenIds: newChildren };
+          }
+          if (n.id === draggedId) {
+            return {
+              ...n,
+              parentId: newParentId,
+              color: newParent.color || n.color,
+              offsetX: 0,
+              offsetY: 0
+            };
+          }
+          return n;
+        })
+      };
+    });
+
+    setSelectedNodeId(draggedId);
+  };
+
   // REPARENTALIZAR NÓ (MUDAR DE NÓ-PAI VIA ARRASTE)
   const handleReparentNode = (childId: string, newParentId: string) => {
     const child = activeBoard.mindMapNodes.find(n => n.id === childId);
@@ -655,18 +752,32 @@ export const App: React.FC = () => {
     };
   }, [selectedNodeId, selectedStickyId, historyIndex, history]);
 
-  // Pan e Zoom no Canvas
+  // Scroll do Mouse direto para ZOOM IN / ZOOM OUT centrado no cursor
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    if (e.ctrlKey || e.metaKey) {
-      const zoomFactor = -e.deltaY * 0.0015;
-      setZoom(prev => Math.min(Math.max(prev + zoomFactor, 0.2), 2.5));
-    } else {
-      setPan(prev => ({
-        x: prev.x - e.deltaX,
-        y: prev.y - e.deltaY
-      }));
+
+    // Se Shift estiver pressionado, faz rolagem horizontal
+    if (e.shiftKey) {
+      setPan(prev => ({ ...prev, x: prev.x - e.deltaY }));
+      return;
     }
+
+    // Zoom direto com o scroll do mouse (roda para cima = zoom in, roda para baixo = zoom out)
+    const zoomIntensity = 0.0018;
+    const factor = Math.exp(-e.deltaY * zoomIntensity);
+    const newZoom = Math.min(Math.max(zoom * factor, 0.15), 3.0);
+
+    // Mantém o ponto focal sob o cursor do mouse
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+    const canvasX = (mouseX - pan.x) / zoom;
+    const canvasY = (mouseY - pan.y) / zoom;
+
+    const newPanX = mouseX - canvasX * newZoom;
+    const newPanY = mouseY - canvasY * newZoom;
+
+    setZoom(newZoom);
+    setPan({ x: newPanX, y: newPanY });
   };
 
   const handleMouseDownCanvas = (e: React.MouseEvent) => {
@@ -807,6 +918,7 @@ export const App: React.FC = () => {
               onDeleteNode={handleDeleteNode}
               onReorderNode={handleReorderNode}
               onReparentNode={handleReparentNode}
+              onReorderInsertNode={handleReorderInsertNode}
               onUpdateNodeStyle={handleUpdateNodeStyle}
               onDuplicateNode={handleDuplicateNode}
               pan={pan}
