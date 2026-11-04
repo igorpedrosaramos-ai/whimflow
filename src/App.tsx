@@ -689,14 +689,6 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleDoubleClickCanvas = (e: React.MouseEvent) => {
-    const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root') || activeBoard.mindMapNodes[0];
-    if (rootNode) {
-      const targetParent = selectedNodeId || rootNode.id;
-      handleAddChildNode(targetParent);
-    }
-  };
-
   const handleMouseMoveCanvas = (e: React.MouseEvent) => {
     if (isPanning && panStartRef.current) {
       const dx = e.clientX - panStartRef.current.x;
@@ -783,7 +775,6 @@ export const App: React.FC = () => {
           className={`canvas-container ${isPanning || currentTool === 'hand' ? 'panning' : currentTool === 'draw' ? 'drawing' : ''}`}
           onWheel={handleWheel}
           onMouseDown={handleMouseDownCanvas}
-          onDoubleClick={handleDoubleClickCanvas}
           onMouseMove={handleMouseMoveCanvas}
           onMouseUp={handleMouseUpCanvas}
         >
