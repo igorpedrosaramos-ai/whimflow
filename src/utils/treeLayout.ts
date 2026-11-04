@@ -130,8 +130,10 @@ export function getBezierPath(
   endY: number
 ): string {
   const dx = Math.abs(endX - startX);
+  const dy = Math.abs(endY - startY);
   const direction = endX >= startX ? 1 : -1;
-  const cpDistance = Math.max(dx * 0.45, 30);
+  // Distância de controle balanceada que preserva a curvatura orgânica mesmo com grande deslocamento vertical
+  const cpDistance = Math.max(34, Math.min(dx * 0.52 + dy * 0.08, dx * 0.95));
   const cp1X = startX + cpDistance * direction;
   const cp1Y = startY;
   const cp2X = endX - cpDistance * direction;

@@ -115,53 +115,76 @@ html, body, #root {
   position: absolute;
   padding: 8px 16px;
   border-radius: var(--radius-md);
-  color: #ffffff;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   font-size: 14px;
   font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--border-subtle);
   cursor: pointer;
   transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   min-width: 120px;
 }
 .mindmap-node-card:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--border-strong);
 }
 .mindmap-node-card.selected {
   /* Outline e glow definidos dinamicamente de acordo com a cor escolhida pelo usuário */
 }
 .mindmap-node-card.root {
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
-  padding: 14px 24px;
-  background-color: #1e293b;
-  border: 1px solid #334155;
+  padding: 12px 24px;
+  background-color: var(--bg-surface);
+  border: 2px solid var(--border-strong);
   border-radius: var(--radius-lg);
+  color: var(--text-primary);
 }
 
 /* Contador Numérico de Ramos Ocultos / Badge Whimsical */
 .branch-counter-badge {
-  background-color: rgba(255, 255, 255, 0.22);
   color: #ffffff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  width: 22px;
-  height: 22px;
+  min-width: 22px;
+  height: 19px;
+  padding: 0 6px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.branch-counter-badge:hover {
+  filter: brightness(1.2);
+  transform: scale(1.08);
+}
+
+/* Botão Sutil de Recolher Ramo Ativo */
+.branch-collapse-toggle {
+  color: var(--text-muted);
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.15s, transform 0.15s;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
   flex-shrink: 0;
 }
-.branch-counter-badge:hover {
-  background-color: rgba(255, 255, 255, 0.4);
-  transform: scale(1.1);
+.branch-collapse-toggle:hover {
+  opacity: 1;
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
+  transform: scale(1.15);
 }
 
 /* Post-it / Sticky Note */

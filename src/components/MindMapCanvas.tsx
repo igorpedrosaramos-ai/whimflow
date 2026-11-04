@@ -7,6 +7,8 @@ import { NodeContextMenu } from './NodeContextMenu';
 interface MindMapCanvasProps {
   nodes: MindMapNode[];
   selectedNodeId: string | null;
+  editingNodeId?: string | null;
+  onClearEditingNodeId?: () => void;
   onSelectNode: (id: string | null) => void;
   onUpdateNodeText: (id: string, text: string) => void;
   onToggleCollapse: (id: string) => void;
@@ -25,6 +27,8 @@ interface MindMapCanvasProps {
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   nodes,
   selectedNodeId,
+  editingNodeId,
+  onClearEditingNodeId,
   onSelectNode,
   onUpdateNodeText,
   onToggleCollapse,
@@ -46,6 +50,18 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [dragCursorPos, setDragCursorPos] = useState<{ x: number; y: number } | null>(null);
   
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sincroniza início de edição direta quando um novo nó é criado
+  useEffect(() => {
+    if (editingNodeId) {
+      const target = nodes.find(n => n.id === editingNodeId);
+      if (target) {
+        setEditingId(target.id);
+        setEditingText(target.text);
+      }
+      onClearEditingNodeId?.();
+    }
+  }, [editingNodeId, nodes, onClearEditingNodeId]);
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, MindMapNode>();
@@ -191,57 +207,86 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     };
   }, [draggingNodeId, dropTargetNodeId, onReparentNode, pan, zoom]);
 
-  // RENDERIZAÇÃO DAS LINHAS CONECTORAS (Bézier ou Retas, com cores e espessura customizáveis)
+  // RENDERIZAÇÃO DAS LINHAS CONECTORAS (Bézier ou Retas, com portas distribuídas e cores do ramo)
   const renderConnectors = () => {
     const paths: React.ReactElement[] = [];
 
+    // Agrupa filhos visíveis por nó-pai para distribuir portas de conexão na borda
+    const parentChildrenMap = new Map<string, MindMapNode[]>();
     nodes.forEach(child => {
       if (!child.parentId || !isNodeVisible(child)) return;
       const parent = nodeMap.get(child.parentId);
       if (!parent || parent.collapsed) return;
 
-      const pPos = getNodePos(parent);
-      const cPos = getNodePos(child);
-
-      const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
-      const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
-      const startY = pPos.y + pPos.height / 2;
-      const endX = isChildOnLeft ? cPos.x + cPos.width : cPos.x;
-      const endY = cPos.y + cPos.height / 2;
-
-      const strokeColor = child.color || parent.color || '#6366f1';
-      const isSelected = selectedNodeId === child.id || selectedNodeId === parent.id;
-      const lineStyle = child.lineStyle || 'bezier';
-
-      let pathData = '';
-      if (lineStyle === 'straight') {
-        pathData = `M ${startX} ${startY} L ${endX} ${endY}`;
-      } else {
-        pathData = getBezierPath(startX, startY, endX, endY);
+      if (!parentChildrenMap.has(child.parentId)) {
+        parentChildrenMap.set(child.parentId, []);
       }
+      parentChildrenMap.get(child.parentId)!.push(child);
+    });
 
-      paths.push(
-        <g key={`conn-${child.id}`}>
-          <path
-            d={pathData}
-            fill="none"
-            stroke={strokeColor}
-            strokeWidth={isSelected ? "3.5" : "2.5"}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{
-              opacity: isSelected ? 1 : 0.88,
-              transition: 'stroke-width 0.15s ease, opacity 0.15s ease'
-            }}
-          />
-          <circle
-            cx={endX}
-            cy={endY}
-            r={isSelected ? 4 : 3}
-            fill={strokeColor}
-          />
-        </g>
-      );
+    parentChildrenMap.forEach((children, parentId) => {
+      const parent = nodeMap.get(parentId);
+      if (!parent) return;
+      const pPos = getNodePos(parent);
+
+      // Ordena os filhos por sua coordenada Y calculada
+      children.sort((a, b) => {
+        const aPos = getNodePos(a);
+        const bPos = getNodePos(b);
+        return aPos.y - bPos.y;
+      });
+
+      const numChildren = children.length;
+      const pad = Math.min(10, pPos.height * 0.22);
+      const usableHeight = pPos.height - pad * 2;
+
+      children.forEach((child, index) => {
+        const cPos = getNodePos(child);
+        const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
+        const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
+
+        // Distribuição uniforme elegante das portas ao longo da borda vertical
+        const startY = numChildren <= 1 
+          ? pPos.y + pPos.height / 2 
+          : pPos.y + pad + (usableHeight * index) / (numChildren - 1);
+
+        const endX = isChildOnLeft ? cPos.x + cPos.width : cPos.x;
+        const endY = cPos.y + cPos.height / 2;
+
+        const strokeColor = child.color || parent.color || '#6366f1';
+        const isSelected = selectedNodeId === child.id || selectedNodeId === parent.id;
+        const lineStyle = child.lineStyle || 'bezier';
+
+        let pathData = '';
+        if (lineStyle === 'straight') {
+          pathData = `M ${startX} ${startY} L ${endX} ${endY}`;
+        } else {
+          pathData = getBezierPath(startX, startY, endX, endY);
+        }
+
+        paths.push(
+          <g key={`conn-${child.id}`}>
+            <path
+              d={pathData}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={isSelected ? "3.2" : "2.2"}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{
+                opacity: isSelected ? 1 : 0.88,
+                transition: 'stroke-width 0.15s ease, opacity 0.15s ease'
+              }}
+            />
+            <circle
+              cx={endX}
+              cy={endY}
+              r={isSelected ? 3.5 : 2.5}
+              fill={strokeColor}
+            />
+          </g>
+        );
+      });
     });
 
     return (
@@ -426,7 +471,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </span>
             )}
 
-            {/* Badge de Ramos Recolhidos */}
+            {/* Badge de Ramos Recolhidos / Contador Whimsical com Cor do Ramo */}
             {hasChildren && node.collapsed && (
               <div
                 className="branch-counter-badge"
@@ -441,17 +486,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </div>
             )}
 
-            {/* Botão de Recolher */}
+            {/* Botão de Recolher Ramo Aberto */}
             {hasChildren && !node.collapsed && !isRoot && (
               <div
-                className="branch-counter-badge"
-                style={{
-                  width: '18px',
-                  height: '18px',
-                  fontSize: '11px',
-                  backgroundColor: 'var(--border-strong)',
-                  color: 'var(--text-secondary)'
-                }}
+                className="branch-collapse-toggle"
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleCollapse(node.id);

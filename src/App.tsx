@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { INITIAL_BOARDS, BLANK_BOARD } from './constants/initialData';
+import { INITIAL_BOARDS, BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD } from './constants/initialData';
 import { Board, ToolType, MindMapNode, StickyNote, WireframeItem, DrawingStroke } from './types';
 import { TopNav } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
@@ -23,10 +23,18 @@ export const App: React.FC = () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Garante que ambos os templates (Onegai e Orion) estejam disponíveis no seletor
+          const hasOnegai = parsed.some((b: Board) => b.id === 'board-onegai');
+          const hasOrion = parsed.some((b: Board) => b.id === 'board-orion-sushi');
+          const list = [...parsed];
+          if (!hasOnegai) list.push(ONEGAI_BOARD);
+          if (!hasOrion) list.push(ORION_SUSHI_BOARD);
+          return list;
+        }
       }
     } catch (e) {
-      console.warn('Iniciando com quadro limpo');
+      console.warn('Iniciando com quadros padrão');
     }
     return INITIAL_BOARDS;
   });
@@ -39,11 +47,14 @@ export const App: React.FC = () => {
   const [history, setHistory] = useState<Board[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
+  // Edição imediata de novos nós
+  const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+
   // Interface & Ferramentas
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentTool, setCurrentTool] = useState<ToolType>('mindmap');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    return (localStorage.getItem(THEME_KEY) as 'dark' | 'light') || 'dark';
+    return (localStorage.getItem(THEME_KEY) as 'dark' | 'light') || 'light';
   });
 
   // Canvas Pan & Zoom
@@ -87,34 +98,63 @@ export const App: React.FC = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  // Atualizar quadro ativo de forma robusta e imediata
-  const updateActiveBoard = useCallback((updater: (board: Board) => Board, _pushHistory: boolean = true) => {
+  // Atualizar quadro ativo de forma robusta e com gravação de histórico
+  const updateActiveBoard = useCallback((updater: (board: Board) => Board, pushHistory: boolean = true) => {
     setBoards(prevBoards => {
       const current = prevBoards.find(b => b.id === activeBoardId) || prevBoards[0];
       if (!current) return prevBoards;
 
+      if (pushHistory) {
+        const snapshot = JSON.parse(JSON.stringify(current));
+        setHistory(prev => [...prev.slice(0, historyIndex + 1), snapshot].slice(-40));
+        setHistoryIndex(prev => Math.min(prev + 1, 39));
+      }
+
       const updated = updater(current);
       return prevBoards.map(b => b.id === current.id ? { ...updated, updatedAt: new Date().toISOString() } : b);
     });
-  }, [activeBoardId]);
+  }, [activeBoardId, historyIndex]);
 
   // Desfazer / Refazer
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (historyIndex >= 0) {
       const previousState = history[historyIndex];
       setBoards(prev => prev.map(b => b.id === previousState.id ? previousState : b));
       setHistoryIndex(prev => prev - 1);
     }
-  };
+  }, [history, historyIndex]);
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const nextIndex = historyIndex + 1;
       const nextState = history[nextIndex];
       setBoards(prev => prev.map(b => b.id === nextState.id ? nextState : b));
       setHistoryIndex(nextIndex);
     }
-  };
+  }, [history, historyIndex]);
+
+  // Atalhos Globais de Teclado (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [handleUndo, handleRedo]);
 
   // CRIAR NOVO QUADRO 100% LIMPO
   const handleCreateNewBoard = (title: string = 'Novo Projeto') => {
@@ -242,6 +282,7 @@ export const App: React.FC = () => {
     }));
 
     setSelectedNodeId(newId);
+    setEditingNodeId(newId);
   };
 
   // CRIAÇÃO DE QUADRADO COM LINHA EMBUTIDA (IRMÃO NO MESMO NÍVEL)
@@ -294,6 +335,7 @@ export const App: React.FC = () => {
     });
 
     setSelectedNodeId(newId);
+    setEditingNodeId(newId);
   };
 
   // REORDENAR NÓS IRMÃOS (SUBIR ↑ / DESCER ↓)
@@ -764,6 +806,8 @@ export const App: React.FC = () => {
             <MindMapCanvas
               nodes={activeBoard.mindMapNodes}
               selectedNodeId={selectedNodeId}
+              editingNodeId={editingNodeId}
+              onClearEditingNodeId={() => setEditingNodeId(null)}
               onSelectNode={setSelectedNodeId}
               onUpdateNodeText={handleUpdateNodeText}
               onToggleCollapse={handleToggleCollapse}

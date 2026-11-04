@@ -1,4 +1,5 @@
 import { Board, Workspace } from '../types';
+import { ONEGAI_BOARD } from './onegaiData';
 import { ORION_SUSHI_BOARD } from './orionData';
 
 export const INITIAL_WORKSPACES: Workspace[] = [
@@ -37,6 +38,6 @@ export const BLANK_BOARD: Board = {
   drawings: []
 };
 
-export { ORION_SUSHI_BOARD };
+export { ONEGAI_BOARD, ORION_SUSHI_BOARD };
 
-export const INITIAL_BOARDS: Board[] = [BLANK_BOARD, ORION_SUSHI_BOARD];
+export const INITIAL_BOARDS: Board[] = [BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD];
