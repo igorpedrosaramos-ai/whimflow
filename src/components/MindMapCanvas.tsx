@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Trash2, Copy, ChevronRight } from 'lucide-react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Plus } from 'lucide-react';
 import { MindMapNode } from '../types';
 import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
 import { NodeContextMenu } from './NodeContextMenu';
@@ -15,10 +15,7 @@ interface MindMapCanvasProps {
   onAddChildNode: (parentId: string) => void;
   onAddSiblingNode: (nodeId: string) => void;
   onDeleteNode: (id: string) => void;
-  onDeleteMultipleNodes?: (ids: string[]) => void;
   onMoveNodeOffset?: (id: string, dx: number, dy: number) => void;
-  onMoveMultipleNodesOffset?: (ids: string[], dx: number, dy: number) => void;
-  onDuplicateMultipleNodes?: (ids: string[]) => void;
   onReorderNode: (nodeId: string, direction: 'up' | 'down') => void;
   onReparentNode: (childId: string, newParentId: string) => void;
   onReorderInsertNode?: (draggedId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
@@ -39,9 +36,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   onAddChildNode,
   onAddSiblingNode,
   onDeleteNode,
-  onDeleteMultipleNodes,
-  onMoveMultipleNodesOffset,
-  onDuplicateMultipleNodes,
   onReorderNode,
   onReparentNode,
   onReorderInsertNode,
@@ -59,21 +53,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [dragCursorPos, setDragCursorPos] = useState<{ x: number; y: number } | null>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
-
-  // ── Multi-seleção por arraste (lasso) ─────────────────────────────────────
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selectionRect, setSelectionRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
-  const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
-  const isLassoActiveRef = useRef(false);
-  // Arraste em grupo
-  const groupDragStartRef = useRef<{ x: number; y: number } | null>(null);
-  const [isDraggingGroup, setIsDraggingGroup] = useState(false);
-
-  // Limpa multi-seleção quando seleção única muda
-  useEffect(() => {
-    if (selectedNodeId === null) return;
-    setSelectedIds(new Set());
-  }, [selectedNodeId]);
 
   // Sincroniza início de edição direta quando um novo nó é criado
   useEffect(() => {
@@ -259,79 +238,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     };
   }, [draggingNodeId, dropTargetNodeId, dropPosition, onReparentNode, onReorderInsertNode, pan, zoom, nodeMap]);
 
-  // ARRASTE EM GRUPO quando há multi-seleção
-  useEffect(() => {
-    const handleGroupMouseMove = (e: MouseEvent) => {
-      if (!groupDragStartRef.current || !isDraggingGroup) return;
-      const dx = e.clientX - groupDragStartRef.current.x;
-      const dy = e.clientY - groupDragStartRef.current.y;
-      groupDragStartRef.current = { x: e.clientX, y: e.clientY };
-      if (onMoveMultipleNodesOffset && selectedIds.size > 0) {
-        onMoveMultipleNodesOffset([...selectedIds], dx, dy);
-      }
-    };
-    const handleGroupMouseUp = () => {
-      setIsDraggingGroup(false);
-      groupDragStartRef.current = null;
-    };
-    if (isDraggingGroup) {
-      window.addEventListener('mousemove', handleGroupMouseMove);
-      window.addEventListener('mouseup', handleGroupMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleGroupMouseMove);
-      window.removeEventListener('mouseup', handleGroupMouseUp);
-    };
-  }, [isDraggingGroup, selectedIds, onMoveMultipleNodesOffset]);
-
-  // LASSO: detecta início no canvas (chamado de fora via props expostas no return)
-  const handleCanvasMouseDownLasso = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.button !== 0) return;
-    isLassoActiveRef.current = true;
-    selectionStartRef.current = { x: e.clientX, y: e.clientY };
-    setSelectionRect({ x1: e.clientX, y1: e.clientY, x2: e.clientX, y2: e.clientY });
-    setSelectedIds(new Set());
-    onSelectNode(null);
-  }, [onSelectNode]);
-
-  const handleCanvasMouseMoveLasso = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isLassoActiveRef.current || !selectionStartRef.current) return;
-    setSelectionRect({
-      x1: selectionStartRef.current.x,
-      y1: selectionStartRef.current.y,
-      x2: e.clientX,
-      y2: e.clientY
-    });
-  }, []);
-
-  const handleCanvasMouseUpLasso = useCallback(() => {
-    if (!isLassoActiveRef.current) return;
-    isLassoActiveRef.current = false;
-    if (!selectionRect) { setSelectionRect(null); return; }
-
-    const minX = Math.min(selectionRect.x1, selectionRect.x2);
-    const maxX = Math.max(selectionRect.x1, selectionRect.x2);
-    const minY = Math.min(selectionRect.y1, selectionRect.y2);
-    const maxY = Math.max(selectionRect.y1, selectionRect.y2);
-
-    const hit = new Set<string>();
-    nodes.forEach(node => {
-      if (!isNodeVisible(node)) return;
-      const el = document.getElementById(`node-${node.id}`);
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      if (r.right >= minX && r.left <= maxX && r.bottom >= minY && r.top <= maxY) {
-        hit.add(node.id);
-      }
-    });
-
-    if (hit.size > 0) {
-      setSelectedIds(hit);
-      onSelectNode(null);
-    }
-    setSelectionRect(null);
-  }, [selectionRect, nodes, onSelectNode]);
-
   // RENDERIZAÇÃO DAS LINHAS CONECTORAS (Bézier ou Retas, com portas distribuídas e cores do ramo)
   const renderConnectors = () => {
     const paths: React.ReactElement[] = [];
@@ -456,8 +362,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       {/* Camada Vetorial Global de Linhas */}
       {renderConnectors()}
 
-      {/* Menu Contextual Flutuante Superior — só quando NÃO há multi-seleção */}
-      {selectedNode && selectedPos && selectedIds.size === 0 && (
+      {/* Menu Contextual Flutuante Superior */}
+      {selectedNode && selectedPos && (
         <NodeContextMenu
           node={selectedNode}
           position={selectedPos}
@@ -466,8 +372,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           onUpdateLineStyle={(lineStyle) => onUpdateNodeStyle(selectedNode.id, { lineStyle })}
           onMoveUp={() => onReorderNode(selectedNode.id, 'up')}
           onMoveDown={() => onReorderNode(selectedNode.id, 'down')}
-          onAddChild={() => onAddChildNode(selectedNode.id)}
-          onAddSibling={() => onAddSiblingNode(selectedNode.id)}
           onDuplicate={() => onDuplicateNode(selectedNode.id)}
           onDelete={() => onDeleteNode(selectedNode.id)}
           canMoveUp={canMoveUp}
@@ -475,136 +379,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         />
       )}
 
-      {/* Barra de Ações para Multi-Seleção */}
-      {selectedIds.size > 1 && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '28px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 2000,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--bg-elevated)',
-            border: '1.5px solid var(--border-strong)',
-            borderRadius: '12px',
-            padding: '10px 18px',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.45)',
-          }}
-        >
-          <span style={{
-            fontSize: '13px',
-            fontWeight: 700,
-            color: 'var(--text-primary)',
-            marginRight: '8px',
-            letterSpacing: '-0.01em'
-          }}>
-            {selectedIds.size} quadrados selecionados
-          </span>
-          <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-subtle)', margin: '0 4px' }} />
-
-          {/* Arrastar grupo — instrução */}
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)', userSelect: 'none' }}>
-            Arraste qualquer quadrado selecionado para mover o grupo
-          </span>
-          <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border-subtle)', margin: '0 4px' }} />
-
-          {/* Duplicar */}
-          <button
-            onClick={() => {
-              if (onDuplicateMultipleNodes) onDuplicateMultipleNodes([...selectedIds]);
-              setSelectedIds(new Set());
-            }}
-            title="Duplicar selecionados"
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px', borderRadius: '8px', border: '1.5px solid var(--border-subtle)',
-              backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)',
-              fontSize: '13px', fontWeight: 600, cursor: 'pointer'
-            }}
-          >
-            <Copy size={14} /> Copiar
-          </button>
-
-          {/* Excluir */}
-          <button
-            onClick={() => {
-              if (onDeleteMultipleNodes) onDeleteMultipleNodes([...selectedIds]);
-              setSelectedIds(new Set());
-              onSelectNode(null);
-            }}
-            title="Apagar selecionados"
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '7px 14px', borderRadius: '8px', border: '1.5px solid #ef4444',
-              backgroundColor: 'transparent', color: '#ef4444',
-              fontSize: '13px', fontWeight: 600, cursor: 'pointer'
-            }}
-          >
-            <Trash2 size={14} /> Apagar
-          </button>
-
-          {/* Desmarcar */}
-          <button
-            onClick={() => setSelectedIds(new Set())}
-            title="Desmarcar seleção"
-            style={{
-              padding: '7px 10px', borderRadius: '8px', border: '1px solid var(--border-subtle)',
-              backgroundColor: 'transparent', color: 'var(--text-muted)',
-              fontSize: '13px', cursor: 'pointer'
-            }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      {/* Overlay de Lasso (retângulo de seleção) — fixo em coords de tela */}
-      {selectionRect && (() => {
-        const minX = Math.min(selectionRect.x1, selectionRect.x2);
-        const minY = Math.min(selectionRect.y1, selectionRect.y2);
-        const w = Math.abs(selectionRect.x2 - selectionRect.x1);
-        const h = Math.abs(selectionRect.y2 - selectionRect.y1);
-        return (
-          <div
-            style={{
-              position: 'fixed',
-              left: minX,
-              top: minY,
-              width: w,
-              height: h,
-              border: '2px dashed var(--accent-purple, #6366f1)',
-              backgroundColor: 'rgba(99,102,241,0.08)',
-              borderRadius: '4px',
-              pointerEvents: 'none',
-              zIndex: 1500,
-            }}
-          />
-        );
-      })()}
-
-      {/* Elemento transparente captura eventos de lasso no fundo do canvas */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: '-5000px',
-          zIndex: 1,
-          cursor: selectionRect ? 'crosshair' : 'default',
-        }}
-        onMouseDown={handleCanvasMouseDownLasso}
-        onMouseMove={handleCanvasMouseMoveLasso}
-        onMouseUp={handleCanvasMouseUpLasso}
-      />
-
       {/* Renderização dos Nós */}
       {nodes.map(node => {
         if (!isNodeVisible(node)) return null;
 
         const isRoot = node.side === 'root';
         const isSelected = selectedNodeId === node.id;
-        const isMultiSelected = selectedIds.has(node.id);
         const isHovered = hoveredNodeId === node.id;
         const isEditing = editingId === node.id;
         const isDropTarget = dropTargetNodeId === node.id;
@@ -630,99 +410,66 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           bg = 'var(--bg-surface)';
           border = `2px solid ${nodeColor}`;
         } else {
-          // accent (estilo clássico com borda esquerda viva)
+          // accent (estilo clássico corporativo com borda esquerda viva)
           bg = 'var(--bg-surface)';
-          borderLeft = `5px solid ${nodeColor}`;
+          borderLeft = `4px solid ${nodeColor}`;
         }
 
         return (
           <div
             key={node.id}
             id={`node-${node.id}`}
-            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isMultiSelected ? 'multi-selected' : ''}`}
+            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''}`}
             style={{
               left: `${pos.x}px`,
               top: `${pos.y}px`,
               minWidth: `${pos.width}px`,
               minHeight: `${pos.height}px`,
-              backgroundColor: isDropTarget ? 'rgba(13, 148, 136, 0.25)' : bg,
-              border: isMultiSelected ? `2px solid #6366f1` : border,
-              borderLeft: isMultiSelected ? undefined : borderLeft,
-              outline: isDropTarget
-                ? '3px dashed var(--accent-teal)'
-                : isMultiSelected
-                ? '2.5px solid rgba(99,102,241,0.7)'
-                : (isSelected ? `2.5px solid ${nodeColor}` : undefined),
-              outlineOffset: isDropTarget ? '4px' : '2px',
-              boxShadow: isMultiSelected
-                ? '0 0 0 3px rgba(99,102,241,0.25), 0 4px 12px rgba(0,0,0,0.25)'
-                : isSelected ? `0 0 16px ${nodeColor}66` : '0 4px 12px rgba(0, 0, 0, 0.25)',
-              zIndex: isDropTarget ? 45 : (isSelected || isMultiSelected ? 35 : 20),
-              padding: isRoot ? '12px 24px' : '8px 16px',
+              backgroundColor: isDropTarget && dropPosition === 'inside' ? 'rgba(13, 148, 136, 0.2)' : bg,
+              border: border,
+              borderLeft: borderLeft,
+              outline: isDropTarget && dropPosition === 'inside'
+                ? '2.5px solid var(--accent-teal, #0d9488)'
+                : (isSelected ? `2px solid ${nodeColor}` : undefined),
+              outlineOffset: '2px',
+              boxShadow: isSelected ? `0 0 12px ${nodeColor}55` : '0 2px 8px rgba(0, 0, 0, 0.2)',
+              zIndex: isDropTarget ? 45 : (isSelected ? 35 : 20),
+              padding: isRoot ? '12px 24px' : '8px 14px',
               whiteSpace: 'nowrap',
               opacity: draggingNodeId === node.id ? 0.35 : 1,
-              cursor: isRoot ? 'default' : isDraggingGroup ? 'grabbing' : (draggingNodeId === node.id ? 'grabbing' : 'grab')
+              cursor: isRoot ? 'default' : (draggingNodeId === node.id ? 'grabbing' : 'grab')
             }}
             onClick={(e) => {
               e.stopPropagation();
-              // Ctrl/Cmd + clique: adiciona/remove da seleção múltipla
-              if (e.ctrlKey || e.metaKey) {
-                setSelectedIds(prev => {
-                  const next = new Set(prev);
-                  if (next.has(node.id)) next.delete(node.id);
-                  else next.add(node.id);
-                  return next;
-                });
-                onSelectNode(null);
-              } else {
-                setSelectedIds(new Set());
-                onSelectNode(node.id);
-              }
+              onSelectNode(node.id);
             }}
             onDoubleClick={(e) => handleStartEdit(node, e)}
             onMouseEnter={() => setHoveredNodeId(node.id)}
             onMouseLeave={() => setHoveredNodeId(null)}
-            onMouseDown={(e) => {
-              // Se o nó faz parte da multi-seleção, inicia arraste em grupo
-              if (isMultiSelected && selectedIds.size > 1 && e.button === 0) {
-                e.stopPropagation();
-                groupDragStartRef.current = { x: e.clientX, y: e.clientY };
-                setIsDraggingGroup(true);
-                return;
-              }
-              handleMouseDown(node, e);
-            }}
+            onMouseDown={(e) => handleMouseDown(node, e)}
           >
-            {/* Indicador Visual de Inserção / Reordenação ao Arrastar */}
+            {/* Indicador Visual Limpo e Corporativo de Reordenação (Linha elegante estilo Notion/Whimsical) */}
             {isDropTarget && dropPosition === 'before' && (
               <div style={{
                 position: 'absolute',
                 top: '-7px',
-                left: '-12px',
-                right: '-12px',
-                height: '4px',
-                backgroundColor: 'var(--accent-teal-light)',
-                borderRadius: '3px',
-                boxShadow: '0 0 12px var(--accent-teal-light)',
+                left: '-8px',
+                right: '-8px',
+                height: '3px',
+                backgroundColor: 'var(--accent-teal, #0d9488)',
+                borderRadius: '2px',
                 zIndex: 100,
                 pointerEvents: 'none'
               }}>
                 <div style={{
                   position: 'absolute',
-                  bottom: '7px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  backgroundColor: 'var(--accent-teal)',
-                  color: '#ffffff',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
-                }}>
-                  ↑ Reordenar para antes deste
-                </div>
+                  left: '-3px',
+                  top: '-2px',
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--accent-teal, #0d9488)'
+                }} />
               </div>
             )}
 
@@ -730,52 +477,23 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               <div style={{
                 position: 'absolute',
                 bottom: '-7px',
-                left: '-12px',
-                right: '-12px',
-                height: '4px',
-                backgroundColor: 'var(--accent-teal-light)',
-                borderRadius: '3px',
-                boxShadow: '0 0 12px var(--accent-teal-light)',
+                left: '-8px',
+                right: '-8px',
+                height: '3px',
+                backgroundColor: 'var(--accent-teal, #0d9488)',
+                borderRadius: '2px',
                 zIndex: 100,
                 pointerEvents: 'none'
               }}>
                 <div style={{
                   position: 'absolute',
-                  top: '7px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  backgroundColor: 'var(--accent-teal)',
-                  color: '#ffffff',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
-                }}>
-                  ↓ Reordenar para depois deste
-                </div>
-              </div>
-            )}
-
-            {isDropTarget && dropPosition === 'inside' && (
-              <div style={{
-                position: 'absolute',
-                top: '-26px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                backgroundColor: 'var(--accent-teal)',
-                color: '#ffffff',
-                fontSize: '11px',
-                fontWeight: 700,
-                padding: '2px 8px',
-                borderRadius: '4px',
-                whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
-                zIndex: 60
-              }}>
-                ↳ Mudar para este setor
+                  left: '-3px',
+                  top: '-2px',
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--accent-teal, #0d9488)'
+                }} />
               </div>
             )}
 
@@ -789,15 +507,15 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 onBlur={handleCommitEdit}
                 onKeyDown={(e) => handleKeyDown(e, node)}
                 style={{
-                  background: 'var(--bg-canvas)',
-                  border: `1.5px solid ${nodeColor}`,
-                  color: 'var(--text-primary)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
                   borderRadius: '4px',
-                  padding: '3px 8px',
+                  padding: '2px 4px',
                   fontSize: isRoot ? '16px' : '13.5px',
                   fontWeight: isRoot ? 700 : 500,
                   outline: 'none',
-                  minWidth: '160px'
+                  minWidth: '80px'
                 }}
               />
             ) : (
@@ -806,13 +524,15 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
                 fontSize: isRoot ? '16px' : '13.5px',
                 fontWeight: isRoot ? 700 : 500,
-                letterSpacing: '-0.01em'
+                letterSpacing: '-0.01em',
+                minWidth: node.text ? undefined : '50px',
+                display: 'inline-block'
               }}>
                 {node.text}
               </span>
             )}
 
-            {/* Badge de Ramos Recolhidos / Contador Whimsical com Cor do Ramo */}
+            {/* Badge de Ramos Recolhidos */}
             {hasChildren && node.collapsed && (
               <div
                 className="branch-counter-badge"
@@ -821,7 +541,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   e.stopPropagation();
                   onToggleCollapse(node.id);
                 }}
-                title={`Expandir ${childCount} ramos conectados`}
+                title={`Expandir ${childCount} ramos`}
               >
                 {childCount}
               </div>
@@ -841,18 +561,18 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </div>
             )}
 
-            {/* Botões Rápidos e Intuitivos de Adicionar Quadrados no Nó */}
+            {/* Botões Externos de Adicionar (+ Filho à direita / + Irmão abaixo) */}
             {(isSelected || isHovered) && !isEditing && !draggingNodeId && (
               <>
-                {/* 1. Botão Adicionar Filho à Direita (+ com ponte de hover generosa) */}
+                {/* 1. Botão Adicionar Filho à Direita */}
                 <div
                   style={{
                     position: 'absolute',
-                    right: '-46px',
+                    right: '-42px',
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    width: '46px',
-                    height: '46px',
+                    width: '42px',
+                    height: '42px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -862,12 +582,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     e.stopPropagation();
                     onAddChildNode(node.id);
                   }}
-                  title="Criar Quadrado Filho conectado por linha (Atalho: Tab)"
+                  title="Criar Quadrado Filho (Atalho: Tab)"
                 >
                   <div
                     style={{
-                      width: '28px',
-                      height: '28px',
+                      width: '26px',
+                      height: '26px',
                       borderRadius: '50%',
                       backgroundColor: nodeColor,
                       color: '#ffffff',
@@ -876,26 +596,26 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 10px rgba(0,0,0,0.35)',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
                       transition: 'transform 0.15s ease'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                   >
-                    <Plus size={16} strokeWidth={2.5} />
+                    <Plus size={15} strokeWidth={2.5} />
                   </div>
                 </div>
 
-                {/* 2. Botão Adicionar Irmão Abaixo (+ no mesmo nível) */}
+                {/* 2. Botão Adicionar Irmão Abaixo */}
                 {!isRoot && (
                   <div
                     style={{
                       position: 'absolute',
-                      bottom: '-36px',
+                      bottom: '-34px',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      width: '46px',
-                      height: '36px',
+                      width: '42px',
+                      height: '34px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -905,12 +625,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                       e.stopPropagation();
                       onAddSiblingNode(node.id);
                     }}
-                    title="Criar Quadrado Irmão no mesmo nível (Atalho: Enter)"
+                    title="Criar Quadrado Irmão (Atalho: Enter)"
                   >
                     <div
                       style={{
-                        width: '26px',
-                        height: '26px',
+                        width: '24px',
+                        height: '24px',
                         borderRadius: '50%',
                         backgroundColor: 'var(--bg-surface)',
                         color: nodeColor,
@@ -919,7 +639,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
                         transition: 'transform 0.15s ease, background-color 0.15s ease'
                       }}
                       onMouseEnter={(e) => {
@@ -933,7 +653,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                         e.currentTarget.style.color = nodeColor;
                       }}
                     >
-                      <Plus size={15} strokeWidth={2.5} />
+                      <Plus size={14} strokeWidth={2.5} />
                     </div>
                   </div>
                 )}
@@ -943,7 +663,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         );
       })}
 
-      {/* Cartão Fantasma Flutuante durante o Arraste para Mudar de Setor */}
+      {/* Cartão Fantasma Limpo durante o Arraste */}
       {draggingNodeId && dragCursorPos && nodeMap.get(draggingNodeId) && (
         <div
           style={{
@@ -955,23 +675,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             zIndex: 1000,
             backgroundColor: nodeMap.get(draggingNodeId)?.color || 'var(--accent-purple)',
             color: '#ffffff',
-            padding: '8px 18px',
-            borderRadius: '8px',
+            padding: '7px 16px',
+            borderRadius: '6px',
             fontWeight: 600,
-            fontSize: '13.5px',
-            boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
-            border: '2px solid #ffffff',
-            opacity: 0.95,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
+            fontSize: '13px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            border: '1.5px solid #ffffff',
+            opacity: 0.9,
             whiteSpace: 'nowrap'
           }}
         >
-          <span>{nodeMap.get(draggingNodeId)?.text}</span>
-          <span style={{ fontSize: '11px', opacity: 0.9, backgroundColor: 'rgba(0,0,0,0.35)', padding: '2px 6px', borderRadius: '4px' }}>
-            {dropTargetNodeId ? 'Soltar para mover para este setor' : 'Arraste sobre outro setor'}
-          </span>
+          {nodeMap.get(draggingNodeId)?.text || 'Quadrado'}
         </div>
       )}
     </>

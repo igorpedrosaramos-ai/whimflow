@@ -257,7 +257,7 @@ export const App: React.FC = () => {
 
     const newNode: MindMapNode = {
       id: newId,
-      text: 'Novo Quadrado',
+      text: '',
       x: parent.x + 240,
       y: parent.y + parent.childrenIds.length * 45,
       parentId: parent.id,
@@ -301,7 +301,7 @@ export const App: React.FC = () => {
     const newId = `node-${Date.now()}`;
     const newNode: MindMapNode = {
       id: newId,
-      text: 'Novo Quadrado',
+      text: '',
       x: sibling.x,
       y: sibling.y + 45,
       parentId: parent.id,
@@ -388,8 +388,9 @@ export const App: React.FC = () => {
       }
 
       if (position === 'inside') {
-        // Reparentaliza como filho de targetNode
         const oldParentId = draggedNode.parentId;
+        if (oldParentId === targetId) return board; // Já é filho deste nó
+
         return {
           ...board,
           mindMapNodes: board.mindMapNodes.map(n => {
@@ -397,7 +398,7 @@ export const App: React.FC = () => {
               return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== draggedId) };
             }
             if (n.id === targetId) {
-              return { ...n, childrenIds: [...n.childrenIds, draggedId], collapsed: false };
+              return { ...n, childrenIds: [...n.childrenIds.filter(cid => cid !== draggedId), draggedId], collapsed: false };
             }
             if (n.id === draggedId) {
               return {
@@ -465,7 +466,7 @@ export const App: React.FC = () => {
     const newParent = activeBoard.mindMapNodes.find(n => n.id === newParentId);
     if (!child || !newParent || child.id === newParent.id) return;
 
-    // Evita ciclos (não pode reparentalizar para um de seus próprios descendentes)
+    // Evita ciclos
     const isDescendant = (checkId: string, targetId: string): boolean => {
       const n = activeBoard.mindMapNodes.find(item => item.id === checkId);
       if (!n || !n.childrenIds) return false;
@@ -474,10 +475,11 @@ export const App: React.FC = () => {
     };
 
     if (isDescendant(childId, newParentId)) {
-      return; // Ciclo proibido
+      return;
     }
 
     const oldParentId = child.parentId;
+    if (oldParentId === newParentId) return;
 
     updateActiveBoard(board => {
       return {
@@ -487,7 +489,7 @@ export const App: React.FC = () => {
             return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== childId) };
           }
           if (n.id === newParentId) {
-            return { ...n, childrenIds: [...n.childrenIds, childId], collapsed: false };
+            return { ...n, childrenIds: [...n.childrenIds.filter(cid => cid !== childId), childId], collapsed: false };
           }
           if (n.id === childId) {
             return {
@@ -860,7 +862,10 @@ export const App: React.FC = () => {
   };
 
   const handleMouseDownCanvas = (e: React.MouseEvent) => {
-    if (e.button === 1 || isSpacePressed.current || currentTool === 'hand') {
+    const target = e.target as HTMLElement;
+    const isCanvasBg = target.id === 'main-canvas-area' || target.classList.contains('canvas-background');
+
+    if (e.button === 1 || isSpacePressed.current || currentTool === 'hand' || (e.button === 0 && isCanvasBg && currentTool !== 'draw')) {
       setIsPanning(true);
       panStartRef.current = { x: e.clientX, y: e.clientY };
     } else if (currentTool === 'draw') {
@@ -995,9 +1000,6 @@ export const App: React.FC = () => {
               onAddChildNode={handleAddChildNode}
               onAddSiblingNode={handleAddSiblingNode}
               onDeleteNode={handleDeleteNode}
-              onDeleteMultipleNodes={handleDeleteMultipleNodes}
-              onDuplicateMultipleNodes={handleDuplicateMultipleNodes}
-              onMoveMultipleNodesOffset={handleMoveMultipleNodesOffset}
               onReorderNode={handleReorderNode}
               onReparentNode={handleReparentNode}
               onReorderInsertNode={handleReorderInsertNode}

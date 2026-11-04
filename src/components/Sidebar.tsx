@@ -206,27 +206,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {/* BOTÕES DE AÇÃO: RENOMEAR, DUPLICAR E EXCLUIR */}
                 {!isEditing && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }} onClick={(e) => e.stopPropagation()}>
-                    {/* Botão de Editar Nome (Lápis com alta visibilidade) */}
+                    {/* Botão de Editar Nome (Lápis compacto sem texto) */}
                     <button
                       type="button"
                       onClick={(e) => startRename(board, e)}
                       style={{
-                        background: 'var(--bg-canvas)',
+                        background: 'transparent',
                         border: '1px solid var(--border-subtle)',
-                        color: 'var(--accent-purple-light)',
+                        color: 'var(--text-secondary)',
                         cursor: 'pointer',
                         padding: '4px 6px',
                         borderRadius: '4px',
                         display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '11px',
-                        fontWeight: 500
+                        alignItems: 'center'
                       }}
-                      title="Renomear Projeto (Editar Nome)"
+                      title="Renomear Projeto"
                     >
                       <Pencil size={12} />
-                      <span style={{ fontSize: '10.5px' }}>Renomear</span>
                     </button>
 
                     {/* Botão Duplicar */}
