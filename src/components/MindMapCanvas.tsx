@@ -13,11 +13,13 @@ interface MindMapCanvasProps {
   onAddChildNode: (parentId: string) => void;
   onAddSiblingNode: (nodeId: string) => void;
   onDeleteNode: (id: string) => void;
-  onMoveNodeOffset: (id: string, dx: number, dy: number) => void;
+  onMoveNodeOffset?: (id: string, dx: number, dy: number) => void;
   onReorderNode: (nodeId: string, direction: 'up' | 'down') => void;
   onReparentNode: (childId: string, newParentId: string) => void;
   onUpdateNodeStyle: (nodeId: string, updates: Partial<MindMapNode>) => void;
   onDuplicateNode: (nodeId: string) => void;
+  pan?: { x: number; y: number };
+  zoom?: number;
 }
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
@@ -29,19 +31,20 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   onAddChildNode,
   onAddSiblingNode,
   onDeleteNode,
-  onMoveNodeOffset,
   onReorderNode,
   onReparentNode,
   onUpdateNodeStyle,
-  onDuplicateNode
+  onDuplicateNode,
+  pan,
+  zoom = 1
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dropTargetNodeId, setDropTargetNodeId] = useState<string | null>(null);
+  const [dragCursorPos, setDragCursorPos] = useState<{ x: number; y: number } | null>(null);
   
-  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const nodeMap = useMemo(() => {
@@ -50,26 +53,24 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     return map;
   }, [nodes]);
 
-  // Layout base da árvore
+  // Layout base da árvore - 100% Responsivo e sem sobreposição
   const layoutMap = useMemo(() => {
     const root = nodes.find(n => n.side === 'root') || nodes[0];
     if (!root) return new Map();
     return calculateMindMapLayout(nodes, root.id, {
-      horizontalGap: 80,
+      horizontalGap: 90,
       verticalGap: 18,
-      rootX: root.x || 0,
-      rootY: root.y || 0
+      rootX: 0,
+      rootY: 0
     });
   }, [nodes]);
 
-  // Posição final combinando cálculo Tidy Tree + offset manual livre do usuário
+  // Posição final calculada estritamente pelo algoritmo responsivo (Zero entrelaçamento)
   const getNodePos = (node: MindMapNode) => {
     const computed = layoutMap.get(node.id);
-    const baseX = computed ? computed.x : node.x;
-    const baseY = computed ? computed.y : node.y;
     return {
-      x: baseX + (node.offsetX || 0),
-      y: baseY + (node.offsetY || 0),
+      x: computed ? computed.x : (node.x || 0),
+      y: computed ? computed.y : (node.y || 0),
       width: computed ? computed.width : 160,
       height: computed ? computed.height : 40
     };
@@ -137,25 +138,27 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }
   }, [editingId]);
 
-  // ARRASTE LIVRE DE QUADRADOS E REPARENTALIZAÇÃO
+  // ARRASTE EXCLUSIVO PARA MUDAR DE SETOR / REPARENTALIZAR
   const handleMouseDown = (node: MindMapNode, e: React.MouseEvent) => {
     if (editingId === node.id) return;
     if (e.button !== 0) return;
+    if (node.side === 'root') return; // Nó raiz é fixo como âncora do mapa
     e.stopPropagation();
     onSelectNode(node.id);
     setDraggingNodeId(node.id);
-    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    const canvasX = (e.clientX - (pan?.x || 0)) / (zoom || 1);
+    const canvasY = (e.clientY - (pan?.y || 0)) / (zoom || 1);
+    setDragCursorPos({ x: canvasX, y: canvasY });
   };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!draggingNodeId || !dragStartPos.current) return;
-      const dx = e.clientX - dragStartPos.current.x;
-      const dy = e.clientY - dragStartPos.current.y;
-      onMoveNodeOffset(draggingNodeId, dx, dy);
-      dragStartPos.current = { x: e.clientX, y: e.clientY };
+      if (!draggingNodeId) return;
+      const canvasX = (e.clientX - (pan?.x || 0)) / (zoom || 1);
+      const canvasY = (e.clientY - (pan?.y || 0)) / (zoom || 1);
+      setDragCursorPos({ x: canvasX, y: canvasY });
 
-      // Detecta sobre qual nó o cursor está passando para reparentalizar
+      // Detecta sobre qual nó o cursor está passando para mudar de setor
       const elements = document.elementsFromPoint(e.clientX, e.clientY);
       const targetCard = elements.find(el => 
         el.classList.contains('mindmap-node-card') && el.id !== `node-${draggingNodeId}`
@@ -170,12 +173,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     const handleMouseUp = () => {
       if (draggingNodeId && dropTargetNodeId && draggingNodeId !== dropTargetNodeId) {
-        // Soltou sobre outro nó -> Reparentaliza!
+        // Soltou sobre outro nó -> Reparentaliza e formata a árvore responsivamente!
         onReparentNode(draggingNodeId, dropTargetNodeId);
       }
       setDraggingNodeId(null);
       setDropTargetNodeId(null);
-      dragStartPos.current = null;
+      setDragCursorPos(null);
     };
 
     if (draggingNodeId) {
@@ -186,7 +189,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingNodeId, dropTargetNodeId, onMoveNodeOffset, onReparentNode]);
+  }, [draggingNodeId, dropTargetNodeId, onReparentNode, pan, zoom]);
 
   // RENDERIZAÇÃO DAS LINHAS CONECTORAS (Bézier ou Retas, com cores e espessura customizáveis)
   const renderConnectors = () => {
@@ -347,16 +350,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               top: `${pos.y}px`,
               minWidth: `${pos.width}px`,
               minHeight: `${pos.height}px`,
-              backgroundColor: bg,
+              backgroundColor: isDropTarget ? 'rgba(13, 148, 136, 0.25)' : bg,
               border: border,
               borderLeft: borderLeft,
-              outline: isSelected ? `2.5px solid ${nodeColor}` : (isDropTarget ? '3px dashed var(--accent-teal)' : undefined),
-              outlineOffset: '2px',
+              outline: isDropTarget ? '3px dashed var(--accent-teal)' : (isSelected ? `2.5px solid ${nodeColor}` : undefined),
+              outlineOffset: isDropTarget ? '4px' : '2px',
               boxShadow: isSelected ? `0 0 16px ${nodeColor}66` : '0 4px 12px rgba(0, 0, 0, 0.25)',
-              zIndex: isSelected ? 35 : 20,
+              zIndex: isDropTarget ? 45 : (isSelected ? 35 : 20),
               padding: isRoot ? '12px 24px' : '8px 16px',
               whiteSpace: 'nowrap',
-              cursor: draggingNodeId === node.id ? 'grabbing' : 'grab'
+              opacity: draggingNodeId === node.id ? 0.35 : 1,
+              cursor: isRoot ? 'default' : (draggingNodeId === node.id ? 'grabbing' : 'grab')
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -367,6 +371,28 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             onMouseLeave={() => setHoveredNodeId(null)}
             onMouseDown={(e) => handleMouseDown(node, e)}
           >
+            {/* Indicador de Setor de Destino */}
+            {isDropTarget && (
+              <div style={{
+                position: 'absolute',
+                top: '-26px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: 'var(--accent-teal)',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '4px',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+                zIndex: 60
+              }}>
+                Mudar para este setor
+              </div>
+            )}
+
             {/* Texto ou Input de Edição */}
             {isEditing ? (
               <input
@@ -469,6 +495,38 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           </div>
         );
       })}
+
+      {/* Cartão Fantasma Flutuante durante o Arraste para Mudar de Setor */}
+      {draggingNodeId && dragCursorPos && nodeMap.get(draggingNodeId) && (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${dragCursorPos.x}px`,
+            top: `${dragCursorPos.y}px`,
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+            zIndex: 1000,
+            backgroundColor: nodeMap.get(draggingNodeId)?.color || 'var(--accent-purple)',
+            color: '#ffffff',
+            padding: '8px 18px',
+            borderRadius: '8px',
+            fontWeight: 600,
+            fontSize: '13.5px',
+            boxShadow: '0 12px 30px rgba(0,0,0,0.6)',
+            border: '2px solid #ffffff',
+            opacity: 0.95,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          <span>{nodeMap.get(draggingNodeId)?.text}</span>
+          <span style={{ fontSize: '11px', opacity: 0.9, backgroundColor: 'rgba(0,0,0,0.35)', padding: '2px 6px', borderRadius: '4px' }}>
+            {dropTargetNodeId ? 'Soltar para mover para este setor' : 'Arraste sobre outro setor'}
+          </span>
+        </div>
+      )}
     </>
   );
 };

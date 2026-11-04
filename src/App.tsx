@@ -760,7 +760,7 @@ export const App: React.FC = () => {
             {/* Traços Livres */}
             <FreehandCanvas drawings={activeBoard.drawings} />
 
-            {/* Mapa Mental com Arraste Livre, Linhas Conectoras e Barra Contextual */}
+            {/* Mapa Mental com Layout Responsivo Automático e Arraste para Mudar de Setor */}
             <MindMapCanvas
               nodes={activeBoard.mindMapNodes}
               selectedNodeId={selectedNodeId}
@@ -770,11 +770,12 @@ export const App: React.FC = () => {
               onAddChildNode={handleAddChildNode}
               onAddSiblingNode={handleAddSiblingNode}
               onDeleteNode={handleDeleteNode}
-              onMoveNodeOffset={handleMoveNodeOffset}
               onReorderNode={handleReorderNode}
               onReparentNode={handleReparentNode}
               onUpdateNodeStyle={handleUpdateNodeStyle}
               onDuplicateNode={handleDuplicateNode}
+              pan={pan}
+              zoom={zoom}
             />
 
             {/* Notas Adesivas */}
