@@ -70,8 +70,15 @@ export const App: React.FC = () => {
     return (localStorage.getItem(THEME_KEY) as 'dark' | 'light') || 'light';
   });
 
-  // Canvas Pan & Zoom
-  const [pan, setPan] = useState({ x: 300, y: 350 });
+  // Canvas Pan & Zoom dinâmico e responsivo desde o primeiro frame
+  const [pan, setPan] = useState(() => {
+    const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const h = typeof window !== 'undefined' ? window.innerHeight : 800;
+    return {
+      x: Math.round(w / 2 - 110),
+      y: Math.round(h / 2 - 30)
+    };
+  });
   const [zoom, setZoom] = useState(1.0);
   const [isPanning, setIsPanning] = useState(false);
   const isSpacePressed = useRef(false);
@@ -129,17 +136,18 @@ export const App: React.FC = () => {
 
     const width = window.innerWidth;
     const height = window.innerHeight;
+    const isMobile = width <= 768;
 
-    const mapWidth = Math.max(maxX - minX, 300);
-    const mapHeight = Math.max(maxY - minY, 200);
+    const mapWidth = Math.max(maxX - minX, 260);
+    const mapHeight = Math.max(maxY - minY, 160);
 
-    const padLeft = sidebarOpen ? 320 : 100;
-    const padRight = 80;
-    const padTop = 100;
-    const padBottom = 80;
+    const padLeft = sidebarOpen && !isMobile ? 320 : (isMobile ? 24 : 80);
+    const padRight = isMobile ? 24 : 80;
+    const padTop = isMobile ? 65 : 90;
+    const padBottom = isMobile ? 50 : 70;
 
-    const availWidth = Math.max(200, width - padLeft - padRight);
-    const availHeight = Math.max(200, height - padTop - padBottom);
+    const availWidth = Math.max(160, width - padLeft - padRight);
+    const availHeight = Math.max(160, height - padTop - padBottom);
 
     const scaleX = availWidth / mapWidth;
     const scaleY = availHeight / mapHeight;
@@ -154,6 +162,22 @@ export const App: React.FC = () => {
     setZoom(Number(newZoom.toFixed(2)));
     setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
   }, [activeBoard.mindMapNodes, sidebarOpen]);
+
+  // Listener de Redimensionamento Dinâmico da Janela
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        fitView(activeBoard.mindMapNodes);
+      }, 150);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+    };
+  }, [fitView, activeBoard.mindMapNodes]);
 
   // Auto-enquadramento ao alternar quadros
   useEffect(() => {
