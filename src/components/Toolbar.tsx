@@ -3,14 +3,20 @@ import {
   Network, 
   MousePointer, 
   Hand, 
-  PlusSquare, 
+  Square, 
   StickyNote as StickyIcon, 
   Layout, 
   Type, 
   Pencil, 
   Play,
   GitBranch,
-  Sparkles
+  Sparkles,
+  ArrowUpRight,
+  Smile,
+  Link,
+  Frame,
+  Table,
+  Plus
 } from 'lucide-react';
 import { ToolType } from '../types';
 
@@ -23,6 +29,7 @@ interface ToolbarProps {
   onAddText: () => void;
   onStartPresentation: () => void;
   onOpenAI: () => void;
+  onTogglePresentPanel?: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -33,107 +40,335 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onAddWireframe,
   onAddText,
   onStartPresentation,
-  onOpenAI
+  onOpenAI,
+  onTogglePresentPanel
 }) => {
   return (
-    <div className="floating-toolbar">
-      {/* Botão Principal: Criar Quadrado com Linha Embutida */}
+    <div
+      style={{
+        position: 'absolute',
+        left: '20px',
+        top: '70px',
+        zIndex: 100,
+        backgroundColor: '#1b212c',
+        border: '1px solid #2c3647',
+        borderRadius: '12px',
+        padding: '6px 4px',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '4px',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)',
+        userSelect: 'none'
+      }}
+    >
+      {/* Grupo Superior de Modos de Diagrama */}
       <button
-        className="tool-button active"
         onClick={onAddConnectedNode}
-        title="Criar Quadrado com Linha Embutida (Conectado ao nó selecionado ou à raiz) - Atalho: Tab ou Enter"
         style={{
-          backgroundColor: 'var(--accent-purple)',
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: '#7c3aed',
           color: '#ffffff',
-          boxShadow: '0 2px 8px rgba(99, 102, 241, 0.4)'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(124, 58, 237, 0.4)'
         }}
+        title="Criar Quadrado com Linha Conectada (Tab: Filho | Enter: Irmão)"
       >
-        <PlusSquare size={19} />
+        <Network size={16} />
       </button>
 
-      <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
-
-      {/* Modo Mapa Mental */}
       <button
-        className={`tool-button ${currentTool === 'mindmap' ? 'active' : ''}`}
-        onClick={() => onSelectTool('mindmap')}
-        title="Modo Mapa Mental Inteligente (Tab: Filho | Enter: Irmão)"
+        onClick={() => onSelectTool('wireframe')}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: currentTool === 'wireframe' ? '#2e394d' : 'transparent',
+          color: currentTool === 'wireframe' ? '#ffffff' : '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Modo Wireframe / Componentes"
       >
-        <Network size={18} />
+        <Layout size={16} />
       </button>
 
-      {/* Ferramenta de Seleção */}
+      {/* Divisor */}
+      <div style={{ width: '22px', height: '1px', backgroundColor: '#2d3748', margin: '2px 0' }} />
+
+      {/* Ferramenta de Seleção / Cursor */}
       <button
-        className={`tool-button ${currentTool === 'select' ? 'active' : ''}`}
         onClick={() => onSelectTool('select')}
-        title="Selecionar / Mover (V)"
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: currentTool === 'select' ? '#2e394d' : 'transparent',
+          color: currentTool === 'select' ? '#ffffff' : '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Selecionar / Mover Nós (V)"
       >
-        <MousePointer size={18} />
+        <MousePointer size={16} />
       </button>
 
-      {/* Mão / Panorâmica */}
+      {/* Mão / Pan */}
       <button
-        className={`tool-button ${currentTool === 'hand' ? 'active' : ''}`}
         onClick={() => onSelectTool('hand')}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: currentTool === 'hand' ? '#2e394d' : 'transparent',
+          color: currentTool === 'hand' ? '#ffffff' : '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
         title="Panorâmica / Mover Canvas (H ou segurar Espaço)"
       >
-        <Hand size={18} />
+        <Hand size={16} />
       </button>
 
-      <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
-
-      {/* Nota Adesiva (Post-it) */}
+      {/* Formas Geométricas */}
       <button
-        className={`tool-button ${currentTool === 'sticky' ? 'active' : ''}`}
+        onClick={onAddConnectedNode}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Formas Geométricas"
+      >
+        <Square size={16} />
+      </button>
+
+      {/* Sticky Note */}
+      <button
         onClick={() => {
           onSelectTool('sticky');
           onAddSticky();
         }}
-        title="Adicionar Nota Adesiva (Post-it) para Anotações"
-      >
-        <StickyIcon size={18} />
-      </button>
-
-      {/* Wireframe UI */}
-      <button
-        className={`tool-button ${currentTool === 'wireframe' ? 'active' : ''}`}
-        onClick={() => {
-          onSelectTool('wireframe');
-          onAddWireframe();
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: currentTool === 'sticky' ? '#2e394d' : 'transparent',
+          color: currentTool === 'sticky' ? '#fde047' : '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
         }}
-        title="Adicionar Componente Wireframe / Mockup de Interface"
+        title="Nota Adesiva / Post-it (S)"
       >
-        <Layout size={18} />
+        <StickyIcon size={16} />
       </button>
 
-      {/* Caneta / Desenho Livre */}
+      {/* Mind Map Mode */}
       <button
-        className={`tool-button ${currentTool === 'draw' ? 'active' : ''}`}
-        onClick={() => onSelectTool(currentTool === 'draw' ? 'mindmap' : 'draw')}
-        title="Desenho Livre / Caneta (D)"
+        onClick={() => onSelectTool('mindmap')}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: currentTool === 'mindmap' ? '#7c3aed' : 'transparent',
+          color: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Mapa Mental (M)"
       >
-        <Pencil size={18} />
+        <GitBranch size={16} />
       </button>
 
-      <div style={{ height: '1px', backgroundColor: 'var(--border-subtle)', margin: '2px 0' }} />
+      {/* Conector */}
+      <button
+        onClick={onAddConnectedNode}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Conector / Linha (C)"
+      >
+        <ArrowUpRight size={16} />
+      </button>
+
+      {/* Texto */}
+      <button
+        onClick={onAddText}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Texto Livre (T)"
+      >
+        <Type size={16} />
+      </button>
+
+      {/* Ícone / Emoji */}
+      <button
+        onClick={onAddConnectedNode}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Ícones e Emojis"
+      >
+        <Smile size={16} />
+      </button>
+
+      {/* Link */}
+      <button
+        onClick={onAddConnectedNode}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Link Externo (K)"
+      >
+        <Link size={16} />
+      </button>
+
+      {/* Desenho Livre / Caneta */}
+      <button
+        onClick={() => onSelectTool(currentTool === 'draw' ? 'mindmap' : 'draw')}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: currentTool === 'draw' ? '#2e394d' : 'transparent',
+          color: currentTool === 'draw' ? '#ffffff' : '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Caneta / Desenho Livre (D)"
+      >
+        <Pencil size={16} />
+      </button>
+
+      {/* Moldura / Seção de Apresentação */}
+      <button
+        onClick={onTogglePresentPanel}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Seção / Painel de Apresentação (F)"
+      >
+        <Frame size={16} />
+      </button>
+
+      {/* Tabela */}
+      <button
+        onClick={onAddConnectedNode}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#94a3b8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Tabela"
+      >
+        <Table size={16} />
+      </button>
+
+      {/* Divisor */}
+      <div style={{ width: '22px', height: '1px', backgroundColor: '#2d3748', margin: '2px 0' }} />
 
       {/* Assistente IA */}
       <button
-        className="tool-button"
         onClick={onOpenAI}
-        title="Assistente IA (Gerar ramos e ideias conectadas)"
-        style={{ color: 'var(--accent-purple-light)' }}
+        style={{
+          width: '32px',
+          height: '32px',
+          borderRadius: '7px',
+          border: 'none',
+          backgroundColor: 'transparent',
+          color: '#c084fc',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer'
+        }}
+        title="Assistente IA (Gerar ramos e estruturas)"
       >
-        <Sparkles size={17} />
-      </button>
-
-      {/* Apresentação */}
-      <button
-        className="tool-button"
-        onClick={onStartPresentation}
-        title="Apresentar Mapa em Tela Cheia (F5)"
-      >
-        <Play size={17} />
+        <Sparkles size={16} />
       </button>
     </div>
   );

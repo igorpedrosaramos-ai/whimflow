@@ -4,13 +4,15 @@ import {
   Share2, 
   Play, 
   Plus, 
-  Undo2, 
-  Redo2, 
   Sun, 
   Moon, 
-  ChevronRight,
-  FolderOpen,
-  ChevronDown
+  ChevronRight, 
+  ChevronDown, 
+  Star, 
+  Search, 
+  Command, 
+  Users,
+  Grid
 } from 'lucide-react';
 import { Board } from '../types';
 
@@ -32,6 +34,8 @@ interface TopNavProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onNavigateToDashboard?: () => void;
+  workspaceName?: string;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
@@ -47,109 +51,122 @@ export const TopNav: React.FC<TopNavProps> = ({
   onStartPresentation,
   theme,
   onToggleTheme,
-  canUndo,
-  canRedo,
-  onUndo,
-  onRedo
+  onNavigateToDashboard,
+  workspaceName = 'teste'
 }) => {
-  return (
-    <header className="top-navbar">
-      {/* Esquerda: Logo / Marca Mapa Mental Turbine + Seletor de Projetos */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
-        <button
-          className="tool-button"
-          onClick={onToggleSidebar}
-          title={sidebarOpen ? "Ocultar Painel de Projetos (Ctrl+B)" : "Exibir Painel de Projetos (Ctrl+B)"}
-          style={{ width: '32px', height: '32px', flexShrink: 0 }}
-        >
-          <SidebarIcon size={18} />
-        </button>
+  const isDark = theme === 'dark';
 
-        {/* Brand Badge Oficial: Mapa Mental Turbine */}
-        <div 
-          style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '8px', 
-            cursor: 'pointer',
-            userSelect: 'none',
-            flexShrink: 0
-          }}
+  return (
+    <header
+      className="top-navbar"
+      style={{
+        height: '48px',
+        backgroundColor: isDark ? '#141922' : '#ffffff',
+        borderBottom: isDark ? '1px solid #1e2633' : '1px solid #e2e8f0',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 16px',
+        userSelect: 'none',
+        flexShrink: 0
+      }}
+    >
+      {/* Esquerda: Breadcrumb Autêntico do Whimsical */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
+        {/* Toggle da Barra Lateral */}
+        <button
           onClick={onToggleSidebar}
-          title="Mapa Mental Turbine • Painel de Projetos"
-        >
-          <div style={{
-            width: '26px',
-            height: '26px',
-            borderRadius: '6px',
-            backgroundColor: '#0f172a',
-            border: '1px solid #334155',
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: isDark ? '#94a3b8' : '#64748b',
+            cursor: 'pointer',
+            padding: '4px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-          }}>
-            <svg width="16" height="16" viewBox="0 0 32 32" fill="none">
-              <circle cx="16" cy="16" r="4" fill="#6366f1" />
-              <path d="M16 5v6M16 21v6M5 16h6M21 16h6M8.2 8.2l4.3 4.3M19.5 19.5l4.3 4.3M8.2 23.8l4.3-4.3M19.5 12.5l4.3-4.3" stroke="#38bdf8" strokeWidth="2.4" strokeLinecap="round" />
-            </svg>
-          </div>
-          <span className="brand-logo-text" style={{ 
-            fontWeight: 800, 
-            fontSize: '13.5px', 
-            letterSpacing: '-0.02em', 
-            color: 'var(--text-primary)',
-            whiteSpace: 'nowrap'
-          }}>
-            Mapa Mental Turbine
-          </span>
+            borderRadius: '4px'
+          }}
+          title={sidebarOpen ? 'Recolher Menu (Ctrl+B)' : 'Expandir Menu (Ctrl+B)'}
+        >
+          <SidebarIcon size={17} />
+        </button>
+
+        {/* Link para o Dashboard / Workspace */}
+        <div
+          onClick={onNavigateToDashboard}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            color: isDark ? '#94a3b8' : '#64748b',
+            fontSize: '13px',
+            fontWeight: 500,
+            transition: 'color 0.15s'
+          }}
+          title="Voltar ao Painel Principal / Dashboard"
+          onMouseEnter={e => (e.currentTarget.style.color = '#818cf8')}
+          onMouseLeave={e => (e.currentTarget.style.color = isDark ? '#94a3b8' : '#64748b')}
+        >
+          <span>Teams</span>
+          <span style={{ color: '#94a3b8' }}>/</span>
+          <Users size={14} color="#818cf8" />
+          <span>Everyone at {workspaceName}</span>
         </div>
 
         {/* Separador de Navegação */}
-        <ChevronRight size={13} color="var(--text-muted)" className="breadcrumb-chevron" style={{ flexShrink: 0 }} />
+        <ChevronRight size={13} color="#94a3b8" style={{ flexShrink: 0 }} />
 
-        {/* Bloco de Título do Projeto & Dropdown Rápido (Sem duplicação de texto) */}
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '4px', 
-          minWidth: 0, 
-          flex: '0 1 auto',
-          backgroundColor: 'var(--bg-canvas)',
-          padding: '2px 8px 2px 6px',
-          borderRadius: '6px',
-          border: '1px solid var(--border-subtle)',
-          overflow: 'hidden'
-        }}>
-          <FolderOpen size={14} color="var(--accent-purple-light)" style={{ flexShrink: 0 }} />
-          
-          {/* Campo de Edição do Título */}
+        {/* Bloco de Título do Quadro Atual */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            minWidth: 0,
+            flex: '0 1 auto',
+            backgroundColor: isDark ? '#1a222f' : '#f8fafc',
+            padding: '3px 8px 3px 6px',
+            borderRadius: '6px',
+            border: isDark ? '1px solid #2a3446' : '1px solid #e2e8f0',
+            overflow: 'hidden'
+          }}
+        >
+          {/* Ícone Roxo do Board */}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <rect x="3" y="3" width="18" height="18" rx="3" />
+            <circle cx="8" cy="8" r="1" fill="#7c3aed" />
+            <circle cx="12" cy="8" r="1" fill="#7c3aed" />
+            <circle cx="16" cy="8" r="1" fill="#7c3aed" />
+          </svg>
+
+          {/* Campo Editável de Título */}
           <input
             type="text"
             value={boardTitle}
-            onChange={(e) => onUpdateTitle(e.target.value)}
+            onChange={e => onUpdateTitle(e.target.value)}
             style={{
               background: 'transparent',
               border: 'none',
-              color: 'var(--text-primary)',
-              fontWeight: 700,
+              color: isDark ? '#f8fafc' : '#0f172a',
+              fontWeight: 600,
               fontSize: '13px',
               padding: '1px 2px',
               outline: 'none',
-              minWidth: '50px',
-              maxWidth: '180px',
+              minWidth: '60px',
+              maxWidth: '220px',
               textOverflow: 'ellipsis',
               overflow: 'hidden',
               whiteSpace: 'nowrap'
             }}
-            title="Clique para editar o nome do projeto"
+            title="Clique para renomear este quadro"
           />
 
-          {/* Seletor dropdown integrado ao lado do título */}
+          {/* Seletor Dropdown Rápido */}
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
             <select
               value={activeBoardId}
-              onChange={(e) => {
+              onChange={e => {
                 if (e.target.value === 'NEW') onCreateNewBoard();
                 else onSelectBoard(e.target.value);
               }}
@@ -162,97 +179,171 @@ export const TopNav: React.FC<TopNavProps> = ({
                 height: '100%',
                 zIndex: 2
               }}
-              title="Trocar para outro projeto salvo"
+              title="Trocar para outro quadro"
             >
-              <option value="" disabled>Alternar Projeto...</option>
+              <option value="" disabled>Alternar Quadro...</option>
               {boards.map(b => (
-                <option key={b.id} value={b.id} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
-                  {b.title}
+                <option key={b.id} value={b.id}>
+                  {b.title || 'untitled'}
                 </option>
               ))}
-              <option value="NEW" style={{ background: 'var(--bg-surface)', color: 'var(--accent-purple-light)', fontWeight: 700 }}>
-                + Novo Projeto em Branco...
-              </option>
+              <option value="NEW">+ Novo Quadro em Branco...</option>
             </select>
-            <div style={{
-              width: '16px',
-              height: '16px',
+            <ChevronDown size={12} color="#94a3b8" />
+          </div>
+        </div>
+
+        {/* Estrela de Favorito */}
+        <Star size={14} color="#94a3b8" style={{ cursor: 'pointer', flexShrink: 0 }} />
+      </div>
+
+      {/* Direita: Presença, Compartilhar, Apresentar, Atalhos */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        {/* Indicador de Presença: 8 pontos verdes */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '1px',
+                backgroundColor: '#10b981'
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Avatar do Usuário */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            padding: '2px 8px 2px 4px',
+            borderRadius: '14px',
+            backgroundColor: isDark ? '#232b38' : '#f1f5f9',
+            fontSize: '12px',
+            fontWeight: 600
+          }}
+        >
+          <div
+            style={{
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              backgroundColor: '#10b981',
+              color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'var(--text-muted)'
-            }}>
-              <ChevronDown size={12} />
-            </div>
+              fontSize: '10px'
+            }}
+          >
+            I
           </div>
+          <span style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>1</span>
         </div>
-      </div>
 
-      {/* Centro: Desfazer / Refazer (Ocultado em telas pequenas para economizar espaço) */}
-      <div className="undo-redo-group" style={{ display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0, margin: '0 4px' }}>
-        {onUndo && (
+        {/* Botão de Navegar para o Dashboard */}
+        {onNavigateToDashboard && (
           <button
-            onClick={onUndo}
-            disabled={!canUndo}
-            className="tool-button"
-            style={{ width: '28px', height: '28px', opacity: canUndo ? 1 : 0.3 }}
-            title="Desfazer (Ctrl+Z)"
+            id="btn-goto-dashboard"
+            onClick={onNavigateToDashboard}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              backgroundColor: isDark ? '#1e2634' : '#f1f5f9',
+              border: isDark ? '1px solid #2e3a4e' : '1px solid #e2e8f0',
+              color: isDark ? '#f1f5f9' : '#334155',
+              fontSize: '12.5px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+            title="Ir para o Dashboard de Quadros"
           >
-            <Undo2 size={14} />
+            <Grid size={14} />
+            <span>Dashboard</span>
           </button>
         )}
-        {onRedo && (
-          <button
-            onClick={onRedo}
-            disabled={!canRedo}
-            className="tool-button"
-            style={{ width: '28px', height: '28px', opacity: canRedo ? 1 : 0.3 }}
-            title="Refazer (Ctrl+Y)"
-          >
-            <Redo2 size={14} />
-          </button>
-        )}
-      </div>
 
-      {/* Direita: Ações Principais (Novo Quadro, Compartilhar, Apresentar, Tema) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-        {/* Botão + Novo Quadro */}
-        <button
-          onClick={onCreateNewBoard}
-          className="nav-action-btn secondary"
-          title="Criar um Novo Quadro em Branco"
-        >
-          <Plus size={14} color="var(--accent-purple-light)" />
-          <span className="nav-btn-text">Novo</span>
-        </button>
-
-        {/* Compartilhar Link */}
+        {/* Botão Compartilhar */}
         <button
           onClick={onOpenShare}
-          className="nav-action-btn primary"
-          title="Compartilhar Link Público ou Exportar (PPTX, PDF, PNG)"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            backgroundColor: '#7c3aed',
+            border: 'none',
+            color: '#ffffff',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(124, 58, 237, 0.35)'
+          }}
+          title="Compartilhar Link ou Exportar"
         >
-          <Share2 size={14} />
-          <span className="nav-btn-text">Compartilhar</span>
+          <Share2 size={13} />
+          <span>Share</span>
         </button>
 
-        {/* Apresentar */}
+        {/* Botão ▷ Present */}
         <button
           onClick={onStartPresentation}
-          className="nav-action-btn presentation"
-          title="Modo Apresentação Executiva em Tela Cheia (F5)"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            borderRadius: '6px',
+            backgroundColor: isDark ? '#232b38' : '#f1f5f9',
+            border: isDark ? '1px solid #333f52' : '1px solid #e2e8f0',
+            color: isDark ? '#f8fafc' : '#0f172a',
+            fontSize: '12.5px',
+            fontWeight: 600,
+            cursor: 'pointer'
+          }}
+          title="Apresentação em Tela Cheia (F5)"
         >
-          <Play size={13} fill="currentColor" />
-          <span className="nav-btn-text">Apresentar</span>
+          <Play size={12} fill="currentColor" />
+          <span>Present</span>
+        </button>
+
+        {/* Busca */}
+        <button
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: isDark ? '#94a3b8' : '#64748b',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center'
+          }}
+          title="Buscar"
+        >
+          <Search size={16} />
         </button>
 
         {/* Alternador de Tema */}
         <button
           onClick={onToggleTheme}
-          className="tool-button"
-          title={theme === 'dark' ? "Mudar para Tema Claro" : "Mudar para Tema Escuro"}
-          style={{ width: '32px', height: '32px' }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: isDark ? '#94a3b8' : '#64748b',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center'
+          }}
+          title={theme === 'dark' ? 'Mudar para Tema Claro' : 'Mudar para Tema Escuro'}
         >
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>

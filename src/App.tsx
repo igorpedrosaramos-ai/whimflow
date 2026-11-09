@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { INITIAL_BOARDS, BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD } from './constants/initialData';
-import { Board, ToolType, MindMapNode, StickyNote, WireframeItem, DrawingStroke } from './types';
+import { Board, ToolType, MindMapNode, StickyNote, WireframeItem, DrawingStroke, SlideSection } from './types';
 import { TopNav } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
 import { Toolbar } from './components/Toolbar';
@@ -11,6 +11,10 @@ import { ZoomControls } from './components/ZoomControls';
 import { AIModal } from './components/AIModal';
 import { ShareModal } from './components/ShareModal';
 import { PresentationView } from './components/PresentationView';
+import { DashboardView } from './components/DashboardView';
+import { TemplateModal } from './components/TemplateModal';
+import { PresentSidePanel } from './components/PresentSidePanel';
+import { TemplateItem } from './constants/templatesData';
 import { EXECUTIVE_PALETTE } from './components/NodeContextMenu';
 import { calculateMindMapLayout } from './utils/treeLayout';
 import { parseOutlineText, createNodesFromOutline } from './utils/mindMapImport';
@@ -111,6 +115,11 @@ export const App: React.FC = () => {
   const [marqueeRect, setMarqueeRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
   const isMarqueeActiveRef = useRef(false);
+
+  // Visualização Principal: 'dashboard' (Workspace Teams Whimsical) ou 'editor' (Canvas)
+  const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>('dashboard');
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [isPresentSidePanelOpen, setIsPresentSidePanelOpen] = useState(false);
 
   // Modais
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
@@ -280,7 +289,7 @@ export const App: React.FC = () => {
   }, [handleUndo, handleRedo]);
 
   // CRIAR NOVO QUADRO 100% LIMPO
-  const handleCreateNewBoard = (title: string = 'Novo Projeto') => {
+  const handleCreateNewBoard = (title: string = 'untitled') => {
     const newBoardId = `board-${Date.now()}`;
     const newBoard: Board = {
       id: newBoardId,
@@ -291,7 +300,7 @@ export const App: React.FC = () => {
       mindMapNodes: [
         {
           id: 'root',
-          text: 'Ideia Central',
+          text: 'Central Idea',
           x: 0,
           y: 0,
           width: 220,
@@ -299,7 +308,7 @@ export const App: React.FC = () => {
           parentId: null,
           childrenIds: [],
           collapsed: false,
-          color: '#6366f1',
+          color: '#7c3aed',
           borderStyle: 'accent',
           lineStyle: 'bezier',
           side: 'root'
@@ -310,7 +319,8 @@ export const App: React.FC = () => {
       stickies: [],
       wireframes: [],
       texts: [],
-      drawings: []
+      drawings: [],
+      sections: []
     };
 
     setBoards(prev => [newBoard, ...prev]);
@@ -318,7 +328,58 @@ export const App: React.FC = () => {
     setSelectedNodeId('root');
     setPan({ x: 300, y: 350 });
     setZoom(1.0);
+    setCurrentView('editor');
   };
+
+  // ABERTURA DE QUADRO PELO DASHBOARD
+  const handleOpenBoard = useCallback((boardId: string) => {
+    setActiveBoardId(boardId);
+    setCurrentView('editor');
+    const target = boards.find(b => b.id === boardId);
+    if (target) {
+      setTimeout(() => fitView(target.mindMapNodes), 80);
+    }
+  }, [boards, fitView]);
+
+  // CRIAÇÃO A PARTIR DE TEMPLATES DO WHIMSICAL
+  const handleCreateFromTemplate = useCallback((template: TemplateItem) => {
+    const newId = `board-${Date.now()}`;
+    const newBoard: Board = {
+      ...template.boardData,
+      id: newId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    setBoards(prev => [newBoard, ...prev]);
+    setActiveBoardId(newId);
+    setIsTemplateModalOpen(false);
+    setCurrentView('editor');
+    setTimeout(() => fitView(newBoard.mindMapNodes), 100);
+  }, [fitView]);
+
+  // SEÇÕES DE APRESENTAÇÃO (PRESENT SIDE PANEL)
+  const handleAddSection = useCallback(() => {
+    const sectionId = `sec-${Date.now()}`;
+    const title = selectedNodeId 
+      ? (activeBoard.mindMapNodes.find(n => n.id === selectedNodeId)?.text || 'untitled') 
+      : `untitled ${(activeBoard.sections?.length || 0) + 1}`;
+    const newSection: SlideSection = {
+      id: sectionId,
+      title,
+      nodeIds: selectedNodeIds.length > 0 ? [...selectedNodeIds] : (selectedNodeId ? [selectedNodeId] : ['root'])
+    };
+    updateActiveBoard(b => ({
+      ...b,
+      sections: [...(b.sections || []), newSection]
+    }));
+  }, [activeBoard, selectedNodeId, selectedNodeIds, updateActiveBoard]);
+
+  const handleDeleteSection = useCallback((secId: string) => {
+    updateActiveBoard(b => ({
+      ...b,
+      sections: (b.sections || []).filter(s => s.id !== secId)
+    }));
+  }, [updateActiveBoard]);
 
   // DUPLICAR QUADRO
   const handleDuplicateBoard = (id: string) => {
@@ -1344,6 +1405,44 @@ export const App: React.FC = () => {
     activeBoard.wireframes.length + 
     activeBoard.drawings.length;
 
+  // Renderização do Dashboard Whimsical
+  if (currentView === 'dashboard') {
+    return (
+      <div style={{ width: '100vw', height: '100vh', display: 'flex', position: 'relative' }}>
+        <DashboardView
+          boards={boards}
+          onOpenBoard={handleOpenBoard}
+          onCreateNewBoard={(title) => handleCreateNewBoard(title || 'untitled')}
+          onOpenTemplates={() => setIsTemplateModalOpen(true)}
+          onOpenAI={() => setIsAIModalOpen(true)}
+          onDuplicateBoard={handleDuplicateBoard}
+          onDeleteBoard={handleDeleteBoard}
+          onRenameBoard={(id, newTitle) => {
+            setBoards(prev => prev.map(b => b.id === id ? { ...b, title: newTitle, updatedAt: new Date().toISOString() } : b));
+          }}
+          workspaceName="teste"
+          theme={theme}
+        />
+
+        {/* Modal de Templates do Whimsical */}
+        <TemplateModal
+          isOpen={isTemplateModalOpen}
+          onClose={() => setIsTemplateModalOpen(false)}
+          onSelectTemplate={handleCreateFromTemplate}
+          workspaceName="teste"
+        />
+
+        {/* Modal IA */}
+        <AIModal
+          isOpen={isAIModalOpen}
+          onClose={() => setIsAIModalOpen(false)}
+          selectedNode={activeBoard.mindMapNodes.find(n => n.id === selectedNodeId) || null}
+          onAddGeneratedBranches={handleAddGeneratedBranches}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Top Navigation com Seletor de Quadros e Ações */}
@@ -1352,8 +1451,8 @@ export const App: React.FC = () => {
         onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
         boards={boards}
         activeBoardId={activeBoard.id}
-        onSelectBoard={setActiveBoardId}
-        onCreateNewBoard={() => handleCreateNewBoard()}
+        onSelectBoard={handleOpenBoard}
+        onCreateNewBoard={() => handleCreateNewBoard('untitled')}
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         onOpenShare={() => setIsShareModalOpen(true)}
@@ -1365,21 +1464,26 @@ export const App: React.FC = () => {
         canRedo={historyIndex < history.length - 1}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        onNavigateToDashboard={() => setCurrentView('dashboard')}
+        workspaceName="teste"
       />
 
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
         {/* Painel Lateral com Lista de Projetos */}
         <Sidebar
           isOpen={sidebarOpen}
           boards={boards}
           activeBoardId={activeBoard.id}
-          onSelectBoard={setActiveBoardId}
+          onSelectBoard={handleOpenBoard}
           onCreateBoard={handleCreateNewBoard}
           onDuplicateBoard={handleDuplicateBoard}
           onDeleteBoard={handleDeleteBoard}
           onRenameBoard={(id, newTitle) => {
             setBoards(prev => prev.map(b => b.id === id ? { ...b, title: newTitle, updatedAt: new Date().toISOString() } : b));
           }}
+          onNavigateToDashboard={() => setCurrentView('dashboard')}
+          onOpenTemplates={() => setIsTemplateModalOpen(true)}
+          workspaceName="teste"
         />
 
         {/* Toolbar Flutuante */}
@@ -1392,6 +1496,7 @@ export const App: React.FC = () => {
           onAddText={() => handleAddSticky()}
           onStartPresentation={() => setIsPresentationOpen(true)}
           onOpenAI={() => setIsAIModalOpen(true)}
+          onTogglePresentPanel={() => setIsPresentSidePanelOpen(prev => !prev)}
         />
 
         {/* Canvas Principal */}
@@ -1557,14 +1662,45 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Controles de Zoom */}
+        {/* Painel Lateral de Apresentação (Whimsical Present Panel) */}
+        <PresentSidePanel
+          isOpen={isPresentSidePanelOpen}
+          onClose={() => setIsPresentSidePanelOpen(false)}
+          sections={activeBoard.sections || []}
+          onAddSection={handleAddSection}
+          onSelectSection={(secId) => {
+            const sec = (activeBoard.sections || []).find(s => s.id === secId);
+            if (sec && sec.nodeIds.length > 0) {
+              setSelectedNodeId(sec.nodeIds[0]);
+              setSelectedNodeIds(sec.nodeIds);
+            }
+          }}
+          onDeleteSection={handleDeleteSection}
+          onStartPresentation={() => setIsPresentationOpen(true)}
+          theme={theme}
+        />
+
+        {/* Controles de Zoom & Barra Inferior Whimsical */}
         <ZoomControls
           zoom={zoom}
           onZoomIn={() => setZoom(prev => Math.min(prev + 0.1, 2.5))}
           onZoomOut={() => setZoom(prev => Math.max(prev - 0.1, 0.2))}
           onResetZoom={() => fitView()}
+          canUndo={historyIndex >= 0}
+          canRedo={historyIndex < history.length - 1}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          theme={theme}
         />
       </div>
+
+      {/* Modal de Templates do Whimsical */}
+      <TemplateModal
+        isOpen={isTemplateModalOpen}
+        onClose={() => setIsTemplateModalOpen(false)}
+        onSelectTemplate={handleCreateFromTemplate}
+        workspaceName="teste"
+      />
 
       {/* Modal IA */}
       <AIModal

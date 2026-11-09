@@ -104,6 +104,12 @@ export interface DrawingStroke {
   strokeWidth: number;
 }
 
+export interface SlideSection {
+  id: string;
+  title: string;
+  nodeIds: string[];
+}
+
 export interface Board {
   id: string;
   title: string;
@@ -117,6 +123,7 @@ export interface Board {
   wireframes: WireframeItem[];
   texts: TextItem[];
   drawings: DrawingStroke[];
+  sections?: SlideSection[];
 }
 
 export interface Workspace {
