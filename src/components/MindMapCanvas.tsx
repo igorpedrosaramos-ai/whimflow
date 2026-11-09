@@ -87,7 +87,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     const root = nodes.find(n => n.side === 'root') || nodes[0];
     if (!root) return new Map();
     return calculateMindMapLayout(nodes, root.id, {
-      horizontalGap: 90,
+      horizontalGap: 100,
       verticalGap: 18,
       rootX: 0,
       rootY: 0
@@ -449,6 +449,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             style={{
               left: `${pos.x}px`,
               top: `${pos.y}px`,
+              width: `${pos.width}px`,
               minWidth: `${pos.width}px`,
               minHeight: `${pos.height}px`,
               backgroundColor: isDropTarget && dropPosition === 'inside' ? 'rgba(13, 148, 136, 0.2)' : bg,

@@ -10,7 +10,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { Board, MindMapNode } from '../types';
-import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
+import { calculateMindMapLayout, getBezierPath, estimateNodeDimensions } from '../utils/treeLayout';
 
 interface PresentationViewProps {
   board: Board;
@@ -80,29 +80,6 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
     return map;
   }, [board.mindMapNodes]);
 
-  // Layout espacial da árvore responsiva (mesmo algoritmo do editor para zero sobreposição)
-  const layoutMap = useMemo(() => {
-    if (!rootNode) return new Map();
-    return calculateMindMapLayout(board.mindMapNodes, rootNode.id, {
-      horizontalGap: 90,
-      verticalGap: 18,
-      rootX: 0,
-      rootY: 0
-    });
-  }, [board.mindMapNodes, rootNode]);
-
-  const getNodePos = (node: MindMapNode) => {
-    const computed = layoutMap.get(node.id);
-    const baseX = computed ? computed.x : node.x;
-    const baseY = computed ? computed.y : node.y;
-    return {
-      x: baseX,
-      y: baseY,
-      width: computed ? computed.width : 120,
-      height: computed ? computed.height : 38
-    };
-  };
-
   // Coleta todos os nós descendentes de um ramo
   const getBranchNodeIds = (branchId: string): Set<string> => {
     const set = new Set<string>([branchId]);
@@ -119,18 +96,79 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
     return set;
   };
 
+  // Nós estritamente ativos e visíveis no slide atual:
+  // Slide 0: Visão Geral de toda a estrutura (com todos os ramos primários e secundários calculados)
+  // Slide N: Foco no Ramo N (com a Raiz + Ramo N e todos os seus filhos 100% expandidos e calculados)
+  // Os outros ramos primários ficam apenas como âncoras recolhidas (sem seus filhos), eliminando 100% de colisões!
+  const slideNodes = useMemo(() => {
+    if (!rootNode) return [];
+
+    if (currentSlideIndex === 0) {
+      // Visão Geral: todos os nós com collapsed = false para cálculo completo do layout
+      return board.mindMapNodes.map(n => ({ ...n, collapsed: false }));
+    }
+
+    const branch = primaryBranches[currentSlideIndex - 1];
+    if (!branch) return board.mindMapNodes;
+
+    // Coleta todos os descendentes do ramo ativo
+    const activeIds = getBranchNodeIds(branch.id);
+    activeIds.add(rootNode.id);
+
+    // Filtra apenas nós relevantes ao slide:
+    // 1. A raiz
+    // 2. O ramo ativo e todos os seus descendentes
+    // 3. Os outros ramos primários (como nó de contexto, mas SEM os filhos deles)
+    return board.mindMapNodes
+      .filter(n => {
+        if (n.id === rootNode.id) return true;
+        if (activeIds.has(n.id)) return true;
+        if (n.parentId === rootNode.id) return true;
+        return false;
+      })
+      .map(n => {
+        if (activeIds.has(n.id)) {
+          return { ...n, collapsed: false }; // Ramo ativo e seus filhos 100% expandidos
+        }
+        return { ...n, collapsed: true }; // Outros ramos primários ficam recolhidos
+      });
+  }, [currentSlideIndex, board.mindMapNodes, primaryBranches, rootNode]);
+
+  // Layout espacial calculado exclusivamente para os nós do slide atual (Zero colisões)
+  const layoutMap = useMemo(() => {
+    if (!rootNode || slideNodes.length === 0) return new Map();
+    return calculateMindMapLayout(slideNodes, rootNode.id, {
+      horizontalGap: 100,
+      verticalGap: 18,
+      rootX: 0,
+      rootY: 0
+    });
+  }, [slideNodes, rootNode]);
+
+  const getNodePos = (node: MindMapNode) => {
+    const computed = layoutMap.get(node.id);
+    const dims = estimateNodeDimensions(node);
+    const baseX = computed ? computed.x : (node.x || 0);
+    const baseY = computed ? computed.y : (node.y || 0);
+    return {
+      x: baseX,
+      y: baseY,
+      width: computed ? computed.width : dims.width,
+      height: computed ? computed.height : dims.height
+    };
+  };
+
   // Conjunto de nós em destaque no slide atual
   const activeHighlightedIds = useMemo(() => {
     if (currentSlideIndex === 0) {
-      // Visão Geral: todos os nós estão ativos
-      return new Set(board.mindMapNodes.map(n => n.id));
+      return new Set(slideNodes.map(n => n.id));
     }
     const branch = primaryBranches[currentSlideIndex - 1];
-    if (!branch) return new Set(board.mindMapNodes.map(n => n.id));
+    if (!branch) return new Set(slideNodes.map(n => n.id));
     const branchIds = getBranchNodeIds(branch.id);
     if (rootNode) branchIds.add(rootNode.id);
     return branchIds;
-  }, [currentSlideIndex, primaryBranches, board.mindMapNodes, rootNode]);
+  }, [currentSlideIndex, primaryBranches, slideNodes, rootNode]);
 
   // Calcula câmera automática (Pan e Zoom) com enquadramento proporcional e responsivo
   const cameraTransform = useMemo(() => {
@@ -140,7 +178,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
     if (currentSlideIndex === 0 || primaryBranches.length === 0) {
       // Visão Geral: Enquadra todos os nós com margem de respiro
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      board.mindMapNodes.forEach(node => {
+      slideNodes.forEach(node => {
         const pos = getNodePos(node);
         if (pos.x < minX) minX = pos.x;
         if (pos.y < minY) minY = pos.y;
@@ -183,7 +221,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     branchIds.forEach(id => {
-      const node = nodeMap.get(id);
+      const node = slideNodes.find(n => n.id === id);
       if (node) {
         const pos = getNodePos(node);
         if (pos.x < minX) minX = pos.x;
@@ -211,7 +249,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
     const panY = height / 2 - centerY * zoom + userPanOffset.y;
 
     return { panX, panY, zoom };
-  }, [currentSlideIndex, primaryBranches, board.mindMapNodes, layoutMap, windowDimensions, userPanOffset, userZoomFactor, rootNode]);
+  }, [currentSlideIndex, primaryBranches, slideNodes, layoutMap, windowDimensions, userPanOffset, userZoomFactor, rootNode]);
 
   // Teclas de atalho para apresentação
   useEffect(() => {
@@ -276,11 +314,14 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
 
   // Renderiza conectores com portas distribuídas na borda do pai
   const renderConnectors = () => {
+    const slideNodeMap = new Map<string, MindMapNode>();
+    slideNodes.forEach(n => slideNodeMap.set(n.id, n));
+
     const parentChildrenMap = new Map<string, MindMapNode[]>();
-    board.mindMapNodes.forEach(child => {
+    slideNodes.forEach(child => {
       if (!child.parentId) return;
-      const parent = nodeMap.get(child.parentId);
-      if (!parent) return;
+      const parent = slideNodeMap.get(child.parentId);
+      if (!parent || parent.collapsed) return;
 
       if (!parentChildrenMap.has(child.parentId)) {
         parentChildrenMap.set(child.parentId, []);
@@ -291,7 +332,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
     const paths: React.ReactElement[] = [];
 
     parentChildrenMap.forEach((children, parentId) => {
-      const parent = nodeMap.get(parentId);
+      const parent = slideNodeMap.get(parentId);
       if (!parent) return;
       const pPos = getNodePos(parent);
 
@@ -511,7 +552,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
           {renderConnectors()}
 
           {/* Nós / Quadrados Visuais */}
-          {board.mindMapNodes.map(node => {
+          {slideNodes.map(node => {
             const isRoot = node.side === 'root';
             const pos = getNodePos(node);
             const nodeColor = node.color || '#6366f1';
@@ -543,6 +584,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
                   position: 'absolute',
                   left: `${pos.x}px`,
                   top: `${pos.y}px`,
+                  width: `${pos.width}px`,
                   minWidth: `${pos.width}px`,
                   minHeight: `${pos.height}px`,
                   backgroundColor: bg,

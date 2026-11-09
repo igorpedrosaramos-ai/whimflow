@@ -15,11 +15,21 @@ export interface ComputedNodeLayout {
 export function estimateNodeDimensions(node: MindMapNode): { width: number; height: number } {
   if (node.side === 'root') {
     const textLen = (node.text || '').length;
-    return { width: Math.max(180, Math.round(textLen * 9.2 + 48)), height: 48 };
+    return { width: Math.max(180, Math.round(textLen * 9.5 + 56)), height: 48 };
   }
-  const textLen = (node.text || '').length;
-  // Largura proporcional sem quebras; nós vazios ficam compactos e elegantes
-  const width = textLen === 0 ? 100 : Math.max(110, Math.min(460, Math.round(textLen * 8.5 + 36)));
+  const text = node.text || '';
+  const textLen = text.length;
+  if (textLen === 0) {
+    return { width: 100, height: 38 };
+  }
+
+  // Medição proporcional precisa sem corte arbitrário (zero sobreposição com nós-filhos)
+  // ~8.8px por caractere no corpo 13.5px com folga de padding lateral e possíveis badges
+  const hasChildBadge = Boolean(node.childrenIds && node.childrenIds.length > 0 && node.collapsed);
+  const badgePadding = hasChildBadge ? 36 : 0;
+  const basePadding = 42; // 14px padding esquerdo + 14px padding direito + folga segura
+
+  const width = Math.max(110, Math.round(textLen * 8.8 + basePadding + badgePadding));
   const height = 38;
   return { width, height };
 }
