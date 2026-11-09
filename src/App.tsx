@@ -24,10 +24,17 @@ export const App: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Garante que ambos os templates (Onegai e Orion) estejam disponíveis no seletor
-          const hasOnegai = parsed.some((b: Board) => b.id === 'board-onegai');
-          const hasOrion = parsed.some((b: Board) => b.id === 'board-orion-sushi');
-          const list = [...parsed];
+          // Limpeza defensiva de nós legados com "Novo Quadrado" ou "Novo nó"
+          const sanitized = parsed.map((b: Board) => ({
+            ...b,
+            mindMapNodes: (b.mindMapNodes || []).map(n => ({
+              ...n,
+              text: (n.text === 'Novo Quadrado' || n.text === 'Novo nó') ? '' : (n.text || '')
+            }))
+          }));
+          const hasOnegai = sanitized.some((b: Board) => b.id === 'board-onegai');
+          const hasOrion = sanitized.some((b: Board) => b.id === 'board-orion-sushi');
+          const list = [...sanitized];
           if (!hasOnegai) list.push(ONEGAI_BOARD);
           if (!hasOrion) list.push(ORION_SUSHI_BOARD);
           return list;
@@ -66,7 +73,13 @@ export const App: React.FC = () => {
 
   // Seleções
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>('root');
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(['root']);
   const [selectedStickyId, setSelectedStickyId] = useState<string | null>(null);
+
+  // Seleção por Retângulo (Marquee / Lasso) no Canvas
+  const [marqueeRect, setMarqueeRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isMarqueeActiveRef = useRef(false);
 
   // Modais
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
@@ -282,6 +295,7 @@ export const App: React.FC = () => {
     }));
 
     setSelectedNodeId(newId);
+    setSelectedNodeIds([newId]);
     setEditingNodeId(newId);
   };
 
@@ -335,6 +349,7 @@ export const App: React.FC = () => {
     });
 
     setSelectedNodeId(newId);
+    setSelectedNodeIds([newId]);
     setEditingNodeId(newId);
   };
 
@@ -370,10 +385,19 @@ export const App: React.FC = () => {
   ) => {
     if (draggedId === targetId) return;
 
+    // Se o nó arrastado fizer parte de uma seleção múltipla, move todos os nós selecionados juntos
+    const movingIds = (selectedNodeIds.length > 1 && selectedNodeIds.includes(draggedId))
+      ? selectedNodeIds.filter(id => {
+          const n = activeBoard.mindMapNodes.find(item => item.id === id);
+          return n && n.side !== 'root' && id !== targetId;
+        })
+      : [draggedId];
+
+    if (movingIds.length === 0) return;
+
     updateActiveBoard(board => {
-      const draggedNode = board.mindMapNodes.find(n => n.id === draggedId);
       const targetNode = board.mindMapNodes.find(n => n.id === targetId);
-      if (!draggedNode || !targetNode) return board;
+      if (!targetNode) return board;
 
       // Impede ciclos (não pode soltar dentro de seus próprios descendentes)
       const isDescendant = (checkId: string, searchTarget: string): boolean => {
@@ -383,24 +407,31 @@ export const App: React.FC = () => {
         return n.childrenIds.some(cid => isDescendant(cid, searchTarget));
       };
 
-      if (isDescendant(draggedId, targetId)) {
-        return board;
-      }
+      const validMovingIds = movingIds.filter(mid => !isDescendant(mid, targetId));
+      if (validMovingIds.length === 0) return board;
 
       if (position === 'inside') {
-        const oldParentId = draggedNode.parentId;
-        if (oldParentId === targetId) return board; // Já é filho deste nó
-
         return {
           ...board,
           mindMapNodes: board.mindMapNodes.map(n => {
-            if (oldParentId && n.id === oldParentId) {
-              return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== draggedId) };
+            // Remove dos pais antigos
+            if (n.childrenIds && n.childrenIds.some(cid => validMovingIds.includes(cid))) {
+              return {
+                ...n,
+                childrenIds: n.childrenIds.filter(cid => !validMovingIds.includes(cid))
+              };
             }
+            // Adiciona ao novo pai
             if (n.id === targetId) {
-              return { ...n, childrenIds: [...n.childrenIds.filter(cid => cid !== draggedId), draggedId], collapsed: false };
+              const existing = n.childrenIds.filter(cid => !validMovingIds.includes(cid));
+              return {
+                ...n,
+                childrenIds: [...existing, ...validMovingIds],
+                collapsed: false
+              };
             }
-            if (n.id === draggedId) {
+            // Atualiza propriedades dos nós movidos
+            if (validMovingIds.includes(n.id)) {
               return {
                 ...n,
                 parentId: targetId,
@@ -421,29 +452,30 @@ export const App: React.FC = () => {
       const newParent = board.mindMapNodes.find(n => n.id === newParentId);
       if (!newParent) return board;
 
-      const oldParentId = draggedNode.parentId;
-
-      // Lista atualizada de filhos do novo pai
-      let newChildren = newParent.childrenIds.filter(cid => cid !== draggedId);
+      let newChildren = newParent.childrenIds.filter(cid => !validMovingIds.includes(cid));
       const targetIndex = newChildren.indexOf(targetId);
       const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
 
       if (insertIndex >= 0) {
-        newChildren.splice(insertIndex, 0, draggedId);
+        newChildren.splice(insertIndex, 0, ...validMovingIds);
       } else {
-        newChildren.push(draggedId);
+        newChildren.push(...validMovingIds);
       }
 
       return {
         ...board,
         mindMapNodes: board.mindMapNodes.map(n => {
-          if (oldParentId && oldParentId !== newParentId && n.id === oldParentId) {
-            return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== draggedId) };
+          // Remove dos pais antigos se não for o novo pai
+          if (n.id !== newParentId && n.childrenIds && n.childrenIds.some(cid => validMovingIds.includes(cid))) {
+            return {
+              ...n,
+              childrenIds: n.childrenIds.filter(cid => !validMovingIds.includes(cid))
+            };
           }
           if (n.id === newParentId) {
             return { ...n, childrenIds: newChildren };
           }
-          if (n.id === draggedId) {
+          if (validMovingIds.includes(n.id)) {
             return {
               ...n,
               parentId: newParentId,
@@ -588,7 +620,7 @@ export const App: React.FC = () => {
       const gather = (nodeId: string) => {
         toDelete.add(nodeId);
         const node = board.mindMapNodes.find(n => n.id === nodeId);
-        if (node) node.childrenIds.forEach(gather);
+        if (node && node.childrenIds) node.childrenIds.forEach(gather);
       };
       toDeleteInput.forEach(gather);
 
@@ -600,6 +632,7 @@ export const App: React.FC = () => {
       };
     });
     setSelectedNodeId(null);
+    setSelectedNodeIds([]);
   };
 
   // DUPLICAR MÚLTIPLOS NÓS
@@ -608,82 +641,56 @@ export const App: React.FC = () => {
     const toDup = ids.filter(id => id !== rootNode?.id);
     if (toDup.length === 0) return;
 
+    const newIds: string[] = [];
+
     updateActiveBoard(board => {
       const newNodes: MindMapNode[] = [];
-      const idMap: Record<string, string> = {};
+      const parentToNewChildren = new Map<string, string[]>();
 
-      toDup.forEach(id => {
+      toDup.forEach((id, idx) => {
         const node = board.mindMapNodes.find(n => n.id === id);
         if (!node || !node.parentId) return;
-        const newId = `node-${Date.now()}-dup-${id}`;
-        idMap[id] = newId;
+        const newId = `node-${Date.now()}-${idx}`;
+        newIds.push(newId);
+
         newNodes.push({
           ...JSON.parse(JSON.stringify(node)),
           id: newId,
-          text: `${node.text} (Cópia)`,
+          text: node.text ? `${node.text} (Cópia)` : '',
           childrenIds: [],
-          offsetX: (node.offsetX || 0) + 24,
-          offsetY: (node.offsetY || 0) + 48,
+          offsetX: 0,
+          offsetY: 0
         });
+
+        const list = parentToNewChildren.get(node.parentId) || [];
+        list.push(newId);
+        parentToNewChildren.set(node.parentId, list);
       });
 
-      let updatedNodes = [...board.mindMapNodes];
-      // Adiciona novos nós como filhos dos seus pais originais
-      newNodes.forEach(newNode => {
-        const originalId = Object.keys(idMap).find(k => idMap[k] === newNode.id)!;
-        const original = board.mindMapNodes.find(n => n.id === originalId);
-        if (!original || !original.parentId) return;
-        updatedNodes = updatedNodes.map(n =>
-          n.id === original.parentId
-            ? { ...n, childrenIds: [...n.childrenIds, newNode.id] }
-            : n
-        );
-      });
-
-      return { ...board, mindMapNodes: [...updatedNodes, ...newNodes] };
+      return {
+        ...board,
+        mindMapNodes: [
+          ...board.mindMapNodes.map(n => {
+            const added = parentToNewChildren.get(n.id);
+            if (added) {
+              return { ...n, childrenIds: [...n.childrenIds, ...added] };
+            }
+            return n;
+          }),
+          ...newNodes
+        ]
+      };
     });
-  };
 
-  // MOVER MÚLTIPLOS NÓS (arraste em grupo)
-  const handleMoveMultipleNodesOffset = (ids: string[], dx: number, dy: number) => {
-    updateActiveBoard(board => ({
-      ...board,
-      mindMapNodes: board.mindMapNodes.map(n => ids.includes(n.id) ? {
-        ...n,
-        offsetX: (n.offsetX || 0) + dx / zoom,
-        offsetY: (n.offsetY || 0) + dy / zoom
-      } : n)
-    }), false);
+    if (newIds.length > 0) {
+      setSelectedNodeId(newIds[0]);
+      setSelectedNodeIds(newIds);
+    }
   };
 
   // EXCLUIR NÓ E SUB-RAMOS
   const handleDeleteNode = (id: string) => {
-    const rootNode = activeBoard.mindMapNodes.find(n => n.side === 'root');
-    if (rootNode && id === rootNode.id) return;
-
-    updateActiveBoard(board => {
-      const toDelete = new Set<string>();
-      const gather = (nodeId: string) => {
-        toDelete.add(nodeId);
-        const node = board.mindMapNodes.find(n => n.id === nodeId);
-        if (node) {
-          node.childrenIds.forEach(gather);
-        }
-      };
-      gather(id);
-
-      return {
-        ...board,
-        mindMapNodes: board.mindMapNodes
-          .filter(n => !toDelete.has(n.id))
-          .map(n => ({
-            ...n,
-            childrenIds: n.childrenIds.filter(cid => !toDelete.has(cid))
-          }))
-      };
-    });
-
-    setSelectedNodeId(null);
+    handleDeleteMultipleNodes([id]);
   };
 
   // BOTÃO PRINCIPAL DA TOOLBAR (+ Quadrado com Linha)
@@ -798,6 +805,16 @@ export const App: React.FC = () => {
 
       if (isInput) return;
 
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        if (selectedNodeIds.length > 0) {
+          handleDuplicateMultipleNodes(selectedNodeIds);
+        } else if (selectedNodeId) {
+          handleDuplicateNode(selectedNodeId);
+        }
+        return;
+      }
+
       if (e.key === 'Tab' && selectedNodeId) {
         e.preventDefault();
         handleAddChildNode(selectedNodeId);
@@ -805,7 +822,9 @@ export const App: React.FC = () => {
         e.preventDefault();
         handleAddSiblingNode(selectedNodeId);
       } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (selectedNodeId) {
+        if (selectedNodeIds.length > 0) {
+          handleDeleteMultipleNodes(selectedNodeIds);
+        } else if (selectedNodeId) {
           handleDeleteNode(selectedNodeId);
         } else if (selectedStickyId) {
           updateActiveBoard(b => ({ ...b, stickies: b.stickies.filter(s => s.id !== selectedStickyId) }));
@@ -813,6 +832,7 @@ export const App: React.FC = () => {
         }
       } else if (e.key === 'Escape') {
         setSelectedNodeId(null);
+        setSelectedNodeIds([]);
         setSelectedStickyId(null);
       }
     };
@@ -831,7 +851,7 @@ export const App: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [selectedNodeId, selectedStickyId, historyIndex, history]);
+  }, [selectedNodeId, selectedNodeIds, selectedStickyId, historyIndex, history]);
 
   // Scroll do Mouse direto para ZOOM IN / ZOOM OUT centrado no cursor
   const handleWheel = (e: React.WheelEvent) => {
@@ -861,11 +881,78 @@ export const App: React.FC = () => {
     setPan({ x: newPanX, y: newPanY });
   };
 
+  // Listeners globais de janela para arraste fluido de Marquee e Pan
+  useEffect(() => {
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      if (isPanning && panStartRef.current) {
+        const dx = e.clientX - panStartRef.current.x;
+        const dy = e.clientY - panStartRef.current.y;
+        setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+        panStartRef.current = { x: e.clientX, y: e.clientY };
+      } else if (isMarqueeActiveRef.current && marqueeStartRef.current) {
+        const dx = Math.abs(e.clientX - marqueeStartRef.current.x);
+        const dy = Math.abs(e.clientY - marqueeStartRef.current.y);
+        if (dx > 4 || dy > 4) {
+          const x1 = Math.min(marqueeStartRef.current.x, e.clientX);
+          const y1 = Math.min(marqueeStartRef.current.y, e.clientY);
+          const x2 = Math.max(marqueeStartRef.current.x, e.clientX);
+          const y2 = Math.max(marqueeStartRef.current.y, e.clientY);
+          setMarqueeRect({ x1, y1, x2, y2 });
+
+          // Identifica nós que intersectam a área de seleção em tela
+          const hitIds: string[] = [];
+          activeBoard.mindMapNodes.forEach(node => {
+            const el = document.getElementById(`node-${node.id}`);
+            if (!el) return;
+            const rect = el.getBoundingClientRect();
+            if (rect.right >= x1 && rect.left <= x2 && rect.bottom >= y1 && rect.top <= y2) {
+              hitIds.push(node.id);
+            }
+          });
+
+          setSelectedNodeIds(hitIds);
+          if (hitIds.length === 1) {
+            setSelectedNodeId(hitIds[0]);
+          } else if (hitIds.length === 0) {
+            setSelectedNodeId(null);
+          }
+        }
+      }
+    };
+
+    const handleWindowMouseUp = () => {
+      if (isMarqueeActiveRef.current) {
+        if (!marqueeRect) {
+          // Clique simples no fundo vazio sem deslocamento: desmarca seleção
+          setSelectedNodeId(null);
+          setSelectedNodeIds([]);
+          setSelectedStickyId(null);
+        }
+        isMarqueeActiveRef.current = false;
+        marqueeStartRef.current = null;
+        setMarqueeRect(null);
+      }
+      setIsPanning(false);
+      panStartRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [isPanning, marqueeRect, activeBoard.mindMapNodes]);
+
   const handleMouseDownCanvas = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
-    const isCanvasBg = target.id === 'main-canvas-area' || target.classList.contains('canvas-background');
+    const isInteractive = target.closest(
+      '.mindmap-node-card, .sticky-note, .node-context-menu, .toolbar-container, .top-nav, button, input, textarea, a'
+    );
+    const isCanvasBg = !isInteractive;
 
-    if (e.button === 1 || isSpacePressed.current || currentTool === 'hand' || (e.button === 0 && isCanvasBg && currentTool !== 'draw')) {
+    // Pan do canvas preservado: Botão do meio, Barra de Espaço pressionada, ou ferramenta Mão
+    if (e.button === 1 || isSpacePressed.current || currentTool === 'hand') {
       setIsPanning(true);
       panStartRef.current = { x: e.clientX, y: e.clientY };
     } else if (currentTool === 'draw') {
@@ -878,19 +965,16 @@ export const App: React.FC = () => {
         color: '#f43f5e',
         strokeWidth: 3
       };
-    } else {
-      setSelectedNodeId(null);
-      setSelectedStickyId(null);
+    } else if (e.button === 0 && isCanvasBg) {
+      // Arrastar sobre fundo vazio inicia retângulo de seleção múltipla (Lasso)
+      isMarqueeActiveRef.current = true;
+      marqueeStartRef.current = { x: e.clientX, y: e.clientY };
+      setMarqueeRect(null);
     }
   };
 
   const handleMouseMoveCanvas = (e: React.MouseEvent) => {
-    if (isPanning && panStartRef.current) {
-      const dx = e.clientX - panStartRef.current.x;
-      const dy = e.clientY - panStartRef.current.y;
-      setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-      panStartRef.current = { x: e.clientX, y: e.clientY };
-    } else if (isDrawing && currentStrokeRef.current) {
+    if (isDrawing && currentStrokeRef.current) {
       const canvasX = (e.clientX - pan.x) / zoom;
       const canvasY = (e.clientY - pan.y) / zoom;
       currentStrokeRef.current.points.push({ x: canvasX, y: canvasY });
@@ -902,10 +986,8 @@ export const App: React.FC = () => {
   };
 
   const handleMouseUpCanvas = () => {
-    setIsPanning(false);
     setIsDrawing(false);
     currentStrokeRef.current = null;
-    panStartRef.current = null;
   };
 
   const totalObjects = 
@@ -992,14 +1074,24 @@ export const App: React.FC = () => {
             <MindMapCanvas
               nodes={activeBoard.mindMapNodes}
               selectedNodeId={selectedNodeId}
+              selectedNodeIds={selectedNodeIds}
               editingNodeId={editingNodeId}
               onClearEditingNodeId={() => setEditingNodeId(null)}
-              onSelectNode={setSelectedNodeId}
+              onSelectNode={(id) => {
+                setSelectedNodeId(id);
+                setSelectedNodeIds(id ? [id] : []);
+              }}
+              onSelectMultipleNodes={(ids) => {
+                setSelectedNodeIds(ids);
+                setSelectedNodeId(ids.length === 1 ? ids[0] : null);
+              }}
               onUpdateNodeText={handleUpdateNodeText}
               onToggleCollapse={handleToggleCollapse}
               onAddChildNode={handleAddChildNode}
               onAddSiblingNode={handleAddSiblingNode}
               onDeleteNode={handleDeleteNode}
+              onDeleteMultipleNodes={handleDeleteMultipleNodes}
+              onDuplicateMultipleNodes={handleDuplicateMultipleNodes}
               onReorderNode={handleReorderNode}
               onReparentNode={handleReparentNode}
               onReorderInsertNode={handleReorderInsertNode}
@@ -1029,6 +1121,91 @@ export const App: React.FC = () => {
             />
           </div>
         </div>
+
+        {/* Retângulo de Seleção Múltipla com o Mouse (Marquee / Lasso) */}
+        {marqueeRect && (
+          <div
+            style={{
+              position: 'fixed',
+              left: `${marqueeRect.x1}px`,
+              top: `${marqueeRect.y1}px`,
+              width: `${marqueeRect.x2 - marqueeRect.x1}px`,
+              height: `${marqueeRect.y2 - marqueeRect.y1}px`,
+              border: '1.5px solid var(--accent-purple, #6366f1)',
+              backgroundColor: 'rgba(99, 102, 241, 0.08)',
+              borderRadius: '3px',
+              pointerEvents: 'none',
+              zIndex: 1000
+            }}
+          />
+        )}
+
+        {/* Barra de Ações para Seleção Múltipla */}
+        {selectedNodeIds.length > 1 && (
+          <div
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 2000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: 'var(--bg-elevated, #1e232d)',
+              border: '1px solid var(--border-strong, #3f4758)',
+              borderRadius: '8px',
+              padding: '6px 14px',
+              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4)',
+              userSelect: 'none'
+            }}
+          >
+            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginRight: '6px' }}>
+              {selectedNodeIds.length} selecionados
+            </span>
+            <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-subtle, #333a48)', margin: '0 4px' }} />
+            <button
+              onClick={() => handleDuplicateMultipleNodes(selectedNodeIds)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '5px 10px', borderRadius: '5px',
+                border: '1px solid var(--border-subtle, #3f4758)',
+                backgroundColor: 'var(--bg-surface, #282e3b)',
+                color: 'var(--text-primary)', fontSize: '12.5px', fontWeight: 500, cursor: 'pointer'
+              }}
+              title="Copiar/Duplicar selecionados"
+            >
+              Copiar
+            </button>
+            <button
+              onClick={() => handleDeleteMultipleNodes(selectedNodeIds)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '5px 10px', borderRadius: '5px',
+                border: '1px solid #7f1d1d',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                color: '#f87171', fontSize: '12.5px', fontWeight: 500, cursor: 'pointer'
+              }}
+              title="Excluir selecionados"
+            >
+              Excluir
+            </button>
+            <button
+              onClick={() => {
+                setSelectedNodeId(null);
+                setSelectedNodeIds([]);
+              }}
+              style={{
+                padding: '5px 8px', borderRadius: '5px',
+                border: 'none', background: 'transparent',
+                color: 'var(--text-muted)', fontSize: '12px', cursor: 'pointer'
+              }}
+              title="Desmarcar seleção"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Controles de Zoom */}
         <ZoomControls

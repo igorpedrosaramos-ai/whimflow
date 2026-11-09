@@ -7,14 +7,18 @@ import { NodeContextMenu } from './NodeContextMenu';
 interface MindMapCanvasProps {
   nodes: MindMapNode[];
   selectedNodeId: string | null;
+  selectedNodeIds?: string[];
   editingNodeId?: string | null;
   onClearEditingNodeId?: () => void;
   onSelectNode: (id: string | null) => void;
+  onSelectMultipleNodes?: (ids: string[]) => void;
   onUpdateNodeText: (id: string, text: string) => void;
   onToggleCollapse: (id: string) => void;
   onAddChildNode: (parentId: string) => void;
   onAddSiblingNode: (nodeId: string) => void;
   onDeleteNode: (id: string) => void;
+  onDeleteMultipleNodes?: (ids: string[]) => void;
+  onDuplicateMultipleNodes?: (ids: string[]) => void;
   onMoveNodeOffset?: (id: string, dx: number, dy: number) => void;
   onReorderNode: (nodeId: string, direction: 'up' | 'down') => void;
   onReparentNode: (childId: string, newParentId: string) => void;
@@ -28,14 +32,18 @@ interface MindMapCanvasProps {
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   nodes,
   selectedNodeId,
+  selectedNodeIds = [],
   editingNodeId,
   onClearEditingNodeId,
   onSelectNode,
+  onSelectMultipleNodes,
   onUpdateNodeText,
   onToggleCollapse,
   onAddChildNode,
   onAddSiblingNode,
   onDeleteNode,
+  onDeleteMultipleNodes,
+  onDuplicateMultipleNodes,
   onReorderNode,
   onReparentNode,
   onReorderInsertNode,
@@ -52,6 +60,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside'>('inside');
   const [dragCursorPos, setDragCursorPos] = useState<{ x: number; y: number } | null>(null);
 
+  // Evita que um clique simples inicie arraste do nó acidentalmente
+  const dragPendingRef = useRef<{ id: string; clientX: number; clientY: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Sincroniza início de edição direta quando um novo nó é criado
@@ -125,13 +135,13 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const handleStartEdit = (node: MindMapNode, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingId(node.id);
-    setEditingText(node.text);
+    setEditingText(node.text || '');
     onSelectNode(node.id);
   };
 
   const handleCommitEdit = () => {
-    if (editingId && editingText.trim()) {
-      onUpdateNodeText(editingId, editingText.trim());
+    if (editingId) {
+      onUpdateNodeText(editingId, editingText);
     }
     setEditingId(null);
   };
@@ -157,25 +167,40 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }
   }, [editingId]);
 
-  // ARRASTE EXCLUSIVO PARA MUDAR DE SETOR / REPARENTALIZAR
+  // ARRASTE SEGURO PARA MUDAR DE SETOR / REPARENTALIZAR
   const handleMouseDown = (node: MindMapNode, e: React.MouseEvent) => {
     if (editingId === node.id) return;
     if (e.button !== 0) return;
-    if (node.side === 'root') return; // Nó raiz é fixo como âncora do mapa
     e.stopPropagation();
-    onSelectNode(node.id);
-    setDraggingNodeId(node.id);
-    const canvasX = (e.clientX - (pan?.x || 0)) / (zoom || 1);
-    const canvasY = (e.clientY - (pan?.y || 0)) / (zoom || 1);
-    setDragCursorPos({ x: canvasX, y: canvasY });
+
+    // Se o nó já estiver em uma seleção múltipla, preserva o grupo para permitir arrastar em bloco
+    const isAlreadySelected = selectedNodeIds && selectedNodeIds.includes(node.id);
+    if (!isAlreadySelected && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+      onSelectNode(node.id);
+    }
+
+    // Se for nó raiz, não arrasta
+    if (node.side === 'root') return;
+
+    // Registra clique inicial, mas só ativa drag se o cursor se mover > 4px
+    dragPendingRef.current = { id: node.id, clientX: e.clientX, clientY: e.clientY };
   };
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      // Ativa o arraste somente se houve deslocamento real (> 4px)
+      if (dragPendingRef.current && !draggingNodeId) {
+        const dx = Math.abs(e.clientX - dragPendingRef.current.clientX);
+        const dy = Math.abs(e.clientY - dragPendingRef.current.clientY);
+        if (dx > 4 || dy > 4) {
+          setDraggingNodeId(dragPendingRef.current.id);
+        }
+      }
+
       if (!draggingNodeId) return;
-      const canvasX = (e.clientX - (pan?.x || 0)) / (zoom || 1);
-      const canvasY = (e.clientY - (pan?.y || 0)) / (zoom || 1);
-      setDragCursorPos({ x: canvasX, y: canvasY });
+
+      // Coordenadas de tela fixas para ancoragem perfeita sob o cursor do mouse
+      setDragCursorPos({ x: e.clientX, y: e.clientY });
 
       // Detecta sobre qual nó o cursor está passando para mudar de setor ou reordenar
       const elements = document.elementsFromPoint(e.clientX, e.clientY);
@@ -194,11 +219,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           if (targetNode.side === 'root') {
             setDropTargetNodeId(targetId);
             setDropPosition('inside');
-          } else if (relY < 0.32) {
+          } else if (relY < 0.35) {
             // Parte superior do card: Reordenar para ANTES deste irmão
             setDropTargetNodeId(targetId);
             setDropPosition('before');
-          } else if (relY > 0.68) {
+          } else if (relY > 0.65) {
             // Parte inferior do card: Reordenar para DEPOIS deste irmão
             setDropTargetNodeId(targetId);
             setDropPosition('after');
@@ -215,6 +240,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     };
 
     const handleMouseUp = () => {
+      dragPendingRef.current = null;
       if (draggingNodeId && dropTargetNodeId && draggingNodeId !== dropTargetNodeId) {
         if (onReorderInsertNode) {
           onReorderInsertNode(draggingNodeId, dropTargetNodeId, dropPosition);
@@ -228,10 +254,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       setDragCursorPos(null);
     };
 
-    if (draggingNodeId) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    }
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
@@ -384,7 +408,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         if (!isNodeVisible(node)) return null;
 
         const isRoot = node.side === 'root';
-        const isSelected = selectedNodeId === node.id;
+        const isMultiSelected = selectedNodeIds && selectedNodeIds.length > 1 && selectedNodeIds.includes(node.id);
+        const isSingleSelected = selectedNodeId === node.id || (selectedNodeIds && selectedNodeIds.length === 1 && selectedNodeIds[0] === node.id);
+        const isSelected = isSingleSelected || isMultiSelected;
         const isHovered = hoveredNodeId === node.id;
         const isEditing = editingId === node.id;
         const isDropTarget = dropTargetNodeId === node.id;
@@ -426,10 +452,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               minWidth: `${pos.width}px`,
               minHeight: `${pos.height}px`,
               backgroundColor: isDropTarget && dropPosition === 'inside' ? 'rgba(13, 148, 136, 0.2)' : bg,
-              border: border,
-              borderLeft: borderLeft,
+              border: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
+              borderLeft: isMultiSelected ? undefined : borderLeft,
               outline: isDropTarget && dropPosition === 'inside'
                 ? '2.5px solid var(--accent-teal, #0d9488)'
+                : isMultiSelected
+                ? '2px solid var(--accent-purple, #6366f1)'
                 : (isSelected ? `2px solid ${nodeColor}` : undefined),
               outlineOffset: '2px',
               boxShadow: isSelected ? `0 0 12px ${nodeColor}55` : '0 2px 8px rgba(0, 0, 0, 0.2)',
@@ -441,7 +469,16 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             }}
             onClick={(e) => {
               e.stopPropagation();
-              onSelectNode(node.id);
+              // Se clicar com Ctrl ou Shift, alterna na seleção múltipla
+              if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                const current = selectedNodeIds || [];
+                const next = current.includes(node.id) 
+                  ? current.filter(id => id !== node.id)
+                  : [...current, node.id];
+                onSelectMultipleNodes?.(next);
+              } else {
+                onSelectNode(node.id);
+              }
             }}
             onDoubleClick={(e) => handleStartEdit(node, e)}
             onMouseEnter={() => setHoveredNodeId(node.id)}
@@ -502,6 +539,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               <input
                 ref={inputRef}
                 type="text"
+                placeholder="Digite algo..."
                 value={editingText}
                 onChange={(e) => setEditingText(e.target.value)}
                 onBlur={handleCommitEdit}
@@ -578,6 +616,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                     justifyContent: 'center',
                     zIndex: 50
                   }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
                     onAddChildNode(node.id);
@@ -621,6 +661,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                       justifyContent: 'center',
                       zIndex: 50
                     }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAddSiblingNode(node.id);
@@ -663,16 +705,16 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         );
       })}
 
-      {/* Cartão Fantasma Limpo durante o Arraste */}
+      {/* Cartão Fantasma Limpo durante o Arraste (Posicionamento Fixo Exato sob o Cursor) */}
       {draggingNodeId && dragCursorPos && nodeMap.get(draggingNodeId) && (
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             left: `${dragCursorPos.x}px`,
             top: `${dragCursorPos.y}px`,
             transform: 'translate(-50%, -50%)',
             pointerEvents: 'none',
-            zIndex: 1000,
+            zIndex: 10000,
             backgroundColor: nodeMap.get(draggingNodeId)?.color || 'var(--accent-purple)',
             color: '#ffffff',
             padding: '7px 16px',
@@ -682,10 +724,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             border: '1.5px solid #ffffff',
             opacity: 0.9,
-            whiteSpace: 'nowrap'
+            whiteSpace: 'nowrap',
+            minWidth: '60px',
+            minHeight: '28px'
           }}
         >
-          {nodeMap.get(draggingNodeId)?.text || 'Quadrado'}
+          {nodeMap.get(draggingNodeId)?.text || ''}
         </div>
       )}
     </>
