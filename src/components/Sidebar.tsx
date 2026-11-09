@@ -28,6 +28,7 @@ interface SidebarProps {
   onRenameBoard: (id: string, newTitle: string) => void;
   onNavigateToDashboard?: () => void;
   onOpenTemplates?: () => void;
+  onOpenTrash?: () => void;
   workspaceName?: string;
 }
 
@@ -42,13 +43,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRenameBoard,
   onNavigateToDashboard,
   onOpenTemplates,
+  onOpenTrash,
   workspaceName = 'teste'
 }) => {
   const [search, setSearch] = useState('');
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [isDownloadCardDismissed, setIsDownloadCardDismissed] = useState(false);
 
   if (!isOpen) return null;
 
@@ -430,42 +431,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Rodapé da Barra Lateral */}
       <div style={{ padding: '10px 12px', borderTop: '1px solid #202633', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {!isDownloadCardDismissed && (
-          <div
-            style={{
-              position: 'relative',
-              padding: '10px',
-              borderRadius: '6px',
-              background: 'linear-gradient(135deg, #1e2638 0%, #29344d 100%)',
-              border: '1px solid #334155',
-              color: '#ffffff'
-            }}
-          >
-            <button
-              onClick={() => setIsDownloadCardDismissed(true)}
-              style={{
-                position: 'absolute',
-                top: '6px',
-                right: '6px',
-                background: 'transparent',
-                border: 'none',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                padding: '2px'
-              }}
-            >
-              <X size={12} />
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
-              <Laptop size={14} color="#38bdf8" />
-              <span style={{ fontSize: '11.5px', fontWeight: 600 }}>Download the app</span>
-            </div>
-            <p style={{ margin: 0, fontSize: '10.5px', color: '#94a3b8', lineHeight: 1.3 }}>
-              Get the best experience with Whimsical for Windows
-            </p>
-          </div>
-        )}
-
         <button
           onClick={onOpenTemplates}
           style={{
@@ -487,6 +452,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
 
         <button
+          onClick={onOpenTrash}
           style={{
             display: 'flex',
             alignItems: 'center',

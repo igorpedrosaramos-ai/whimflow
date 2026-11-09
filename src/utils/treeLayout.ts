@@ -200,3 +200,74 @@ export function getBezierPath(
   const cpX = startX + dx * 0.5 * direction;
   return `M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}`;
 }
+
+/**
+ * Purga e Normalização Definitiva de Nós do Mapa Mental:
+ * Elimina nós em branco, nós contendo apenas traço '-', 'Novo Quadrado', 'Novo nó'
+ * e reparenta automaticamente os filhos válidos para o nó superior, garantindo
+ * ZERO espaços em branco soltos e conexões consistentes.
+ */
+export function cleanAndNormalizeMindMap(nodes: MindMapNode[]): MindMapNode[] {
+  if (!nodes || nodes.length === 0) return [];
+
+  const isInvalid = (n: MindMapNode): boolean => {
+    if (n.side === 'root' || n.id === 'root') return false;
+    const clean = (n.text || '').replace(/[\s\u00A0\u200B\u200C\u200D\uFEFF]/g, '');
+    return (
+      !clean || 
+      clean === '-' || 
+      clean === '--' || 
+      clean === '—' || 
+      clean === '–' || 
+      clean.toLowerCase() === 'novoquadrado' || 
+      clean.toLowerCase() === 'novonó'
+    );
+  };
+
+  const nodeMap = new Map<string, MindMapNode>();
+  nodes.forEach(n => nodeMap.set(n.id, { ...n, childrenIds: [...(n.childrenIds || [])] }));
+
+  // Coleta todos os nós inválidos
+  const invalidIds = new Set<string>();
+  nodes.forEach(n => {
+    if (isInvalid(n)) invalidIds.add(n.id);
+  });
+
+  if (invalidIds.size === 0) {
+    return nodes;
+  }
+
+  // Reparenta os filhos dos nós inválidos para o pai do nó inválido
+  invalidIds.forEach(badId => {
+    const badNode = nodeMap.get(badId);
+    if (!badNode) return;
+    const parentId = badNode.parentId;
+    const childrenToHoist = badNode.childrenIds || [];
+
+    if (parentId && nodeMap.has(parentId)) {
+      const parentNode = nodeMap.get(parentId)!;
+      childrenToHoist.forEach(cid => {
+        const childNode = nodeMap.get(cid);
+        if (childNode) {
+          childNode.parentId = parentId;
+          if (!parentNode.childrenIds.includes(cid)) {
+            parentNode.childrenIds.push(cid);
+          }
+        }
+      });
+      // Remove badNode da lista de filhos do pai
+      parentNode.childrenIds = parentNode.childrenIds.filter(id => id !== badId);
+    }
+  });
+
+  // Filtra os nós inválidos e higieniza as referências de childrenIds
+  const result: MindMapNode[] = [];
+  nodeMap.forEach((n, id) => {
+    if (!invalidIds.has(id)) {
+      n.childrenIds = n.childrenIds.filter(cid => !invalidIds.has(cid) && nodeMap.has(cid));
+      result.push(n);
+    }
+  });
+
+  return result;
+}

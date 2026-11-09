@@ -16,12 +16,14 @@ import { DocEditorView } from './components/DocEditorView';
 import { AgentChatView } from './components/AgentChatView';
 import { TemplateModal } from './components/TemplateModal';
 import { PresentSidePanel } from './components/PresentSidePanel';
+import { SearchModal } from './components/SearchModal';
+import { TrashModal } from './components/TrashModal';
 import { TemplateItem } from './constants/templatesData';
 import { EXECUTIVE_PALETTE } from './components/NodeContextMenu';
-import { calculateMindMapLayout } from './utils/treeLayout';
+import { calculateMindMapLayout, cleanAndNormalizeMindMap } from './utils/treeLayout';
 import { parseOutlineText, createNodesFromOutline } from './utils/mindMapImport';
 
-const STORAGE_KEY = 'whimflow_boards_v5';
+const STORAGE_KEY = 'whimflow_boards_v6';
 const THEME_KEY = 'whimflow_theme';
 
 export const App: React.FC = () => {
@@ -32,38 +34,20 @@ export const App: React.FC = () => {
 
   // Estado dos Quadros com Purga Total de Nós Fantasmas / Espaços em Branco
   const [boards, setBoards] = useState<Board[]>(() => {
-    const purgeEmptyNodes = (nodeList: MindMapNode[]): MindMapNode[] => {
-      const emptyIds = new Set<string>();
-      (nodeList || []).forEach(n => {
-        const isRoot = n.side === 'root' || n.id === 'root';
-        const clean = (n.text || '').trim();
-        if (!isRoot && (!clean || clean === 'Novo Quadrado' || clean === 'Novo nó')) {
-          emptyIds.add(n.id);
-        }
-      });
-
-      return (nodeList || [])
-        .filter(n => !emptyIds.has(n.id))
-        .map(n => ({
-          ...n,
-          childrenIds: (n.childrenIds || []).filter(cid => !emptyIds.has(cid))
-        }));
-    };
-
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('whimflow_boards_v5');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const sanitized = parsed.map((b: Board) => ({
             ...b,
-            mindMapNodes: purgeEmptyNodes(b.mindMapNodes)
+            mindMapNodes: cleanAndNormalizeMindMap(b.mindMapNodes)
           }));
           const hasOnegai = sanitized.some((b: Board) => b.id === 'board-onegai');
           const hasOrion = sanitized.some((b: Board) => b.id === 'board-orion-sushi');
           const list = [...sanitized];
-          if (!hasOnegai) list.push(ONEGAI_BOARD);
-          if (!hasOrion) list.push(ORION_SUSHI_BOARD);
+          if (!hasOnegai) list.push({ ...ONEGAI_BOARD, mindMapNodes: cleanAndNormalizeMindMap(ONEGAI_BOARD.mindMapNodes) });
+          if (!hasOrion) list.push({ ...ORION_SUSHI_BOARD, mindMapNodes: cleanAndNormalizeMindMap(ORION_SUSHI_BOARD.mindMapNodes) });
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
           } catch (e) {}
@@ -73,7 +57,10 @@ export const App: React.FC = () => {
     } catch (e) {
       console.warn('Iniciando com quadros padrão');
     }
-    return INITIAL_BOARDS;
+    return INITIAL_BOARDS.map(b => ({
+      ...b,
+      mindMapNodes: cleanAndNormalizeMindMap(b.mindMapNodes)
+    }));
   });
 
   const [activeBoardId, setActiveBoardId] = useState<string>(() => {
@@ -122,6 +109,23 @@ export const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'dashboard' | 'editor' | 'doc' | 'agent'>('dashboard');
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isPresentSidePanelOpen, setIsPresentSidePanelOpen] = useState(false);
+
+  // Modais de Lixeira e Busca Global
+  const [trashBoards, setTrashBoards] = useState<Board[]>([]);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+
+  // Atalho global de busca (Ctrl+K / Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchModalOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Modais
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
@@ -402,17 +406,36 @@ export const App: React.FC = () => {
     setActiveBoardId(duplicated.id);
   };
 
-  // EXCLUIR QUADRO
+  // EXCLUIR QUADRO (Move para a Lixeira)
   const handleDeleteBoard = (id: string) => {
     if (boards.length <= 1) {
       alert('Você precisa manter pelo menos um quadro ativo.');
       return;
+    }
+    const toDelete = boards.find(b => b.id === id);
+    if (toDelete) {
+      setTrashBoards(prev => [toDelete, ...prev]);
     }
     const remaining = boards.filter(b => b.id !== id);
     setBoards(remaining);
     if (activeBoardId === id) {
       setActiveBoardId(remaining[0].id);
     }
+  };
+
+  // RESTAURAR QUADRO DA LIXEIRA
+  const handleRestoreBoard = (id: string) => {
+    const toRestore = trashBoards.find(b => b.id === id);
+    if (toRestore) {
+      setBoards(prev => [toRestore, ...prev]);
+      setTrashBoards(prev => prev.filter(b => b.id !== id));
+      setActiveBoardId(toRestore.id);
+    }
+  };
+
+  // EXCLUIR DEFINITIVAMENTE DA LIXEIRA
+  const handlePermanentlyDeleteBoard = (id: string) => {
+    setTrashBoards(prev => prev.filter(b => b.id !== id));
   };
 
   // GESTÃO DE TEXTO DO NÓ
@@ -1469,6 +1492,8 @@ export const App: React.FC = () => {
           onRenameBoard={(id, newTitle) => {
             setBoards(prev => prev.map(b => b.id === id ? { ...b, title: newTitle, updatedAt: new Date().toISOString() } : b));
           }}
+          onOpenTrash={() => setIsTrashModalOpen(true)}
+          onOpenSearch={() => setIsSearchModalOpen(true)}
           workspaceName="teste"
           theme={theme}
         />
@@ -1487,6 +1512,33 @@ export const App: React.FC = () => {
           onClose={() => setIsAIModalOpen(false)}
           selectedNode={activeBoard.mindMapNodes.find(n => n.id === selectedNodeId) || null}
           onAddGeneratedBranches={handleAddGeneratedBranches}
+        />
+
+        {/* Modal de Lixeira */}
+        <TrashModal
+          isOpen={isTrashModalOpen}
+          onClose={() => setIsTrashModalOpen(false)}
+          trashBoards={trashBoards}
+          onRestoreBoard={handleRestoreBoard}
+          onPermanentlyDeleteBoard={handlePermanentlyDeleteBoard}
+          onEmptyTrash={() => setTrashBoards([])}
+          theme={theme}
+        />
+
+        {/* Modal de Busca Global */}
+        <SearchModal
+          isOpen={isSearchModalOpen}
+          onClose={() => setIsSearchModalOpen(false)}
+          boards={boards}
+          onSelectBoard={(id) => {
+            handleOpenBoard(id);
+            setIsSearchModalOpen(false);
+          }}
+          onCreateNewBoard={(title) => {
+            handleCreateNewBoard(title);
+            setIsSearchModalOpen(false);
+          }}
+          theme={theme}
         />
       </div>
     );
@@ -1552,6 +1604,7 @@ export const App: React.FC = () => {
         onUndo={handleUndo}
         onRedo={handleRedo}
         onNavigateToDashboard={() => setCurrentView('dashboard')}
+        onOpenSearch={() => setIsSearchModalOpen(true)}
         workspaceName="teste"
       />
 
@@ -1570,6 +1623,7 @@ export const App: React.FC = () => {
           }}
           onNavigateToDashboard={() => setCurrentView('dashboard')}
           onOpenTemplates={() => setIsTemplateModalOpen(true)}
+          onOpenTrash={() => setIsTrashModalOpen(true)}
           workspaceName="teste"
         />
 
@@ -1803,6 +1857,33 @@ export const App: React.FC = () => {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         activeBoard={activeBoard}
+      />
+
+      {/* Modal de Lixeira */}
+      <TrashModal
+        isOpen={isTrashModalOpen}
+        onClose={() => setIsTrashModalOpen(false)}
+        trashBoards={trashBoards}
+        onRestoreBoard={handleRestoreBoard}
+        onPermanentlyDeleteBoard={handlePermanentlyDeleteBoard}
+        onEmptyTrash={() => setTrashBoards([])}
+        theme={theme}
+      />
+
+      {/* Modal de Busca Global */}
+      <SearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        boards={boards}
+        onSelectBoard={(id) => {
+          handleOpenBoard(id);
+          setIsSearchModalOpen(false);
+        }}
+        onCreateNewBoard={(title) => {
+          handleCreateNewBoard(title);
+          setIsSearchModalOpen(false);
+        }}
+        theme={theme}
       />
 
       {/* Modo Apresentação */}

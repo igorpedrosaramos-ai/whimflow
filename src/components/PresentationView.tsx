@@ -14,7 +14,7 @@ import {
   Minus
 } from 'lucide-react';
 import { Board, MindMapNode } from '../types';
-import { calculateMindMapLayout, getBezierPath, estimateNodeDimensions } from '../utils/treeLayout';
+import { calculateMindMapLayout, getBezierPath, estimateNodeDimensions, cleanAndNormalizeMindMap } from '../utils/treeLayout';
 
 interface PresentationViewProps {
   board: Board;
@@ -27,16 +27,21 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
   initialSelectedNodeId, 
   onClose 
 }) => {
-  const rootNode = board.mindMapNodes.find(n => n.side === 'root') || board.mindMapNodes[0];
+  // Purga nós em branco, traços e orfãos, normalizando a hierarquia da árvore
+  const cleanNodes = useMemo(() => {
+    return cleanAndNormalizeMindMap(board.mindMapNodes);
+  }, [board.mindMapNodes]);
+
+  const rootNode = cleanNodes.find(n => n.side === 'root') || cleanNodes[0];
   const primaryBranches = useMemo(() => {
-    return board.mindMapNodes.filter(n => n.parentId === rootNode?.id);
-  }, [board.mindMapNodes, rootNode]);
+    return cleanNodes.filter(n => n.parentId === rootNode?.id);
+  }, [cleanNodes, rootNode]);
 
   const nodeMap = useMemo(() => {
     const map = new Map<string, MindMapNode>();
-    board.mindMapNodes.forEach(n => map.set(n.id, n));
+    cleanNodes.forEach(n => map.set(n.id, n));
     return map;
-  }, [board.mindMapNodes]);
+  }, [cleanNodes]);
 
   // Se o usuário já tinha um nó selecionado ao clicar em "Apresentar", inicia focado no ramo correspondente
   const initialSlide = useMemo(() => {
@@ -161,7 +166,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
     }
 
     const newCollapsed = new Set<string>();
-    board.mindMapNodes.forEach(node => {
+    cleanNodes.forEach(node => {
       if (node.side === 'root') return;
       if (!node.childrenIds || node.childrenIds.length === 0) return;
 
@@ -187,15 +192,15 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
 
     if (currentSlideIndex === 0) {
       // Visão Geral: todos os nós incluídos
-      baseNodes = board.mindMapNodes;
+      baseNodes = cleanNodes;
     } else {
       const branch = primaryBranches[currentSlideIndex - 1];
-      if (!branch) return board.mindMapNodes;
+      if (!branch) return cleanNodes;
 
       const activeIds = getBranchNodeIds(branch.id);
       activeIds.add(rootNode.id);
 
-      baseNodes = board.mindMapNodes.filter(n => {
+      baseNodes = cleanNodes.filter(n => {
         if (n.id === rootNode.id) return true;
         if (activeIds.has(n.id)) return true;
         // Se isolateMode estiver ativo, NÃO mostra outros ramos primários
@@ -203,12 +208,6 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
         return false;
       });
     }
-
-    // Purga qualquer nó vazio sem texto ("espaço em branco")
-    baseNodes = baseNodes.filter(n => {
-      const isRoot = n.side === 'root' || n.id === 'root';
-      return isRoot || ((n.text || '').trim().length > 0 && n.text !== 'Novo Quadrado');
-    });
 
     // Aplica o status de colapso local
     return baseNodes.map(n => {
@@ -221,7 +220,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
         collapsed: isLocallyCollapsed || isOtherBranch
       };
     });
-  }, [currentSlideIndex, board.mindMapNodes, primaryBranches, rootNode, collapsedNodeIds, isolateMode]);
+  }, [currentSlideIndex, cleanNodes, primaryBranches, rootNode, collapsedNodeIds, isolateMode]);
 
   // Mapa de verificação rápida para visibilidade de nós (respeita pais colapsados)
   const slideNodeMap = useMemo(() => {

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { Plus, ExternalLink } from 'lucide-react';
 import { MindMapNode } from '../types';
-import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
+import { calculateMindMapLayout, getBezierPath, cleanAndNormalizeMindMap } from '../utils/treeLayout';
 import { NodeContextMenu } from './NodeContextMenu';
 
 interface MindMapCanvasProps {
@@ -97,14 +97,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }
   }, [editingNodeId, nodes, onClearEditingNodeId]);
 
-  // Filtra nós vazios/fantasmas para que NUNCA apareçam como "espaços em branco" soltos
+  // Filtra nós vazios/fantasmas e nós de traço '-', reparentando filhos para que NUNCA apareçam como "espaços em branco"
   const effectiveNodes = useMemo(() => {
-    return nodes.filter(n => {
-      const isRoot = n.side === 'root' || n.id === 'root';
-      if (isRoot) return true;
-      if (n.id === editingId) return true; // Permite nó enquanto o usuário está digitando
-      return (n.text || '').trim().length > 0;
-    });
+    const cleaned = cleanAndNormalizeMindMap(nodes);
+    // Se o nó em edição foi temporariamente filtrado por estar vazio, mantenha-o para digitação
+    if (editingId && !cleaned.some(n => n.id === editingId)) {
+      const editingNode = nodes.find(n => n.id === editingId);
+      if (editingNode) {
+        return [...cleaned, editingNode];
+      }
+    }
+    return cleaned;
   }, [nodes, editingId]);
 
   const nodeMap = useMemo(() => {

@@ -36,6 +36,8 @@ interface DashboardViewProps {
   onDuplicateBoard: (boardId: string) => void;
   onDeleteBoard: (boardId: string) => void;
   onRenameBoard: (boardId: string, newTitle: string) => void;
+  onOpenTrash?: () => void;
+  onOpenSearch?: () => void;
   workspaceName?: string;
   theme?: 'dark' | 'light';
 }
@@ -51,6 +53,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onDuplicateBoard,
   onDeleteBoard,
   onRenameBoard,
+  onOpenTrash,
+  onOpenSearch,
   workspaceName = 'teste',
   theme = 'light'
 }) => {
@@ -253,44 +257,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* Rodapé da Barra Lateral */}
         <div style={{ padding: '12px 14px', borderTop: '1px solid #202633', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Card Download the app */}
-          {!isDownloadCardDismissed && (
-            <div
-              style={{
-                position: 'relative',
-                padding: '12px',
-                borderRadius: '8px',
-                background: 'linear-gradient(135deg, #1e2638 0%, #29344d 100%)',
-                border: '1px solid #334155',
-                color: '#ffffff'
-              }}
-            >
-              <button
-                onClick={() => setIsDownloadCardDismissed(true)}
-                style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#94a3b8',
-                  cursor: 'pointer',
-                  padding: '2px'
-                }}
-              >
-                <X size={13} />
-              </button>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <Laptop size={16} color="#38bdf8" />
-                <span style={{ fontSize: '12.5px', fontWeight: 600 }}>Download the app</span>
-              </div>
-              <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8', lineHeight: 1.35 }}>
-                Get the best experience with Whimsical for Windows
-              </p>
-            </div>
-          )}
-
           {/* Templates & color themes */}
           <button
             onClick={onOpenTemplates}
@@ -314,6 +280,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Trash */}
           <button
+            onClick={onOpenTrash}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -413,6 +380,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* Busca */}
             <button
+              onClick={onOpenSearch}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -422,13 +390,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 display: 'flex',
                 alignItems: 'center'
               }}
-              title="Buscar"
+              title="Buscar (Ctrl+K)"
             >
               <Search size={16} />
             </button>
 
             {/* Tecla de Atalhos */}
             <button
+              onClick={onOpenSearch}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -438,7 +407,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 display: 'flex',
                 alignItems: 'center'
               }}
-              title="Atalhos"
+              title="Comandos / Atalhos (Ctrl+K)"
             >
               <Command size={16} />
             </button>

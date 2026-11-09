@@ -35,6 +35,7 @@ interface TopNavProps {
   onUndo?: () => void;
   onRedo?: () => void;
   onNavigateToDashboard?: () => void;
+  onOpenSearch?: () => void;
   workspaceName?: string;
 }
 
@@ -52,6 +53,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   theme,
   onToggleTheme,
   onNavigateToDashboard,
+  onOpenSearch,
   workspaceName = 'teste'
 }) => {
   const isDark = theme === 'dark';
@@ -317,6 +319,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 
         {/* Busca */}
         <button
+          onClick={onOpenSearch}
           style={{
             background: 'transparent',
             border: 'none',
@@ -326,7 +329,7 @@ export const TopNav: React.FC<TopNavProps> = ({
             display: 'flex',
             alignItems: 'center'
           }}
-          title="Buscar"
+          title="Buscar (Ctrl+K)"
         >
           <Search size={16} />
         </button>
