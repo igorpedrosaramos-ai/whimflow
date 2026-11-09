@@ -23,26 +23,43 @@ export const App: React.FC = () => {
     document.title = 'Mapa Mental Turbine';
   }, []);
 
-  // Estado dos Quadros
+  // Estado dos Quadros com Purga Total de Nós Fantasmas / Espaços em Branco
   const [boards, setBoards] = useState<Board[]>(() => {
+    const purgeEmptyNodes = (nodeList: MindMapNode[]): MindMapNode[] => {
+      const emptyIds = new Set<string>();
+      (nodeList || []).forEach(n => {
+        const isRoot = n.side === 'root' || n.id === 'root';
+        const clean = (n.text || '').trim();
+        if (!isRoot && (!clean || clean === 'Novo Quadrado' || clean === 'Novo nó')) {
+          emptyIds.add(n.id);
+        }
+      });
+
+      return (nodeList || [])
+        .filter(n => !emptyIds.has(n.id))
+        .map(n => ({
+          ...n,
+          childrenIds: (n.childrenIds || []).filter(cid => !emptyIds.has(cid))
+        }));
+    };
+
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Limpeza defensiva de nós legados com "Novo Quadrado" ou "Novo nó"
           const sanitized = parsed.map((b: Board) => ({
             ...b,
-            mindMapNodes: (b.mindMapNodes || []).map(n => ({
-              ...n,
-              text: (n.text === 'Novo Quadrado' || n.text === 'Novo nó') ? '' : (n.text || '')
-            }))
+            mindMapNodes: purgeEmptyNodes(b.mindMapNodes)
           }));
           const hasOnegai = sanitized.some((b: Board) => b.id === 'board-onegai');
           const hasOrion = sanitized.some((b: Board) => b.id === 'board-orion-sushi');
           const list = [...sanitized];
           if (!hasOnegai) list.push(ONEGAI_BOARD);
           if (!hasOrion) list.push(ORION_SUSHI_BOARD);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+          } catch (e) {}
           return list;
         }
       }
@@ -332,9 +349,17 @@ export const App: React.FC = () => {
 
   // GESTÃO DE TEXTO DO NÓ
   const handleUpdateNodeText = (id: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      const target = activeBoard.mindMapNodes.find(n => n.id === id);
+      if (target && target.side !== 'root' && target.id !== 'root') {
+        handleDeleteNode(id);
+        return;
+      }
+    }
     updateActiveBoard(board => ({
       ...board,
-      mindMapNodes: board.mindMapNodes.map(n => n.id === id ? { ...n, text } : n)
+      mindMapNodes: board.mindMapNodes.map(n => n.id === id ? { ...n, text: trimmed } : n)
     }));
   };
 

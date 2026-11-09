@@ -93,23 +93,33 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }
   }, [editingNodeId, nodes, onClearEditingNodeId]);
 
+  // Filtra nós vazios/fantasmas para que NUNCA apareçam como "espaços em branco" soltos
+  const effectiveNodes = useMemo(() => {
+    return nodes.filter(n => {
+      const isRoot = n.side === 'root' || n.id === 'root';
+      if (isRoot) return true;
+      if (n.id === editingId) return true; // Permite nó enquanto o usuário está digitando
+      return (n.text || '').trim().length > 0;
+    });
+  }, [nodes, editingId]);
+
   const nodeMap = useMemo(() => {
     const map = new Map<string, MindMapNode>();
-    nodes.forEach(n => map.set(n.id, n));
+    effectiveNodes.forEach(n => map.set(n.id, n));
     return map;
-  }, [nodes]);
+  }, [effectiveNodes]);
 
   // Layout base da árvore - 100% Responsivo e sem sobreposição
   const layoutMap = useMemo(() => {
-    const root = nodes.find(n => n.side === 'root') || nodes[0];
+    const root = effectiveNodes.find(n => n.side === 'root') || effectiveNodes[0];
     if (!root) return new Map();
-    return calculateMindMapLayout(nodes, root.id, {
+    return calculateMindMapLayout(effectiveNodes, root.id, {
       horizontalGap: 100,
       verticalGap: 18,
       rootX: 0,
       rootY: 0
     });
-  }, [nodes]);
+  }, [effectiveNodes]);
 
   // Posição final calculada estritamente pelo algoritmo responsivo (Zero entrelaçamento)
   const getNodePos = (node: MindMapNode) => {
@@ -158,7 +168,14 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
   const handleCommitEdit = () => {
     if (editingId) {
-      onUpdateNodeText(editingId, editingText);
+      const trimmed = editingText.trim();
+      const node = nodeMap.get(editingId);
+      // Se o usuário não digitou nada em um nó novo (ou limpou o texto), remove para não deixar espaço em branco
+      if (!trimmed && node && node.side !== 'root' && node.id !== 'root') {
+        onDeleteNode(editingId);
+      } else {
+        onUpdateNodeText(editingId, trimmed);
+      }
     }
     setEditingId(null);
   };
@@ -173,6 +190,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       handleCommitEdit();
       onAddChildNode(node.id);
     } else if (e.key === 'Escape') {
+      const trimmed = editingText.trim();
+      if (!trimmed && node.side !== 'root' && node.id !== 'root') {
+        onDeleteNode(node.id);
+      }
       setEditingId(null);
     }
   };
@@ -375,7 +396,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     const paths: React.ReactElement[] = [];
 
     const parentChildrenMap = new Map<string, MindMapNode[]>();
-    nodes.forEach(child => {
+    effectiveNodes.forEach(child => {
       if (!child.parentId || !isNodeVisible(child)) return;
       const parent = nodeMap.get(child.parentId);
       if (!parent || parent.collapsed) return;
@@ -770,7 +791,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       )}
 
       {/* Renderização dos Nós */}
-      {nodes.map(node => {
+      {effectiveNodes.map(node => {
         if (!isNodeVisible(node)) return null;
 
         const isRoot = node.side === 'root';

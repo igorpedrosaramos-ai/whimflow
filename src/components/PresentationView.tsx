@@ -204,6 +204,12 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
       });
     }
 
+    // Purga qualquer nó vazio sem texto ("espaço em branco")
+    baseNodes = baseNodes.filter(n => {
+      const isRoot = n.side === 'root' || n.id === 'root';
+      return isRoot || ((n.text || '').trim().length > 0 && n.text !== 'Novo Quadrado');
+    });
+
     // Aplica o status de colapso local
     return baseNodes.map(n => {
       const isLocallyCollapsed = collapsedNodeIds.has(n.id);
