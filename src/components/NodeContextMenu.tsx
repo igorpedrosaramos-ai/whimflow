@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   ArrowUp, 
   ArrowDown, 
@@ -9,85 +10,128 @@ import {
   Minus, 
   Square, 
   Check, 
-  ChevronDown 
+  ChevronDown,
+  Bold,
+  Italic,
+  Smile,
+  Link2,
+  ExternalLink,
+  Type,
+  CornerDownRight,
+  FolderMinus,
+  FolderPlus
 } from 'lucide-react';
 import { MindMapNode } from '../types';
 
-export const EXECUTIVE_PALETTE = [
-  { label: 'Índigo', hex: '#6366f1' },
-  { label: 'Teal', hex: '#0d9488' },
-  { label: 'Esmeralda', hex: '#059669' },
-  { label: 'Azul', hex: '#2563eb' },
-  { label: 'Laranja', hex: '#ea580c' },
-  { label: 'Rubi', hex: '#e11d48' },
-  { label: 'Âmbar', hex: '#d97706' },
-  { label: 'Violeta', hex: '#7c3aed' },
-  { label: 'Grafite', hex: '#475569' }
+// Paleta oficial padrão Whimsical (8 cores equilibradas e de alto contraste)
+export const WHIMSICAL_PALETTE = [
+  { label: 'Cinza Corporativo', hex: '#64748b' },
+  { label: 'Vermelho Coral', hex: '#f43f5e' },
+  { label: 'Laranja Âmbar', hex: '#f97316' },
+  { label: 'Amarelo Ouro', hex: '#eab308' },
+  { label: 'Verde Esmeralda', hex: '#10b981' },
+  { label: 'Azul Elétrico', hex: '#3b82f6' },
+  { label: 'Roxo Violeta', hex: '#8b5cf6' },
+  { label: 'Rosa Framboesa', hex: '#ec4899' }
+];
+
+export const EXECUTIVE_PALETTE = WHIMSICAL_PALETTE;
+
+const EMOJI_PRESETS = [
+  '🎯', '🚀', '💡', '📊', '⚡', '📌', '🏷️', '✅',
+  '⭐', '🔍', '📝', '📦', '💰', '🔥', '🍣', '🍱',
+  '🍙', '🥟', '🍜', '🍤', '🍙', '🥢', '💼', '🏆'
 ];
 
 interface NodeContextMenuProps {
   node: MindMapNode;
   position: { x: number; y: number; width: number; height: number };
-  onUpdateColor: (color: string) => void;
-  onUpdateBorderStyle: (style: 'accent' | 'border' | 'fill') => void;
-  onUpdateLineStyle: (style: 'bezier' | 'straight') => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
+  pan?: { x: number; y: number };
+  zoom?: number;
+  onUpdateStyle: (updates: Partial<MindMapNode>) => void;
+  onUpdateColor?: (color: string) => void;
+  onUpdateBorderStyle?: (style: 'accent' | 'border' | 'fill' | 'text') => void;
+  onUpdateLineStyle?: (style: 'bezier' | 'straight' | 'stepped') => void;
+  onToggleCollapse?: () => void;
   onAddChild?: () => void;
   onAddSibling?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  hasChildren?: boolean;
 }
 
 export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
   node,
   position,
-  onUpdateColor,
-  onUpdateBorderStyle,
-  onUpdateLineStyle,
+  pan,
+  zoom,
+  onUpdateStyle,
+  onToggleCollapse,
+  onAddChild,
+  onAddSibling,
   onMoveUp,
   onMoveDown,
   onDuplicate,
   onDelete,
-  canMoveUp,
-  canMoveDown
+  canMoveUp = false,
+  canMoveDown = false,
+  hasChildren = false
 }) => {
-  const [showPalette, setShowPalette] = useState(false);
+  const [activePopover, setActivePopover] = useState<'palette' | 'emoji' | 'link' | null>(null);
+  const [linkInput, setLinkInput] = useState(node.link || '');
+
   const currentColor = node.color || '#6366f1';
   const currentBorderStyle = node.borderStyle || 'accent';
   const currentLineStyle = node.lineStyle || 'bezier';
-
-  // 6 Cores executivas diretas de alta legibilidade
-  const QUICK_COLORS = ['#4f46e5', '#0d9488', '#16a34a', '#ea580c', '#e11d48', '#475569'];
+  const isBold = !!node.bold;
+  const isItalic = !!node.italic;
+  const currentSize = node.fontSize || 'medium';
 
   const handleColorChange = (hex: string, e: React.SyntheticEvent) => {
     e.stopPropagation();
-    onUpdateColor(hex);
-    setShowPalette(false);
+    onUpdateStyle({ color: hex });
+    setActivePopover(null);
   };
 
-  const isNearTop = position.y < 55;
-  const menuTop = isNearTop ? position.y + position.height + 10 : position.y - 46;
+  const handleSaveLink = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    const clean = linkInput.trim();
+    onUpdateStyle({ link: clean || undefined });
+    setActivePopover(null);
+  };
 
-  return (
+  const z = zoom || 1;
+  const pX = pan?.x || 0;
+  const pY = pan?.y || 0;
+
+  const screenCenterX = (position.x + position.width / 2) * z + pX;
+  const screenNodeTop = position.y * z + pY;
+  const isNearTop = screenNodeTop < 120;
+  const screenTop = isNearTop 
+    ? (position.y + position.height) * z + pY + 14 
+    : screenNodeTop - 52;
+
+  const menu = (
     <div
       className="node-context-menu"
       style={{
-        position: 'absolute',
-        left: `${position.x + position.width / 2}px`,
-        top: `${menuTop}px`,
+        position: 'fixed',
+        left: `${screenCenterX}px`,
+        top: `${screenTop}px`,
         transform: 'translateX(-50%)',
-        backgroundColor: 'var(--bg-elevated, #1e232d)',
-        border: '1.5px solid var(--border-strong, #3d4556)',
+        backgroundColor: 'var(--bg-elevated, #181d28)',
+        border: '1.5px solid var(--border-strong, #333d4e)',
         borderRadius: '8px',
-        padding: '4px 8px',
+        padding: '3px 6px',
         display: 'flex',
         alignItems: 'center',
-        gap: '6px',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-        zIndex: 1000,
+        gap: '4px',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
+        zIndex: 9999,
         pointerEvents: 'auto',
         userSelect: 'none'
       }}
@@ -95,122 +139,94 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* Botão Seletor de Cores Aprimorado */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-        {QUICK_COLORS.map(hex => {
-          const isSelected = hex.toLowerCase() === currentColor.toLowerCase();
+      {/* 8 Cores Oficiais Whimsical */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+        {WHIMSICAL_PALETTE.map(p => {
+          const isSelected = p.hex.toLowerCase() === currentColor.toLowerCase();
           return (
             <button
-              key={hex}
+              key={p.hex}
               type="button"
               onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => handleColorChange(hex, e)}
+              onClick={(e) => handleColorChange(p.hex, e)}
               style={{
-                width: '18px',
-                height: '18px',
+                width: '16px',
+                height: '16px',
                 borderRadius: '50%',
-                backgroundColor: hex,
+                backgroundColor: p.hex,
                 cursor: 'pointer',
-                border: isSelected ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
-                boxShadow: isSelected ? `0 0 0 2px ${hex}` : 'none',
+                border: isSelected ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.25)',
+                boxShadow: isSelected ? `0 0 0 2px ${p.hex}` : 'none',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: 0,
                 transition: 'transform 0.1s ease'
               }}
-              title={`Cor ${hex}`}
+              title={p.label}
             >
-              {isSelected && <Check size={11} color="#ffffff" strokeWidth={3} />}
+              {isSelected && <Check size={10} color="#ffffff" strokeWidth={3} />}
             </button>
           );
         })}
-
-        {/* Botão de Paleta Completa */}
-        <div style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowPalette(!showPalette);
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '20px',
-              height: '20px',
-              borderRadius: '4px',
-              background: showPalette ? 'var(--accent-purple)' : 'rgba(255,255,255,0.08)',
-              border: '1px solid var(--border-subtle)',
-              cursor: 'pointer',
-              color: 'var(--text-primary)',
-              padding: 0
-            }}
-            title="Mais Cores"
-          >
-            <ChevronDown size={12} />
-          </button>
-
-          {showPalette && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '28px',
-                left: '-20px',
-                backgroundColor: 'var(--bg-elevated, #1c2028)',
-                border: '1.5px solid var(--border-strong, #3f4758)',
-                borderRadius: '8px',
-                padding: '8px',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '8px',
-                boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
-                zIndex: 1010,
-                width: '120px'
-              }}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {EXECUTIVE_PALETTE.map(p => (
-                <button
-                  key={p.hex}
-                  type="button"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => handleColorChange(p.hex, e)}
-                  style={{
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    backgroundColor: p.hex,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: p.hex.toLowerCase() === currentColor.toLowerCase() ? '2px solid #ffffff' : '1px solid rgba(255,255,255,0.2)',
-                    padding: 0
-                  }}
-                  title={p.label}
-                >
-                  {p.hex.toLowerCase() === currentColor.toLowerCase() && <Check size={13} color="#ffffff" strokeWidth={3} />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
-      <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-subtle, #333a48)', margin: '0 2px' }} />
+      <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-subtle, #2d3748)', margin: '0 2px' }} />
 
-      {/* Alternar Estilo de Borda */}
+      {/* Alternador de Estilo de Cartão (Accent | Border | Fill | Text) */}
       <button
         type="button"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
-          const next = currentBorderStyle === 'accent' ? 'border' : currentBorderStyle === 'border' ? 'fill' : 'accent';
-          onUpdateBorderStyle(next);
+          const order: Array<'accent' | 'border' | 'fill' | 'text'> = ['accent', 'border', 'fill', 'text'];
+          const next = order[(order.indexOf(currentBorderStyle) + 1) % order.length];
+          onUpdateStyle({ borderStyle: next });
+        }}
+        style={{
+          height: '24px',
+          padding: '0 5px',
+          borderRadius: '4px',
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--text-secondary, #cbd5e1)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '3px',
+          fontSize: '11px',
+          fontWeight: 600
+        }}
+        title={`Estilo do Card: ${
+          currentBorderStyle === 'accent' ? 'Destaque Lateral (Clique para Borda)' :
+          currentBorderStyle === 'border' ? 'Borda Completa (Clique para Preenchido)' :
+          currentBorderStyle === 'fill' ? 'Preenchido (Clique para Texto Puro)' :
+          'Apenas Texto (Clique para Destaque)'
+        }`}
+      >
+        {currentBorderStyle === 'text' ? (
+          <Type size={13} color={currentColor} />
+        ) : (
+          <Square 
+            size={13} 
+            fill={currentBorderStyle === 'fill' ? currentColor : 'none'} 
+            stroke={currentBorderStyle === 'fill' ? 'none' : 'currentColor'}
+          />
+        )}
+        <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          {currentBorderStyle === 'accent' ? 'Lateral' : currentBorderStyle === 'border' ? 'Borda' : currentBorderStyle === 'fill' ? 'Cor' : 'Texto'}
+        </span>
+      </button>
+
+      {/* Alternador de Estilo de Linha (Bézier | Reta | Cotovelo) */}
+      <button
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          const order: Array<'bezier' | 'straight' | 'stepped'> = ['bezier', 'straight', 'stepped'];
+          const next = order[(order.indexOf(currentLineStyle) + 1) % order.length];
+          onUpdateStyle({ lineStyle: next });
         }}
         style={{
           width: '24px',
@@ -224,100 +240,321 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
           alignItems: 'center',
           justifyContent: 'center'
         }}
-        title={`Estilo do Card: ${currentBorderStyle === 'accent' ? 'Destaque Lateral' : currentBorderStyle === 'border' ? 'Borda Completa' : 'Preenchido'}`}
+        title={`Linha: ${
+          currentLineStyle === 'bezier' ? 'Curva Bézier (Clique para Reta)' :
+          currentLineStyle === 'straight' ? 'Reta Direta (Clique para Cotovelo)' :
+          'Cotovelo / Stepped (Clique para Curva)'
+        }`}
       >
-        <Square size={14} />
+        {currentLineStyle === 'bezier' ? <Spline size={13} /> : currentLineStyle === 'straight' ? <Minus size={13} /> : <CornerDownRight size={13} />}
       </button>
 
-      {/* Alternar Estilo da Linha (Curva Bézier vs Reta) */}
+      <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-subtle, #2d3748)', margin: '0 2px' }} />
+
+      {/* Formatação Tipográfica: Negrito (B) */}
       <button
         type="button"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
-          onUpdateLineStyle(currentLineStyle === 'bezier' ? 'straight' : 'bezier');
+          onUpdateStyle({ bold: !isBold });
         }}
         style={{
-          width: '24px',
+          width: '22px',
           height: '24px',
           borderRadius: '4px',
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--text-secondary, #cbd5e1)',
+          background: isBold ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+          border: isBold ? '1px solid #6366f1' : 'none',
+          color: isBold ? '#818cf8' : 'var(--text-secondary, #cbd5e1)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
         }}
-        title={`Estilo da Linha: ${currentLineStyle === 'bezier' ? 'Curva Bézier' : 'Linha Reta'}`}
+        title="Negrito (Ctrl+B)"
       >
-        {currentLineStyle === 'bezier' ? <Spline size={14} /> : <Minus size={14} />}
+        <Bold size={12} />
       </button>
 
-      <div style={{ width: '1px', height: '16px', backgroundColor: 'var(--border-subtle, #333a48)', margin: '0 2px' }} />
+      {/* Formatação Tipográfica: Itálico (I) */}
+      <button
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onUpdateStyle({ italic: !isItalic });
+        }}
+        style={{
+          width: '22px',
+          height: '24px',
+          borderRadius: '4px',
+          background: isItalic ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+          border: isItalic ? '1px solid #6366f1' : 'none',
+          color: isItalic ? '#818cf8' : 'var(--text-secondary, #cbd5e1)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+        title="Itálico (Ctrl+I)"
+      >
+        <Italic size={12} />
+      </button>
 
-      {/* Reordenar Irmãos: Subir ↑ / Descer ↓ */}
-      {(canMoveUp || canMoveDown) && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: '4px', padding: '1px' }}>
-          <button
-            type="button"
-            disabled={!canMoveUp}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveUp();
-            }}
-            style={{
-              width: '22px',
-              height: '22px',
-              borderRadius: '3px',
-              background: 'transparent',
-              border: 'none',
-              color: canMoveUp ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: canMoveUp ? 'pointer' : 'default',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            title="Subir na lista"
-          >
-            <ArrowUp size={13} />
-          </button>
-          <button
-            type="button"
-            disabled={!canMoveDown}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              onMoveDown();
-            }}
-            style={{
-              width: '22px',
-              height: '22px',
-              borderRadius: '3px',
-              background: 'transparent',
-              border: 'none',
-              color: canMoveDown ? 'var(--text-primary)' : 'var(--text-muted)',
-              cursor: canMoveDown ? 'pointer' : 'default',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-            title="Descer na lista"
-          >
-            <ArrowDown size={13} />
-          </button>
-        </div>
-      )}
+      {/* Tamanho de Fonte (S / M / L) */}
+      <button
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          const order: Array<'small' | 'medium' | 'large'> = ['small', 'medium', 'large'];
+          const next = order[(order.indexOf(currentSize) + 1) % order.length];
+          onUpdateStyle({ fontSize: next });
+        }}
+        style={{
+          height: '24px',
+          padding: '0 4px',
+          borderRadius: '4px',
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--text-secondary, #cbd5e1)',
+          cursor: 'pointer',
+          fontSize: '10px',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+        title={`Tamanho do Texto: ${currentSize === 'small' ? 'Pequeno (12px)' : currentSize === 'medium' ? 'Médio (14px)' : 'Grande (16px)'}`}
+      >
+        {currentSize === 'small' ? 'P' : currentSize === 'medium' ? 'M' : 'G'}
+      </button>
 
-      {/* Duplicar */}
-      {node.side !== 'root' && (
+      <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-subtle, #2d3748)', margin: '0 2px' }} />
+
+      {/* Botão de Ícone / Emoji */}
+      <div style={{ position: 'relative' }}>
         <button
           type="button"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            onDuplicate();
+            setActivePopover(activePopover === 'emoji' ? null : 'emoji');
+          }}
+          style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '4px',
+            background: node.icon || activePopover === 'emoji' ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+            border: node.icon ? '1px solid #6366f1' : 'none',
+            color: 'var(--text-secondary, #cbd5e1)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px'
+          }}
+          title={node.icon ? `Ícone Atual: ${node.icon} (Clique para alterar)` : 'Adicionar Ícone / Emoji'}
+        >
+          {node.icon ? node.icon : <Smile size={13} />}
+        </button>
+
+        {activePopover === 'emoji' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '30px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'var(--bg-elevated, #181d28)',
+              border: '1.5px solid var(--border-strong, #333d4e)',
+              borderRadius: '8px',
+              padding: '8px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(6, 1fr)',
+              gap: '6px',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+              zIndex: 1020,
+              width: '180px'
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {EMOJI_PRESETS.map((em, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdateStyle({ icon: em });
+                  setActivePopover(null);
+                }}
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '4px',
+                  background: node.icon === em ? 'rgba(99, 102, 241, 0.3)' : 'transparent',
+                  border: node.icon === em ? '1px solid #6366f1' : 'none',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0
+                }}
+              >
+                {em}
+              </button>
+            ))}
+            {node.icon && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUpdateStyle({ icon: undefined });
+                  setActivePopover(null);
+                }}
+                style={{
+                  gridColumn: 'span 6',
+                  marginTop: '4px',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: '#f87171',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Remover Ícone
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Botão de Hiperlink */}
+      <div style={{ position: 'relative' }}>
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            setLinkInput(node.link || '');
+            setActivePopover(activePopover === 'link' ? null : 'link');
+          }}
+          style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '4px',
+            background: node.link || activePopover === 'link' ? 'rgba(99, 102, 241, 0.25)' : 'transparent',
+            border: node.link ? '1px solid #6366f1' : 'none',
+            color: node.link ? '#818cf8' : 'var(--text-secondary, #cbd5e1)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title={node.link ? `Link: ${node.link}` : 'Adicionar Link Externo'}
+        >
+          <Link2 size={13} />
+        </button>
+
+        {activePopover === 'link' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '30px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              backgroundColor: 'var(--bg-elevated, #181d28)',
+              border: '1.5px solid var(--border-strong, #333d4e)',
+              borderRadius: '8px',
+              padding: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+              zIndex: 1020,
+              width: '210px'
+            }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <input
+              type="url"
+              placeholder="https://exemplo.com"
+              value={linkInput}
+              onChange={(e) => setLinkInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveLink(e);
+              }}
+              style={{
+                width: '100%',
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '4px',
+                padding: '4px 6px',
+                fontSize: '11px',
+                color: 'var(--text-primary)',
+                outline: 'none'
+              }}
+              autoFocus
+            />
+            <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+              {node.link && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpdateStyle({ link: undefined });
+                    setActivePopover(null);
+                  }}
+                  style={{
+                    padding: '3px 6px',
+                    borderRadius: '4px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#f87171',
+                    fontSize: '10px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Remover
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveLink}
+                style={{
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  background: 'var(--accent-purple, #6366f1)',
+                  border: 'none',
+                  color: '#ffffff',
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Recolher / Expandir Ramo (se tiver filhos) */}
+      {hasChildren && onToggleCollapse && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCollapse();
           }}
           style={{
             width: '24px',
@@ -331,13 +568,67 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
             alignItems: 'center',
             justifyContent: 'center'
           }}
-          title="Duplicar Nó"
+          title={node.collapsed ? 'Expandir Ramo (Ctrl+/)' : 'Recolher Ramo (Ctrl+/)'}
         >
-          <Copy size={13} />
+          {node.collapsed ? <FolderPlus size={13} /> : <FolderMinus size={13} />}
         </button>
       )}
 
-      {/* Excluir Nó (Trash) */}
+      {/* Adicionar Filho (+) */}
+      {onAddChild && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddChild();
+          }}
+          style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '4px',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-secondary, #cbd5e1)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title="Adicionar Filho (Atalho: Tab)"
+        >
+          <Plus size={13} />
+        </button>
+      )}
+
+      <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-subtle, #2d3748)', margin: '0 2px' }} />
+
+      {/* Duplicar Nó */}
+      <button
+        type="button"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onDuplicate();
+        }}
+        style={{
+          width: '24px',
+          height: '24px',
+          borderRadius: '4px',
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--text-secondary, #cbd5e1)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}
+        title="Duplicar Nó (Ctrl+D)"
+      >
+        <Copy size={13} />
+      </button>
+
+      {/* Excluir Nó (se não for raiz) */}
       {node.side !== 'root' && (
         <button
           type="button"
@@ -358,11 +649,13 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
             alignItems: 'center',
             justifyContent: 'center'
           }}
-          title="Excluir (Delete)"
+          title="Excluir Nó (Delete)"
         >
           <Trash2 size={13} />
         </button>
       )}
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(menu, document.body) : null;
 };

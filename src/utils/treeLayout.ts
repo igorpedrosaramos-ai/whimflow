@@ -15,7 +15,8 @@ export interface ComputedNodeLayout {
 export function estimateNodeDimensions(node: MindMapNode): { width: number; height: number } {
   if (node.side === 'root') {
     const textLen = (node.text || '').length;
-    return { width: Math.max(180, Math.round(textLen * 9.5 + 56)), height: 48 };
+    const iconPadding = node.icon ? 24 : 0;
+    return { width: Math.max(180, Math.round(textLen * 9.5 + 56 + iconPadding)), height: 48 };
   }
   const text = node.text || '';
   const textLen = text.length;
@@ -27,10 +28,13 @@ export function estimateNodeDimensions(node: MindMapNode): { width: number; heig
   // ~8.8px por caractere no corpo 13.5px com folga de padding lateral e possíveis badges
   const hasChildBadge = Boolean(node.childrenIds && node.childrenIds.length > 0 && node.collapsed);
   const badgePadding = hasChildBadge ? 36 : 0;
+  const iconPadding = node.icon ? 22 : 0;
+  const linkPadding = node.link ? 20 : 0;
+  const charMultiplier = node.fontSize === 'small' ? 7.8 : node.fontSize === 'large' ? 10.2 : (node.bold ? 9.4 : 8.8);
   const basePadding = 42; // 14px padding esquerdo + 14px padding direito + folga segura
 
-  const width = Math.max(110, Math.round(textLen * 8.8 + basePadding + badgePadding));
-  const height = 38;
+  const width = Math.max(110, Math.round(textLen * charMultiplier + basePadding + badgePadding + iconPadding + linkPadding));
+  const height = node.fontSize === 'large' ? 44 : node.fontSize === 'small' ? 34 : 38;
   return { width, height };
 }
 

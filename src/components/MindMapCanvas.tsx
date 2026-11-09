@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus } from 'lucide-react';
+import { Plus, ExternalLink } from 'lucide-react';
 import { MindMapNode } from '../types';
 import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
 import { NodeContextMenu } from './NodeContextMenu';
@@ -17,6 +17,8 @@ interface MindMapCanvasProps {
   onToggleCollapse: (id: string) => void;
   onAddChildNode: (parentId: string) => void;
   onAddSiblingNode: (nodeId: string) => void;
+  onAddSiblingAboveNode?: (nodeId: string) => void;
+  onAddParentNode?: (nodeId: string) => void;
   onDeleteNode: (id: string) => void;
   onDeleteMultipleNodes?: (ids: string[]) => void;
   onDuplicateMultipleNodes?: (ids: string[]) => void;
@@ -42,6 +44,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   onToggleCollapse,
   onAddChildNode,
   onAddSiblingNode,
+  onAddSiblingAboveNode,
+  onAddParentNode,
   onDeleteNode,
   onDeleteMultipleNodes,
   onDuplicateMultipleNodes,
@@ -181,7 +185,15 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, node: MindMapNode) => {
-    if (e.key === 'Enter') {
+    if (e.altKey && e.key === 'Enter') {
+      e.preventDefault();
+      handleCommitEdit();
+      onAddParentNode?.(node.id);
+    } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleCommitEdit();
+      onAddSiblingAboveNode?.(node.id);
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       handleCommitEdit();
       onAddSiblingNode(node.id);
@@ -444,6 +456,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         let pathData = '';
         if (lineStyle === 'straight') {
           pathData = `M ${startX} ${startY} L ${endX} ${endY}`;
+        } else if (lineStyle === 'stepped') {
+          const midX = (startX + endX) / 2;
+          pathData = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
         } else {
           pathData = getBezierPath(startX, startY, endX, endY);
         }
@@ -773,20 +788,24 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       {/* Camada Vetorial Global de Linhas */}
       {renderConnectors()}
 
-      {/* Menu Contextual Flutuante Superior */}
+      {/* Menu Contextual Flutuante Superior (Block UI Oficial Whimsical) */}
       {selectedNode && selectedPos && (
         <NodeContextMenu
           node={selectedNode}
           position={selectedPos}
-          onUpdateColor={(color) => onUpdateNodeStyle(selectedNode.id, { color })}
-          onUpdateBorderStyle={(borderStyle) => onUpdateNodeStyle(selectedNode.id, { borderStyle })}
-          onUpdateLineStyle={(lineStyle) => onUpdateNodeStyle(selectedNode.id, { lineStyle })}
+          pan={pan}
+          zoom={zoom}
+          onUpdateStyle={(updates) => onUpdateNodeStyle(selectedNode.id, updates)}
+          onToggleCollapse={() => onToggleCollapse(selectedNode.id)}
+          onAddChild={() => onAddChildNode(selectedNode.id)}
+          onAddSibling={() => onAddSiblingNode(selectedNode.id)}
           onMoveUp={() => onReorderNode(selectedNode.id, 'up')}
           onMoveDown={() => onReorderNode(selectedNode.id, 'down')}
           onDuplicate={() => onDuplicateNode(selectedNode.id)}
           onDelete={() => onDeleteNode(selectedNode.id)}
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
+          hasChildren={selectedNode.childrenIds && selectedNode.childrenIds.length > 0}
         />
       )}
 
@@ -818,14 +837,22 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           border = '2px solid var(--border-strong)';
         } else if (borderStyle === 'fill') {
           bg = nodeColor;
-          border = `2px solid ${nodeColor}`;
+          border = `1.5px solid ${nodeColor}`;
         } else if (borderStyle === 'border') {
           bg = 'var(--bg-surface)';
           border = `2px solid ${nodeColor}`;
+        } else if (borderStyle === 'text') {
+          bg = 'transparent';
+          border = isSelected ? `1.5px dashed ${nodeColor}` : '1.5px solid transparent';
         } else {
           bg = 'var(--bg-surface)';
           borderLeft = `4px solid ${nodeColor}`;
         }
+
+        const isBold = !!node.bold || isRoot;
+        const isItalic = !!node.italic;
+        const fontSizePx = node.fontSize === 'small' ? '12px' : node.fontSize === 'large' ? '16px' : (isRoot ? '16px' : '13.5px');
+        const textColor = borderStyle === 'fill' ? '#ffffff' : (borderStyle === 'text' ? nodeColor : 'var(--text-primary)');
 
         return (
           <div
@@ -877,6 +904,13 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             onMouseLeave={() => setHoveredNodeId(null)}
             onMouseDown={(e) => handleMouseDown(node, e)}
           >
+            {/* Ícone / Emoji Associado */}
+            {node.icon && (
+              <span style={{ marginRight: '6px', fontSize: '14px', verticalAlign: 'middle', userSelect: 'none' }}>
+                {node.icon}
+              </span>
+            )}
+
             {/* Texto ou Input de Edição */}
             {isEditing ? (
               <input
@@ -890,11 +924,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 style={{
                   background: 'transparent',
                   border: 'none',
-                  color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
+                  color: textColor,
                   borderRadius: '4px',
                   padding: '2px 4px',
-                  fontSize: isRoot ? '16px' : '13.5px',
-                  fontWeight: isRoot ? 700 : 500,
+                  fontSize: fontSizePx,
+                  fontWeight: isBold ? 700 : 500,
+                  fontStyle: isItalic ? 'italic' : 'normal',
                   outline: 'none',
                   minWidth: '80px'
                 }}
@@ -902,15 +937,103 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             ) : (
               <span style={{
                 userSelect: 'none',
-                color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
-                fontSize: isRoot ? '16px' : '13.5px',
-                fontWeight: isRoot ? 700 : 500,
+                color: textColor,
+                fontSize: fontSizePx,
+                fontWeight: isBold ? 700 : 500,
+                fontStyle: isItalic ? 'italic' : 'normal',
                 letterSpacing: '-0.01em',
                 minWidth: node.text ? undefined : '50px',
                 display: 'inline-block'
               }}>
                 {node.text}
               </span>
+            )}
+
+            {/* Hiperlink Externo */}
+            {node.link && (
+              <a
+                href={node.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  marginLeft: '6px',
+                  color: textColor,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  verticalAlign: 'middle',
+                  opacity: 0.85
+                }}
+                title={`Abrir link: ${node.link}`}
+              >
+                <ExternalLink size={12} />
+              </a>
+            )}
+
+            {/* Alça de Adição Rápida: Filho (+) ao passar o mouse */}
+            {isHovered && !isDraggingThis && !isEditing && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddChildNode(node.id);
+                }}
+                style={{
+                  position: 'absolute',
+                  right: '-9px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: nodeColor,
+                  color: '#ffffff',
+                  border: '2px solid var(--bg-surface, #ffffff)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  zIndex: 50,
+                  padding: 0
+                }}
+                title="Adicionar Quadrado Filho (Atalho: Tab)"
+              >
+                <Plus size={11} strokeWidth={3} />
+              </button>
+            )}
+
+            {/* Alça de Adição Rápida: Irmão Abaixo (+) ao passar o mouse (se não for raiz) */}
+            {isHovered && !isDraggingThis && !isEditing && !isRoot && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddSiblingNode(node.id);
+                }}
+                style={{
+                  position: 'absolute',
+                  bottom: '-9px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--bg-elevated, #1e293b)',
+                  color: 'var(--text-primary, #ffffff)',
+                  border: '1.5px solid var(--border-subtle, #334155)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+                  zIndex: 50,
+                  padding: 0
+                }}
+                title="Adicionar Quadrado Irmão (Atalho: Enter)"
+              >
+                <Plus size={11} strokeWidth={3} />
+              </button>
             )}
 
             {/* Badge de Ramos Recolhidos */}

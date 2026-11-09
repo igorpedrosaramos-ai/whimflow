@@ -13,6 +13,7 @@ import { ShareModal } from './components/ShareModal';
 import { PresentationView } from './components/PresentationView';
 import { EXECUTIVE_PALETTE } from './components/NodeContextMenu';
 import { calculateMindMapLayout } from './utils/treeLayout';
+import { parseOutlineText, createNodesFromOutline } from './utils/mindMapImport';
 
 const STORAGE_KEY = 'whimflow_boards_v5';
 const THEME_KEY = 'whimflow_theme';
@@ -461,6 +462,105 @@ export const App: React.FC = () => {
             childrenIds: newChildren 
           } : n),
           newNode
+        ]
+      };
+    });
+
+    setSelectedNodeId(newId);
+    setSelectedNodeIds([newId]);
+    setEditingNodeId(newId);
+  };
+
+  // CRIAÇÃO DE QUADRADO IRMÃO ACIMA (Atalho Whimsical: Ctrl + Enter)
+  const handleAddSiblingAboveNode = (siblingId: string) => {
+    const sibling = activeBoard.mindMapNodes.find(n => n.id === siblingId);
+    if (!sibling || !sibling.parentId) return;
+
+    const parent = activeBoard.mindMapNodes.find(n => n.id === sibling.parentId);
+    if (!parent) return;
+
+    const newId = `node-${Date.now()}`;
+    const newNode: MindMapNode = {
+      id: newId,
+      text: '',
+      x: sibling.x,
+      y: sibling.y - 45,
+      parentId: parent.id,
+      childrenIds: [],
+      collapsed: false,
+      color: sibling.color || parent.color || '#6366f1',
+      borderStyle: sibling.borderStyle || 'accent',
+      lineStyle: sibling.lineStyle || 'bezier',
+      side: sibling.side
+    };
+
+    updateActiveBoard(board => {
+      const curIndex = parent.childrenIds.indexOf(siblingId);
+      const newChildren = [...parent.childrenIds];
+      if (curIndex >= 0) {
+        newChildren.splice(curIndex, 0, newId);
+      } else {
+        newChildren.unshift(newId);
+      }
+
+      return {
+        ...board,
+        mindMapNodes: [
+          ...board.mindMapNodes.map(n => n.id === parent.id ? { 
+            ...n, 
+            childrenIds: newChildren 
+          } : n),
+          newNode
+        ]
+      };
+    });
+
+    setSelectedNodeId(newId);
+    setSelectedNodeIds([newId]);
+    setEditingNodeId(newId);
+  };
+
+  // CRIAÇÃO DE NÓ PAI INTERMEDIÁRIO (Atalho Whimsical: Alt + Enter)
+  const handleAddParentNode = (childId: string) => {
+    const child = activeBoard.mindMapNodes.find(n => n.id === childId);
+    if (!child || !child.parentId) return;
+
+    const grandParent = activeBoard.mindMapNodes.find(n => n.id === child.parentId);
+    if (!grandParent) return;
+
+    const newId = `node-${Date.now()}`;
+    const newParentNode: MindMapNode = {
+      id: newId,
+      text: '',
+      x: (child.x + grandParent.x) / 2,
+      y: child.y,
+      parentId: grandParent.id,
+      childrenIds: [childId],
+      collapsed: false,
+      color: child.color || grandParent.color || '#6366f1',
+      borderStyle: child.borderStyle || 'accent',
+      lineStyle: child.lineStyle || 'bezier',
+      side: child.side
+    };
+
+    updateActiveBoard(board => {
+      const childIndex = grandParent.childrenIds.indexOf(childId);
+      const newGrandChildren = [...grandParent.childrenIds];
+      if (childIndex >= 0) {
+        newGrandChildren.splice(childIndex, 1, newId);
+      } else {
+        newGrandChildren.push(newId);
+      }
+
+      return {
+        ...board,
+        mindMapNodes: [
+          ...board.mindMapNodes.map(n => {
+            if (n.id === grandParent.id) return { ...n, childrenIds: newGrandChildren };
+            if (n.id === childId) return { ...n, parentId: newId };
+            return n;
+          }),
+          newParentNode
         ]
       };
     });
@@ -932,13 +1032,104 @@ export const App: React.FC = () => {
         return;
       }
 
+      // Whimsical Shortcut: Ctrl + / (Recolher / Expandir Ramo)
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        if (selectedNodeId) {
+          e.preventDefault();
+          handleToggleCollapse(selectedNodeId);
+          return;
+        }
+      }
+
+      // Whimsical Shortcut: Alt + Enter (Criar nó Pai intermediário)
+      if (e.altKey && e.key === 'Enter' && selectedNodeId) {
+        e.preventDefault();
+        handleAddParentNode(selectedNodeId);
+        return;
+      }
+
+      // Whimsical Shortcut: Ctrl + Enter (Criar nó Irmão Acima)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && selectedNodeId) {
+        e.preventDefault();
+        handleAddSiblingAboveNode(selectedNodeId);
+        return;
+      }
+
+      // Whimsical Shortcut: Tab (Criar Filho)
       if (e.key === 'Tab' && selectedNodeId) {
         e.preventDefault();
         handleAddChildNode(selectedNodeId);
-      } else if (e.key === 'Enter' && selectedNodeId) {
+        return;
+      }
+
+      // Whimsical Shortcut: Enter (Criar Irmão Abaixo)
+      if (e.key === 'Enter' && selectedNodeId) {
         e.preventDefault();
         handleAddSiblingNode(selectedNodeId);
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        return;
+      }
+
+      // Whimsical Shortcut: Navegação com Setas (↑ ↓ ← →)
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedNodeId) {
+        const cur = activeBoard.mindMapNodes.find(n => n.id === selectedNodeId);
+        if (cur) {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            if (cur.parentId) {
+              const parent = activeBoard.mindMapNodes.find(n => n.id === cur.parentId);
+              if (parent && parent.childrenIds.length > 1) {
+                const idx = parent.childrenIds.indexOf(cur.id);
+                if (idx >= 0) {
+                  const targetIdx = e.key === 'ArrowUp' ? Math.max(0, idx - 1) : Math.min(parent.childrenIds.length - 1, idx + 1);
+                  const targetId = parent.childrenIds[targetIdx];
+                  if (targetId && targetId !== cur.id) {
+                    e.preventDefault();
+                    setSelectedNodeId(targetId);
+                    setSelectedNodeIds([targetId]);
+                    return;
+                  }
+                }
+              }
+            }
+          } else if (e.key === 'ArrowRight') {
+            if (cur.childrenIds && cur.childrenIds.length > 0 && !cur.collapsed) {
+              e.preventDefault();
+              const firstChild = cur.childrenIds[0];
+              setSelectedNodeId(firstChild);
+              setSelectedNodeIds([firstChild]);
+              return;
+            }
+          } else if (e.key === 'ArrowLeft') {
+            if (cur.parentId) {
+              e.preventDefault();
+              setSelectedNodeId(cur.parentId);
+              setSelectedNodeIds([cur.parentId]);
+              return;
+            }
+          }
+        }
+      }
+
+      // Whimsical Shortcut: Copiar Ramo como Texto Hierárquico (Ctrl + C)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c' && selectedNodeId) {
+        const root = activeBoard.mindMapNodes.find(n => n.id === selectedNodeId);
+        if (root) {
+          const lines: string[] = [];
+          const collect = (nodeId: string, depth: number) => {
+            const n = activeBoard.mindMapNodes.find(item => item.id === nodeId);
+            if (!n) return;
+            lines.push(`${'  '.repeat(depth)}- ${n.text}`);
+            if (n.childrenIds && n.childrenIds.length > 0) {
+              n.childrenIds.forEach(cid => collect(cid, depth + 1));
+            }
+          };
+          collect(root.id, 0);
+          if (lines.length > 0) {
+            navigator.clipboard.writeText(lines.join('\n')).catch(() => {});
+          }
+        }
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodeIds.length > 0) {
           handleDeleteMultipleNodes(selectedNodeIds);
         } else if (selectedNodeId) {
@@ -962,11 +1153,51 @@ export const App: React.FC = () => {
       }
     };
 
+    // Whimsical Feature: Colar Lista / Markdown para gerar árvore instantânea (Ctrl + V)
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA' || (activeEl as HTMLElement)?.isContentEditable;
+      if (isInput) return;
+
+      const clipboardData = e.clipboardData?.getData('text');
+      if (!clipboardData) return;
+
+      const lines = parseOutlineText(clipboardData);
+      if (lines.length >= 2 || (lines.length === 1 && lines[0].text.length > 0)) {
+        e.preventDefault();
+        const targetParentId = selectedNodeId || 'root';
+        const targetParent = activeBoard.mindMapNodes.find(n => n.id === targetParentId) || activeBoard.mindMapNodes[0];
+        if (targetParent) {
+          const newNodes = createNodesFromOutline(lines, targetParent, activeBoard.mindMapNodes);
+          if (newNodes.length > 0) {
+            const firstLevelIds = newNodes.filter(n => n.parentId === targetParent.id).map(n => n.id);
+            updateActiveBoard(board => ({
+              ...board,
+              mindMapNodes: [
+                ...board.mindMapNodes.map(n => n.id === targetParent.id ? {
+                  ...n,
+                  childrenIds: [...(n.childrenIds || []), ...firstLevelIds],
+                  collapsed: false
+                } : n),
+                ...newNodes
+              ]
+            }));
+            if (firstLevelIds[0]) {
+              setSelectedNodeId(firstLevelIds[0]);
+              setSelectedNodeIds(firstLevelIds);
+            }
+          }
+        }
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('paste', handleGlobalPaste);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('paste', handleGlobalPaste);
     };
   }, [selectedNodeId, selectedNodeIds, selectedStickyId, historyIndex, history]);
 
@@ -1206,6 +1437,8 @@ export const App: React.FC = () => {
               onToggleCollapse={handleToggleCollapse}
               onAddChildNode={handleAddChildNode}
               onAddSiblingNode={handleAddSiblingNode}
+              onAddSiblingAboveNode={handleAddSiblingAboveNode}
+              onAddParentNode={handleAddParentNode}
               onDeleteNode={handleDeleteNode}
               onDeleteMultipleNodes={handleDeleteMultipleNodes}
               onDuplicateMultipleNodes={handleDuplicateMultipleNodes}

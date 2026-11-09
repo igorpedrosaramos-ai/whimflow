@@ -21,9 +21,15 @@ export interface MindMapNode {
   collapsed?: boolean;
   color?: string; // Cor principal da linha e do nó
   borderColor?: string;
-  borderStyle?: 'accent' | 'border' | 'fill';
-  lineStyle?: 'bezier' | 'straight';
+  borderStyle?: 'accent' | 'border' | 'fill' | 'text';
+  lineStyle?: 'bezier' | 'straight' | 'stepped';
   fontSize?: 'small' | 'medium' | 'large';
+  bold?: boolean;
+  italic?: boolean;
+  strikethrough?: boolean;
+  icon?: string; // Emoji ou ícone corporativo associado
+  link?: string; // URL externa associada
+  notes?: string; // Notas ou descrição complementar
   side?: 'left' | 'right' | 'root';
 }
 
