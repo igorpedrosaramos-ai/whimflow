@@ -224,7 +224,7 @@ export function exportBoardAsSVG(board: Board) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${board.title.replace(/\s+/g, '_')}_whimflow.svg`;
+  a.download = `${board.title.replace(/\s+/g, '_')}_mapa_mental_turbine.svg`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -264,7 +264,7 @@ export function exportBoardAsPNG(board: Board): Promise<void> {
           const pngUrl = URL.createObjectURL(pngBlob);
           const a = document.createElement('a');
           a.href = pngUrl;
-          a.download = `${board.title.replace(/\s+/g, '_')}_whimflow.png`;
+          a.download = `${board.title.replace(/\s+/g, '_')}_mapa_mental_turbine.png`;
           document.body.appendChild(a);
           a.click();
           a.remove();

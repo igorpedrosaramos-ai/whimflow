@@ -290,7 +290,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <HardDriveDownload size={13} color="var(--accent-teal-light)" />
           <span>Salvamento local ativo e contínuo</span>
         </div>
-        <div>WhimFlow Pro • Alta Fidelidade</div>
+        <div>Mapa Mental Turbine</div>
       </div>
     </aside>
   );
