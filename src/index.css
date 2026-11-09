@@ -329,3 +329,24 @@ html, body, #root {
   max-width: 540px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
 }
+
+/* Responsividade Mobile & Tablet */
+@media (max-width: 768px) {
+  .nav-btn-text {
+    display: none !important;
+  }
+  .breadcrumb-chevron {
+    display: none !important;
+  }
+  .floating-toolbar {
+    left: 10px;
+    top: 60px;
+    padding: 4px;
+    gap: 3px;
+  }
+  .sidebar-panel {
+    width: 85vw;
+    max-width: 320px;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+}

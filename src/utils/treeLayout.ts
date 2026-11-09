@@ -39,8 +39,8 @@ export function calculateMindMapLayout(
     rootY?: number;
   } = {}
 ): Map<string, ComputedNodeLayout> {
-  const horizontalGap = options.horizontalGap ?? 85;
-  const verticalGap = options.verticalGap ?? 16;
+  const horizontalGap = options.horizontalGap ?? 100;
+  const verticalGap = options.verticalGap ?? 18;
   const rootX = options.rootX ?? 0;
   const rootY = options.rootY ?? 0;
 
@@ -182,13 +182,7 @@ export function getBezierPath(
   endY: number
 ): string {
   const dx = Math.abs(endX - startX);
-  const dy = Math.abs(endY - startY);
   const direction = endX >= startX ? 1 : -1;
-  // Distância de controle balanceada que preserva a curvatura orgânica mesmo com grande deslocamento vertical
-  const cpDistance = Math.max(34, Math.min(dx * 0.52 + dy * 0.08, dx * 0.95));
-  const cp1X = startX + cpDistance * direction;
-  const cp1Y = startY;
-  const cp2X = endX - cpDistance * direction;
-  const cp2Y = endY;
-  return `M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`;
+  const cpX = startX + dx * 0.5 * direction;
+  return `M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}`;
 }

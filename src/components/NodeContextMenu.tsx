@@ -68,13 +68,16 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
     setShowPalette(false);
   };
 
+  const isNearTop = position.y < 55;
+  const menuTop = isNearTop ? position.y + position.height + 10 : position.y - 46;
+
   return (
     <div
       className="node-context-menu"
       style={{
         position: 'absolute',
         left: `${position.x + position.width / 2}px`,
-        top: `${position.y - 44}px`,
+        top: `${menuTop}px`,
         transform: 'translateX(-50%)',
         backgroundColor: 'var(--bg-elevated, #1e232d)',
         border: '1.5px solid var(--border-strong, #3d4556)',

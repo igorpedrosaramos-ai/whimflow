@@ -12,6 +12,7 @@ import { AIModal } from './components/AIModal';
 import { ShareModal } from './components/ShareModal';
 import { PresentationView } from './components/PresentationView';
 import { EXECUTIVE_PALETTE } from './components/NodeContextMenu';
+import { calculateMindMapLayout } from './utils/treeLayout';
 
 const STORAGE_KEY = 'whimflow_boards_v5';
 const THEME_KEY = 'whimflow_theme';
@@ -91,6 +92,68 @@ export const App: React.FC = () => {
   const currentStrokeRef = useRef<DrawingStroke | null>(null);
 
   const activeBoard = boards.find(b => b.id === activeBoardId) || boards[0];
+
+  // Ajuste inteligente e automático do Canvas ao centro da tela (Fit-to-View)
+  const fitView = useCallback((nodesToFit?: MindMapNode[]) => {
+    const targetNodes = nodesToFit || activeBoard.mindMapNodes;
+    if (!targetNodes || targetNodes.length === 0) return;
+
+    const root = targetNodes.find(n => n.side === 'root') || targetNodes[0];
+    const layout = calculateMindMapLayout(targetNodes, root.id, {
+      horizontalGap: 100,
+      verticalGap: 18,
+      rootX: 0,
+      rootY: 0
+    });
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    targetNodes.forEach(node => {
+      const computed = layout.get(node.id);
+      const x = computed ? computed.x : (node.x || 0);
+      const y = computed ? computed.y : (node.y || 0);
+      const w = computed ? computed.width : 120;
+      const h = computed ? computed.height : 38;
+
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x + w > maxX) maxX = x + w;
+      if (y + h > maxY) maxY = y + h;
+    });
+
+    if (!isFinite(minX)) return;
+
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const mapWidth = Math.max(maxX - minX, 300);
+    const mapHeight = Math.max(maxY - minY, 200);
+
+    const padLeft = sidebarOpen ? 320 : 100;
+    const padRight = 80;
+    const padTop = 100;
+    const padBottom = 80;
+
+    const availWidth = Math.max(200, width - padLeft - padRight);
+    const availHeight = Math.max(200, height - padTop - padBottom);
+
+    const scaleX = availWidth / mapWidth;
+    const scaleY = availHeight / mapHeight;
+    const newZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.22), 1.05);
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    const newPanX = padLeft + availWidth / 2 - centerX * newZoom;
+    const newPanY = padTop + availHeight / 2 - centerY * newZoom;
+
+    setZoom(Number(newZoom.toFixed(2)));
+    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+  }, [activeBoard.mindMapNodes, sidebarOpen]);
+
+  // Auto-enquadramento ao alternar quadros
+  useEffect(() => {
+    fitView(activeBoard.mindMapNodes);
+  }, [activeBoardId]);
 
   // Salvar no localStorage continuamente
   useEffect(() => {
@@ -1212,11 +1275,7 @@ export const App: React.FC = () => {
           zoom={zoom}
           onZoomIn={() => setZoom(prev => Math.min(prev + 0.1, 2.5))}
           onZoomOut={() => setZoom(prev => Math.max(prev - 0.1, 0.2))}
-          onResetZoom={() => {
-            setZoom(1.0);
-            setPan({ x: 300, y: 350 });
-          }}
-          onOpenAI={() => setIsAIModalOpen(true)}
+          onResetZoom={() => fitView()}
         />
       </div>
 

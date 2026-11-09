@@ -82,12 +82,13 @@ export const TopNav: React.FC<TopNavProps> = ({
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: 'var(--text-secondary)',
+                color: 'var(--text-muted)',
                 fontWeight: 600,
-                fontSize: '13.5px',
+                fontSize: '13px',
                 cursor: 'pointer',
                 outline: 'none'
               }}
+              title="Alternar Projeto"
             >
               {boards.map(b => (
                 <option key={b.id} value={b.id} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
@@ -95,12 +96,12 @@ export const TopNav: React.FC<TopNavProps> = ({
                 </option>
               ))}
               <option value="NEW" style={{ background: 'var(--bg-surface)', color: 'var(--accent-purple-light)', fontWeight: 700 }}>
-                + Novo Quadro em Branco...
+                + Novo Quadro...
               </option>
             </select>
           </div>
 
-          <ChevronRight size={14} color="var(--text-muted)" />
+          <ChevronRight size={14} color="var(--text-muted)" className="breadcrumb-chevron" />
 
           {/* Edição Rápida do Título */}
           <input
@@ -117,8 +118,8 @@ export const TopNav: React.FC<TopNavProps> = ({
               padding: '2px 6px',
               borderRadius: '4px',
               outline: 'none',
-              minWidth: '160px',
-              maxWidth: '320px'
+              minWidth: '100px',
+              maxWidth: '240px'
             }}
             onFocus={(e) => e.target.style.borderBottomColor = 'var(--accent-purple)'}
             onBlur={(e) => e.target.style.borderBottomColor = 'transparent'}
@@ -171,10 +172,10 @@ export const TopNav: React.FC<TopNavProps> = ({
             fontSize: '13px',
             fontWeight: 600
           }}
-          title="Criar um Novo Quadro 100% Limpo (Do Zero)"
+          title="Criar um Novo Quadro (Do Zero)"
         >
           <Plus size={15} />
-          <span>Novo Quadro</span>
+          <span className="nav-btn-text">Novo Quadro</span>
         </button>
 
         {/* Compartilhar Link */}
@@ -194,10 +195,10 @@ export const TopNav: React.FC<TopNavProps> = ({
             fontWeight: 600,
             boxShadow: '0 2px 6px rgba(99, 102, 241, 0.35)'
           }}
-          title="Compartilhar Link do Projeto ou Exportar"
+          title="Compartilhar Link ou Exportar"
         >
           <Share2 size={15} />
-          <span>Compartilhar</span>
+          <span className="nav-btn-text">Compartilhar</span>
         </button>
 
         {/* Apresentar */}
@@ -219,7 +220,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           title="Modo Apresentação Executiva em Tela Cheia"
         >
           <Play size={15} />
-          <span>Apresentar</span>
+          <span className="nav-btn-text">Apresentar</span>
         </button>
 
         {/* Alternador de Tema */}

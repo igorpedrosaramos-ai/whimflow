@@ -664,7 +664,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({ board, onClo
             title="Recentrar Câmera no Slide"
           >
             <RotateCcw size={12} />
-            <span>Recetralizar</span>
+            <span>Recentralizar</span>
           </button>
         </div>
       </div>

@@ -1,20 +1,19 @@
 import React from 'react';
-import { Minus, Plus, Maximize, Sparkles, HelpCircle } from 'lucide-react';
+import { Minus, Plus, Maximize } from 'lucide-react';
 
 interface ZoomControlsProps {
   zoom: number;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onResetZoom: () => void;
-  onOpenAI: () => void;
+  onOpenAI?: () => void;
 }
 
 export const ZoomControls: React.FC<ZoomControlsProps> = ({
   zoom,
   onZoomIn,
   onZoomOut,
-  onResetZoom,
-  onOpenAI
+  onResetZoom
 }) => {
   const zoomPercent = Math.round(zoom * 100);
 
@@ -32,14 +31,14 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
       <span
         onClick={onResetZoom}
         style={{
-          fontSize: '13px',
+          fontSize: '12.5px',
           fontWeight: 600,
           color: 'var(--text-secondary)',
-          minWidth: '48px',
+          minWidth: '44px',
           textAlign: 'center',
           cursor: 'pointer'
         }}
-        title="Clique para redefinir zoom para 100%"
+        title="Clique para ajustar visualização ao centro"
       >
         {zoomPercent}%
       </span>
@@ -57,20 +56,9 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
         onClick={onResetZoom}
         className="tool-button"
         style={{ width: '28px', height: '28px' }}
-        title="Ajustar ao Centro da Tela"
+        title="Centralizar e Enquadrar Mapa Mental"
       >
         <Maximize size={15} />
-      </button>
-
-      <div style={{ width: '1px', height: '18px', backgroundColor: 'var(--border-subtle)', margin: '0 2px' }} />
-
-      <button
-        onClick={onOpenAI}
-        className="tool-button"
-        style={{ width: '28px', height: '28px', color: 'var(--accent-purple-light)' }}
-        title="Assistente de Ideias IA"
-      >
-        <Sparkles size={16} />
       </button>
     </div>
   );
