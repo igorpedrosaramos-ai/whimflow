@@ -934,6 +934,28 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   minWidth: '80px'
                 }}
               />
+            ) : node.text.includes('\n') ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', userSelect: 'none' }}>
+                <span style={{
+                  color: textColor,
+                  fontSize: fontSizePx,
+                  fontWeight: 700,
+                  letterSpacing: '-0.01em',
+                  lineHeight: 1.25
+                }}>
+                  {node.text.split('\n')[0]}
+                </span>
+                <span style={{
+                  color: 'var(--text-muted, #64748b)',
+                  fontSize: `calc(${fontSizePx} - 1.5px)`,
+                  fontWeight: 400,
+                  marginTop: '2px',
+                  letterSpacing: '-0.01em',
+                  lineHeight: 1.2
+                }}>
+                  {node.text.split('\n').slice(1).join(' ')}
+                </span>
+              </div>
             ) : (
               <span style={{
                 userSelect: 'none',

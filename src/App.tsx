@@ -12,6 +12,8 @@ import { AIModal } from './components/AIModal';
 import { ShareModal } from './components/ShareModal';
 import { PresentationView } from './components/PresentationView';
 import { DashboardView } from './components/DashboardView';
+import { DocEditorView } from './components/DocEditorView';
+import { AgentChatView } from './components/AgentChatView';
 import { TemplateModal } from './components/TemplateModal';
 import { PresentSidePanel } from './components/PresentSidePanel';
 import { TemplateItem } from './constants/templatesData';
@@ -116,8 +118,8 @@ export const App: React.FC = () => {
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
   const isMarqueeActiveRef = useRef(false);
 
-  // Visualização Principal: 'dashboard' (Workspace Teams Whimsical) ou 'editor' (Canvas)
-  const [currentView, setCurrentView] = useState<'dashboard' | 'editor'>('dashboard');
+  // Visualização Principal: 'dashboard' | 'editor' | 'doc' | 'agent'
+  const [currentView, setCurrentView] = useState<'dashboard' | 'editor' | 'doc' | 'agent'>('dashboard');
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isPresentSidePanelOpen, setIsPresentSidePanelOpen] = useState(false);
 
@@ -1399,6 +1401,47 @@ export const App: React.FC = () => {
     currentStrokeRef.current = null;
   };
 
+  const handleGenerateFromAgent = (prompt: string, title?: string, nodes?: MindMapNode[]) => {
+    const newBoardId = `board-agent-${Date.now()}`;
+    const boardTitle = title || (prompt.length > 25 ? prompt.slice(0, 25) + '...' : prompt) || 'untitled';
+    const newBoard: Board = {
+      id: newBoardId,
+      title: boardTitle,
+      workspaceId: 'ws-default',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      mindMapNodes: nodes && nodes.length > 0 ? nodes : [
+        {
+          id: 'root',
+          text: boardTitle,
+          x: 0,
+          y: 0,
+          width: 220,
+          height: 48,
+          parentId: null,
+          childrenIds: [],
+          color: '#7c3aed',
+          borderStyle: 'fill',
+          lineStyle: 'stepped',
+          side: 'root'
+        }
+      ],
+      shapes: [],
+      connectors: [],
+      stickies: [],
+      wireframes: [],
+      texts: [],
+      drawings: []
+    };
+
+    setBoards(prev => [newBoard, ...prev]);
+    setActiveBoardId(newBoardId);
+    setCurrentView('editor');
+    setTimeout(() => {
+      fitView(newBoard.mindMapNodes);
+    }, 100);
+  };
+
   const totalObjects = 
     activeBoard.mindMapNodes.length + 
     activeBoard.stickies.length + 
@@ -1413,6 +1456,8 @@ export const App: React.FC = () => {
           boards={boards}
           onOpenBoard={handleOpenBoard}
           onCreateNewBoard={(title) => handleCreateNewBoard(title || 'untitled')}
+          onOpenDoc={() => setCurrentView('doc')}
+          onOpenAskAgent={() => setCurrentView('agent')}
           onOpenTemplates={() => setIsTemplateModalOpen(true)}
           onOpenAI={() => setIsAIModalOpen(true)}
           onDuplicateBoard={handleDuplicateBoard}
@@ -1438,6 +1483,44 @@ export const App: React.FC = () => {
           onClose={() => setIsAIModalOpen(false)}
           selectedNode={activeBoard.mindMapNodes.find(n => n.id === selectedNodeId) || null}
           onAddGeneratedBranches={handleAddGeneratedBranches}
+        />
+      </div>
+    );
+  }
+
+  // Renderização do Doc Editor Whimsical (Visão de Documentos)
+  if (currentView === 'doc') {
+    return (
+      <div style={{ width: '100vw', height: '100vh', display: 'flex', position: 'relative' }}>
+        <DocEditorView
+          board={activeBoard}
+          onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
+          onNavigateToDashboard={() => setCurrentView('dashboard')}
+          onOpenTemplates={() => setIsTemplateModalOpen(true)}
+          theme={theme}
+          workspaceName="teste"
+        />
+
+        {/* Modal de Templates do Whimsical */}
+        <TemplateModal
+          isOpen={isTemplateModalOpen}
+          onClose={() => setIsTemplateModalOpen(false)}
+          onSelectTemplate={handleCreateFromTemplate}
+          workspaceName="teste"
+        />
+      </div>
+    );
+  }
+
+  // Renderização do Ask Agent Whimsical (Gemini AI Workspace)
+  if (currentView === 'agent') {
+    return (
+      <div style={{ width: '100vw', height: '100vh', display: 'flex', position: 'relative' }}>
+        <AgentChatView
+          onGenerateBoard={handleGenerateFromAgent}
+          onNavigateToDashboard={() => setCurrentView('dashboard')}
+          theme={theme}
+          workspaceName="teste"
         />
       </div>
     );

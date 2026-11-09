@@ -29,6 +29,8 @@ interface DashboardViewProps {
   boards: Board[];
   onOpenBoard: (boardId: string) => void;
   onCreateNewBoard: (title?: string) => void;
+  onOpenDoc: () => void;
+  onOpenAskAgent: () => void;
   onOpenTemplates: () => void;
   onOpenAI: () => void;
   onDuplicateBoard: (boardId: string) => void;
@@ -42,6 +44,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   boards,
   onOpenBoard,
   onCreateNewBoard,
+  onOpenDoc,
+  onOpenAskAgent,
   onOpenTemplates,
   onOpenAI,
   onDuplicateBoard,
@@ -454,9 +458,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               flexWrap: 'wrap'
             }}
           >
-            {/* 1. + Board (Purple #7c3aed) */}
+            {/* 1. + New Board (Purple #7c3aed) */}
             <button
-              onClick={() => onCreateNewBoard()}
+              onClick={() => onCreateNewBoard('untitled')}
               style={{
                 width: '172px',
                 height: '100px',
@@ -485,12 +489,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <circle cx="12" cy="12" r="1" fill="#ffffff" />
                 <circle cx="16" cy="12" r="1" fill="#ffffff" />
               </svg>
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Board</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New Board</span>
             </button>
 
-            {/* 2. + Doc (Blue #0284c7) */}
+            {/* 2. + New Doc (Blue #0284c7 - Foto 1 e 2) */}
             <button
-              onClick={() => onCreateNewBoard('Novo Documento')}
+              onClick={onOpenDoc}
+              title="Text editing with tables and embeds"
               style={{
                 width: '172px',
                 height: '100px',
@@ -511,12 +516,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
             >
               <FileText size={26} color="#ffffff" />
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Doc</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New Doc</span>
             </button>
 
-            {/* 3. + Ask agent (Teal #0d9488) */}
+            {/* 3. + Ask agent (Teal #0d9488 - Foto 1 e 3) */}
             <button
-              onClick={onOpenAI}
+              onClick={onOpenAskAgent}
               style={{
                 width: '172px',
                 height: '100px',
@@ -540,7 +545,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Ask agent</span>
             </button>
 
-            {/* 4. + From template (Slate #475569) */}
+            {/* 4. + New from template (Slate #475569 - Foto 1 e 4) */}
             <button
               onClick={onOpenTemplates}
               style={{
@@ -563,10 +568,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
             >
               <Layout size={26} color="#ffffff" />
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ From template</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New from template</span>
             </button>
 
-            {/* 5. + Folder (Gray #64748b) */}
+            {/* 5. + New folder (Gray #64748b - Foto 1) */}
             <button
               onClick={() => onCreateNewBoard('Nova Pasta')}
               style={{
@@ -589,7 +594,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
             >
               <Folder size={26} color="#ffffff" />
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Folder</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New folder</span>
             </button>
           </div>
 
