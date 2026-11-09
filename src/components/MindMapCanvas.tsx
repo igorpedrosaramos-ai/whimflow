@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { MindMapNode } from '../types';
 import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
@@ -421,7 +422,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     );
   };
 
-  // ─── GHOST CARD + CONNECTOR LINE (Whimsical-style) ───────────────────────────
+  // ─── GHOST CARD + CONNECTOR LINE via Portal (fora de qualquer transform CSS) ──
+  // MOTIVO: position:fixed é afetado por transform em ancestrais (CSS spec).
+  // createPortal renderiza no document.body — sem nenhum ancestral transformado.
   const renderDragGhost = () => {
     if (!draggingNodeId || !dragCursorPos) return null;
 
@@ -431,7 +434,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     const nodeColor = dragNode.color || '#6366f1';
     const borderStyle = dragNode.borderStyle || 'accent';
 
-    // Estilo igual ao card real
     let ghostBg = 'var(--bg-surface)';
     let ghostBorder = `1.5px solid var(--border-subtle)`;
     let ghostBorderLeft: string | undefined = undefined;
@@ -443,7 +445,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       ghostBg = 'var(--bg-surface)';
       ghostBorder = `2px solid ${nodeColor}`;
     } else {
-      // accent
       ghostBg = 'var(--bg-surface)';
       ghostBorder = `1.5px solid var(--border-subtle)`;
       ghostBorderLeft = `4px solid ${nodeColor}`;
@@ -453,17 +454,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     const cx = dragCursorPos.x;
     const cy = dragCursorPos.y;
 
-    // Bézier: da posição original até o cursor (igual ao Whimsical — curva horizontal)
+    // Curva Bézier do centro do nó-fonte até o cursor
     let bezierD = '';
     if (src) {
-      const cp1x = src.x + (cx - src.x) * 0.5;
-      const cp2x = src.x + (cx - src.x) * 0.5;
-      bezierD = `M ${src.x} ${src.y} C ${cp1x} ${src.y}, ${cp2x} ${cy}, ${cx} ${cy}`;
+      const cpx = src.x + (cx - src.x) * 0.5;
+      bezierD = `M ${src.x} ${src.y} C ${cpx} ${src.y}, ${cpx} ${cy}, ${cx} ${cy}`;
     }
 
-    return (
+    // Portal: renderiza direto no body, fora de qualquer transform de canvas
+    return createPortal(
       <>
-        {/* SVG de tela cheia para a linha conectora "elástica" */}
+        {/* SVG: linha elástica Bézier do nó-fonte ao cursor */}
         {src && (
           <svg
             style={{
@@ -477,16 +478,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               overflow: 'visible'
             }}
           >
-            {/* Glow suave por baixo */}
-            <path
-              d={bezierD}
-              fill="none"
-              stroke={nodeColor}
-              strokeWidth={5}
-              strokeLinecap="round"
-              opacity={0.15}
-            />
-            {/* Linha tracejada principal — animada via CSS */}
+            {/* Glow */}
+            <path d={bezierD} fill="none" stroke={nodeColor} strokeWidth={6} strokeLinecap="round" opacity={0.12} />
+            {/* Linha animada */}
             <path
               className="drag-connector-line"
               d={bezierD}
@@ -495,26 +489,22 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               strokeWidth={2}
               strokeLinecap="round"
               strokeDasharray="8 5"
-              opacity={0.9}
+              opacity={0.88}
             />
-            {/* Ponto de ancora no nó-fonte */}
-            <circle cx={src.x} cy={src.y} r={4} fill={nodeColor} opacity={0.55} />
-            <circle cx={src.x} cy={src.y} r={7} fill="none" stroke={nodeColor} strokeWidth={1} opacity={0.25} />
-            {/* Ponto no cursor */}
-            <circle cx={cx} cy={cy} r={3.5} fill={nodeColor} opacity={0.95} />
-            <circle cx={cx} cy={cy} r={7} fill="none" stroke={nodeColor} strokeWidth={1.5} opacity={0.5} />
+            {/* Ponto origem */}
+            <circle cx={src.x} cy={src.y} r={4} fill={nodeColor} opacity={0.5} />
+            {/* Ponto cursor */}
+            <circle cx={cx} cy={cy} r={3.5} fill={nodeColor} opacity={0.9} />
           </svg>
         )}
 
-        {/* Card fantasma real — cópia visual exata do nó, flutuando no cursor */}
+        {/* Ghost card: exatamente no cursor, sem nenhum transform ancestral */}
         <div
-          className="mindmap-node-card drag-ghost-card"
           style={{
             position: 'fixed',
             left: `${cx}px`,
             top: `${cy}px`,
-            // offset de -50% para centrar, leve rotação e lift de escala (Trello feel)
-            transform: 'translate(-50%, -50%) rotate(-2deg) scale(1.07)',
+            transform: 'translate(-50%, -50%) rotate(-2deg) scale(1.05)',
             pointerEvents: 'none',
             zIndex: 10000,
             backgroundColor: ghostBg,
@@ -525,31 +515,18 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             fontWeight: 500,
             fontSize: '13.5px',
             color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
-            boxShadow: `0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px ${nodeColor}44`,
-            opacity: 0.95,
+            boxShadow: `0 20px 50px rgba(0,0,0,0.55), 0 0 0 1px ${nodeColor}55`,
+            opacity: 0.96,
             whiteSpace: 'nowrap',
             letterSpacing: '-0.01em',
             userSelect: 'none',
             willChange: 'transform'
           }}
         >
-          <span style={{
-            color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
-            fontSize: '13.5px',
-            fontWeight: 500
-          }}>
-            {dragNode.text}
-          </span>
-          {/* Overlay de brilho sutil no topo */}
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: '6px',
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0.07) 0%, transparent 55%)',
-            pointerEvents: 'none'
-          }} />
+          {dragNode.text}
         </div>
-      </>
+      </>,
+      document.body
     );
   };
 
