@@ -1632,6 +1632,8 @@ export const App: React.FC = () => {
             handleCreateNewBoard(title);
             setIsSearchModalOpen(false);
           }}
+          onOpenTemplates={() => setIsTemplateModalOpen(true)}
+          workspaceName="teste"
           theme={theme}
         />
       </div>
@@ -1980,6 +1982,8 @@ export const App: React.FC = () => {
           handleCreateNewBoard(title);
           setIsSearchModalOpen(false);
         }}
+        onOpenTemplates={() => setIsTemplateModalOpen(true)}
+        workspaceName="teste"
         theme={theme}
       />
 
