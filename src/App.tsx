@@ -18,6 +18,11 @@ const STORAGE_KEY = 'whimflow_boards_v5';
 const THEME_KEY = 'whimflow_theme';
 
 export const App: React.FC = () => {
+  // Garante que a aba do navegador sempre exiba estritamente "Mapa Mental Turbine"
+  useEffect(() => {
+    document.title = 'Mapa Mental Turbine';
+  }, []);
+
   // Estado dos Quadros
   const [boards, setBoards] = useState<Board[]>(() => {
     try {

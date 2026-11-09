@@ -79,7 +79,7 @@ export const AIModal: React.FC<AIModalProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Sparkles size={20} color="var(--accent-purple-light)" />
-            <h3 style={{ fontSize: '17px', fontWeight: 700 }}>Assistente Whimsical IA (Geração de Ramos)</h3>
+            <h3 style={{ fontSize: '17px', fontWeight: 700 }}>Assistente Inteligente (Geração de Ramos)</h3>
           </div>
           <button
             onClick={onClose}

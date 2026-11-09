@@ -305,12 +305,12 @@ export async function exportBoardAsPDF(board: Board): Promise<void> {
     console.warn('Erro ao inserir imagem no PDF:', err);
   }
 
-  // PÁGINAS SEGUINTES: Detalhamento por Categoria / Ramos
+  // PÁGINAS SEGUINTES: Detalhamento por Categoria / Ramos (Estilo Corporativo Limpo / Papel Timbrado)
   primaryBranches.forEach((branch, idx) => {
     doc.addPage('a4', 'landscape');
     
-    // Fundo limpo corporativo
-    doc.setFillColor(15, 23, 42);
+    // Fundo papel timbrado executivo limpo (branco absoluto)
+    doc.setFillColor(255, 255, 255);
     doc.rect(0, 0, 297, 210, 'F');
 
     // Faixa colorida do ramo
@@ -319,19 +319,24 @@ export async function exportBoardAsPDF(board: Board): Promise<void> {
     const g = parseInt(colorHex.slice(3, 5), 16) || 102;
     const b = parseInt(colorHex.slice(5, 7), 16) || 241;
 
+    // Linha de cabeçalho sutil
+    doc.setDrawColor(226, 232, 240);
+    doc.line(15, 32, 282, 32);
+
+    // Indicador visual do ramo
     doc.setFillColor(r, g, b);
     doc.rect(15, 14, 4, 14, 'F');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
+    doc.setTextColor(15, 23, 42); // Texto escuro de alto contraste
     doc.text(`${idx + 1}. ${branch.text}`, 24, 22);
 
     const children = board.mindMapNodes.filter(n => n.parentId === branch.id);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(148, 163, 184);
-    doc.text(`Detalhamento dos ${children.length} itens correspondentes`, 24, 27);
+    doc.setFontSize(10.5);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Detalhamento dos ${children.length} itens correspondentes • ${board.title}`, 24, 28);
 
     // Listagem em 2 colunas de cards de alta legibilidade
     const col1 = children.slice(0, Math.ceil(children.length / 2));
@@ -340,28 +345,32 @@ export async function exportBoardAsPDF(board: Board): Promise<void> {
     const renderPdfColumn = (items: MindMapNode[], colX: number) => {
       let currentY = 38;
       items.slice(0, 10).forEach((item, itemIdx) => {
-        // Fundo do card
-        doc.setFillColor(30, 41, 59);
+        // Fundo do card executivo (cinza muito suave de alto contraste)
+        doc.setFillColor(248, 250, 252);
         doc.roundedRect(colX, currentY, 126, 12, 1.5, 1.5, 'F');
+
+        // Borda sutil sóbria
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(colX, currentY, 126, 12, 1.5, 1.5, 'S');
 
         // Borda esquerda viva da cor do ramo
         doc.setFillColor(r, g, b);
         doc.rect(colX, currentY, 2.5, 12, 'F');
 
-        // Texto do produto / tópico
+        // Texto do item (preto/carvão de alta legibilidade)
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        doc.setTextColor(241, 245, 249);
+        doc.setFontSize(10.5);
+        doc.setTextColor(15, 23, 42);
         const label = `${itemIdx + 1}. ${item.text}`;
-        doc.text(label.length > 58 ? label.substring(0, 56) + '...' : label, colX + 6, currentY + 7.8);
+        doc.text(label.length > 56 ? label.substring(0, 54) + '...' : label, colX + 6, currentY + 8);
 
         currentY += 15;
       });
 
       if (items.length > 10) {
         doc.setFont('helvetica', 'italic');
-        doc.setFontSize(9);
-        doc.setTextColor(148, 163, 184);
+        doc.setFontSize(9.5);
+        doc.setTextColor(100, 116, 139);
         doc.text(`+ ${items.length - 10} outros itens no mapa...`, colX + 6, currentY + 6);
       }
     };

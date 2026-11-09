@@ -338,15 +338,35 @@ html, body, #root {
   .breadcrumb-chevron {
     display: none !important;
   }
+  .brand-logo-text {
+    display: none !important;
+  }
   .floating-toolbar {
-    left: 10px;
-    top: 60px;
-    padding: 4px;
-    gap: 3px;
+    left: 8px;
+    top: 58px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .tool-button {
+    width: 32px;
+    height: 32px;
   }
   .sidebar-panel {
     width: 85vw;
     max-width: 320px;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+  .bottom-controls {
+    bottom: 10px;
+    right: 10px;
+    padding: 2px 6px;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .top-navbar {
+    padding: 0 8px;
+    gap: 4px;
   }
 }

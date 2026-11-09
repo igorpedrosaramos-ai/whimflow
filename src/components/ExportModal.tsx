@@ -46,7 +46,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           alert('Quadro importado com sucesso!');
           onClose();
         } else {
-          alert('Arquivo JSON inválido para formato de quadro Whimsical.');
+          alert('Arquivo JSON inválido para formato de projeto do Mapa Mental Turbine.');
         }
       } catch (err) {
         alert('Erro ao processar o arquivo JSON.');
