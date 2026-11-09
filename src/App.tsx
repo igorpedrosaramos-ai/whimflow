@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { INITIAL_BOARDS, BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD } from './constants/initialData';
 import { Board, ToolType, MindMapNode, StickyNote, WireframeItem, DrawingStroke, SlideSection } from './types';
 import { TopNav } from './components/TopNav';
@@ -18,6 +18,9 @@ import { TemplateModal } from './components/TemplateModal';
 import { PresentSidePanel } from './components/PresentSidePanel';
 import { SearchModal } from './components/SearchModal';
 import { TrashModal } from './components/TrashModal';
+import { VersionHistoryModal } from './components/VersionHistoryModal';
+import { BoardStatsModal } from './components/BoardStatsModal';
+import { BoardVersionSnapshot } from './types';
 import { TemplateItem } from './constants/templatesData';
 import { EXECUTIVE_PALETTE } from './components/NodeContextMenu';
 import { calculateMindMapLayout, cleanAndNormalizeMindMap } from './utils/treeLayout';
@@ -114,6 +117,8 @@ export const App: React.FC = () => {
   const [trashBoards, setTrashBoards] = useState<Board[]>([]);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [isBoardStatsOpen, setIsBoardStatsOpen] = useState(false);
 
   // Atalho global de busca (Ctrl+K / Cmd+K)
   useEffect(() => {
@@ -436,6 +441,78 @@ export const App: React.FC = () => {
   // EXCLUIR DEFINITIVAMENTE DA LIXEIRA
   const handlePermanentlyDeleteBoard = (id: string) => {
     setTrashBoards(prev => prev.filter(b => b.id !== id));
+  };
+
+  // CRIAR MARCO NOMEADO NA LINHA DO TEMPO (HISTÓRICO ILIMITADO PRO)
+  const handleCreateMilestone = (name: string, description?: string) => {
+    const newSnapshot: BoardVersionSnapshot = {
+      id: `snap-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      title: activeBoard.title,
+      name,
+      description,
+      nodeCount: activeBoard.mindMapNodes.length,
+      objectCount: totalObjects,
+      boardData: JSON.parse(JSON.stringify(activeBoard))
+    };
+
+    updateActiveBoard(b => ({
+      ...b,
+      historySnapshots: [newSnapshot, ...(b.historySnapshots || [])]
+    }), false);
+  };
+
+  // RESTAURAR VERSÃO HISTÓRICA DO QUADRO
+  const handleRestoreSnapshot = (snapshotId: string) => {
+    const snapshots = activeBoard.historySnapshots || [];
+    const snap = snapshots.find(s => s.id === snapshotId);
+    if (!snap) return;
+
+    // Salva o estado atual como backup antes de restaurar
+    const autoBackup: BoardVersionSnapshot = {
+      id: `snap-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      title: activeBoard.title,
+      name: `Backup anterior à restauração de ${new Date(snap.timestamp).toLocaleTimeString('pt-BR')}`,
+      nodeCount: activeBoard.mindMapNodes.length,
+      objectCount: totalObjects,
+      boardData: JSON.parse(JSON.stringify(activeBoard))
+    };
+
+    const restoredBoardData = JSON.parse(JSON.stringify(snap.boardData));
+    updateActiveBoard(b => ({
+      ...restoredBoardData,
+      id: b.id, // Mantém ID original do quadro
+      historySnapshots: [autoBackup, ...snapshots]
+    }));
+  };
+
+  // BIFURCAR / CLONAR VERSÃO HISTÓRICA COMO NOVO QUADRO SEPARADO (WHIMSICAL FORK)
+  const handleForkSnapshot = (snapshotId: string) => {
+    const snapshots = activeBoard.historySnapshots || [];
+    const snap = snapshots.find(s => s.id === snapshotId);
+    if (!snap) return;
+
+    const forkedBoard: Board = {
+      ...JSON.parse(JSON.stringify(snap.boardData)),
+      id: `board-${Date.now()}`,
+      title: `${snap.boardData.title} (Bifurcado ${new Date(snap.timestamp).toLocaleDateString('pt-BR')})`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      historySnapshots: []
+    };
+
+    setBoards(prev => [forkedBoard, ...prev]);
+    setActiveBoardId(forkedBoard.id);
+    setIsVersionHistoryOpen(false);
+  };
+
+  // EXCLUIR SNAPSHOT DO HISTÓRICO
+  const handleDeleteSnapshot = (snapshotId: string) => {
+    updateActiveBoard(b => ({
+      ...b,
+      historySnapshots: (b.historySnapshots || []).filter(s => s.id !== snapshotId)
+    }), false);
   };
 
   // GESTÃO DE TEXTO DO NÓ
@@ -1475,6 +1552,23 @@ export const App: React.FC = () => {
     activeBoard.wireframes.length + 
     activeBoard.drawings.length;
 
+  // Garante que o quadro ativo sempre tenha pelo menos uma versão inicial no histórico (Histórico Ilimitado Pro)
+  const currentBoardSnapshots = useMemo(() => {
+    const existing = activeBoard.historySnapshots || [];
+    if (existing.length === 0) {
+      return [{
+        id: `snap-initial-${activeBoard.id}`,
+        timestamp: activeBoard.createdAt || new Date().toISOString(),
+        title: activeBoard.title,
+        name: 'Versão Inicial',
+        nodeCount: activeBoard.mindMapNodes.length,
+        objectCount: totalObjects,
+        boardData: JSON.parse(JSON.stringify(activeBoard))
+      }];
+    }
+    return existing;
+  }, [activeBoard, totalObjects]);
+
   // Renderização do Dashboard Whimsical
   if (currentView === 'dashboard') {
     return (
@@ -1605,6 +1699,8 @@ export const App: React.FC = () => {
         onRedo={handleRedo}
         onNavigateToDashboard={() => setCurrentView('dashboard')}
         onOpenSearch={() => setIsSearchModalOpen(true)}
+        onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
+        onOpenBoardStats={() => setIsBoardStatsOpen(true)}
         workspaceName="teste"
       />
 
@@ -1832,6 +1928,7 @@ export const App: React.FC = () => {
           canRedo={historyIndex < history.length - 1}
           onUndo={handleUndo}
           onRedo={handleRedo}
+          onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
           theme={theme}
         />
       </div>
@@ -1883,6 +1980,27 @@ export const App: React.FC = () => {
           handleCreateNewBoard(title);
           setIsSearchModalOpen(false);
         }}
+        theme={theme}
+      />
+
+      {/* Modal de Histórico de Versões Ilimitado (Time Machine / Marcos Pro) */}
+      <VersionHistoryModal
+        isOpen={isVersionHistoryOpen}
+        onClose={() => setIsVersionHistoryOpen(false)}
+        activeBoard={activeBoard}
+        snapshots={currentBoardSnapshots}
+        onRestoreSnapshot={handleRestoreSnapshot}
+        onForkSnapshot={handleForkSnapshot}
+        onCreateMilestone={handleCreateMilestone}
+        onDeleteSnapshot={handleDeleteSnapshot}
+        theme={theme}
+      />
+
+      {/* Modal de Estatísticas e Métricas do Quadro (Objetos Ilimitados Pro) */}
+      <BoardStatsModal
+        isOpen={isBoardStatsOpen}
+        onClose={() => setIsBoardStatsOpen(false)}
+        board={activeBoard}
         theme={theme}
       />
 

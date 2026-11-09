@@ -18,6 +18,7 @@ interface ZoomControlsProps {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  onOpenVersionHistory?: () => void;
   theme?: 'dark' | 'light';
 }
 
@@ -30,6 +31,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
   canRedo = false,
   onUndo,
   onRedo,
+  onOpenVersionHistory,
   theme = 'light'
 }) => {
   const zoomPercent = Math.round(zoom * 100);
@@ -102,6 +104,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
 
       {/* Histórico / Time Machine */}
       <button
+        onClick={onOpenVersionHistory}
         style={{
           width: '28px',
           height: '28px',
@@ -114,7 +117,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Histórico de Versões"
+        title="Histórico de Versões e Marcos (Time Machine)"
       >
         <Clock size={14} />
       </button>

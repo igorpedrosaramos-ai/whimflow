@@ -110,12 +110,26 @@ export interface SlideSection {
   nodeIds: string[];
 }
 
+export interface BoardVersionSnapshot {
+  id: string;
+  timestamp: string;
+  title?: string;
+  name?: string;
+  description?: string;
+  nodeCount: number;
+  objectCount: number;
+  boardData: Board;
+}
+
 export interface Board {
   id: string;
   title: string;
   workspaceId: string;
   createdAt: string;
   updatedAt: string;
+  isPrivate?: boolean;
+  isStarred?: boolean;
+  historySnapshots?: BoardVersionSnapshot[];
   mindMapNodes: MindMapNode[];
   shapes: FlowShape[];
   connectors: Connector[];

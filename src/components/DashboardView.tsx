@@ -330,22 +330,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Star size={14} color="#94a3b8" style={{ cursor: 'pointer', marginLeft: '4px' }} />
           </div>
 
-          {/* Ações e Presença */}
+          {/* Ações e Avatar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            {/* Indicador de Presença: 8 pontos teal */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '1px',
-                    backgroundColor: '#10b981'
-                  }}
-                />
-              ))}
-            </div>
 
             {/* Avatar do Usuário */}
             <div

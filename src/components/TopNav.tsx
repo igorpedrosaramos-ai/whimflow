@@ -12,7 +12,9 @@ import {
   Search, 
   Command, 
   Users,
-  Grid
+  Grid,
+  Clock,
+  BarChart2
 } from 'lucide-react';
 import { Board } from '../types';
 
@@ -36,6 +38,8 @@ interface TopNavProps {
   onRedo?: () => void;
   onNavigateToDashboard?: () => void;
   onOpenSearch?: () => void;
+  onOpenVersionHistory?: () => void;
+  onOpenBoardStats?: () => void;
   workspaceName?: string;
 }
 
@@ -54,6 +58,9 @@ export const TopNav: React.FC<TopNavProps> = ({
   onToggleTheme,
   onNavigateToDashboard,
   onOpenSearch,
+  onOpenVersionHistory,
+  onOpenBoardStats,
+  totalObjects = 0,
   workspaceName = 'teste'
 }) => {
   const isDark = theme === 'dark';
@@ -201,20 +208,51 @@ export const TopNav: React.FC<TopNavProps> = ({
 
       {/* Direita: Presença, Compartilhar, Apresentar, Atalhos */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-        {/* Indicador de Presença: 8 pontos verdes */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '1px',
-                backgroundColor: '#10b981'
-              }}
-            />
-          ))}
-        </div>
+        {/* Contador de Objetos Ilimitados Pro / Estatísticas do Quadro */}
+        {onOpenBoardStats && (
+          <button
+            onClick={onOpenBoardStats}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '3px 8px',
+              borderRadius: '6px',
+              border: isDark ? '1px solid #2a3444' : '1px solid #e2e8f0',
+              backgroundColor: isDark ? '#1a222f' : '#f8fafc',
+              color: isDark ? '#94a3b8' : '#64748b',
+              fontSize: '11.5px',
+              fontWeight: 500,
+              cursor: 'pointer'
+            }}
+            title="Estatísticas e Métricas do Quadro (Objetos Ilimitados Pro)"
+          >
+            <BarChart2 size={13} color="#818cf8" />
+            <span>{totalObjects} objetos</span>
+          </button>
+        )}
+
+        {/* Histórico de Versões Ilimitado (Time Machine / Milestones) */}
+        {onOpenVersionHistory && (
+          <button
+            onClick={onOpenVersionHistory}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '4px 6px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              color: isDark ? '#94a3b8' : '#64748b',
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+            title="Histórico de Versões e Marcos (Histórico Ilimitado Pro)"
+          >
+            <Clock size={15} />
+          </button>
+        )}
 
         {/* Avatar do Usuário */}
         <div

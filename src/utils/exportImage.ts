@@ -231,17 +231,22 @@ export function exportBoardAsSVG(board: Board) {
   URL.revokeObjectURL(url);
 }
 
-export function exportBoardAsPNG(board: Board): Promise<void> {
+export function exportBoardAsPNG(
+  board: Board,
+  options: { scale?: number; transparent?: boolean; theme?: 'light' | 'dark' } = {}
+): Promise<void> {
   return new Promise((resolve, reject) => {
     try {
-      const currentTheme = (localStorage.getItem('whimflow_theme') as 'light' | 'dark') || 'light';
+      const currentTheme = options.theme || (localStorage.getItem('whimflow_theme') as 'light' | 'dark') || 'light';
+      const scale = options.scale || 2; // Padrão Retina 2x (ou 1x / 3x)
+      const isTransparent = Boolean(options.transparent);
+
       const svg = generateBoardSVG(board, currentTheme);
       const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const img = new Image();
 
       img.onload = () => {
-        const scale = 2; // Escala Retina 2x para máxima nitidez
         const canvas = document.createElement('canvas');
         canvas.width = img.width * scale;
         canvas.height = img.height * scale;
@@ -251,8 +256,13 @@ export function exportBoardAsPNG(board: Board): Promise<void> {
           return;
         }
 
-        ctx.fillStyle = currentTheme === 'light' ? '#f8fafc' : '#121418';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (!isTransparent) {
+          ctx.fillStyle = currentTheme === 'light' ? '#f8fafc' : '#121418';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
         ctx.scale(scale, scale);
         ctx.drawImage(img, 0, 0);
 
@@ -264,7 +274,7 @@ export function exportBoardAsPNG(board: Board): Promise<void> {
           const pngUrl = URL.createObjectURL(pngBlob);
           const a = document.createElement('a');
           a.href = pngUrl;
-          a.download = `${board.title.replace(/\s+/g, '_')}_mapa_mental_turbine.png`;
+          a.download = `${board.title.replace(/\s+/g, '_')}_sem_marca_dagua.png`;
           document.body.appendChild(a);
           a.click();
           a.remove();
@@ -284,4 +294,44 @@ export function exportBoardAsPNG(board: Board): Promise<void> {
       reject(err);
     }
   });
+}
+
+/**
+ * Exporta o Mapa Mental como Outline Markdown (.md) estruturado
+ * Pronto para importação no Notion, Obsidian, GitHub ou análise com IA
+ */
+export function exportBoardAsMarkdown(board: Board) {
+  const nodes = board.mindMapNodes;
+  const root = nodes.find(n => n.side === 'root') || nodes[0];
+  if (!root) return;
+
+  const nodeMap = new Map<string, MindMapNode>();
+  nodes.forEach(n => nodeMap.set(n.id, n));
+
+  const lines: string[] = [];
+  lines.push(`# ${board.title}`);
+  lines.push('');
+  lines.push(`> Exportado em ${new Date().toLocaleDateString('pt-BR')} • Mapa Mental Turbine (Exportação Pro Sem Marca D'Água)`);
+  lines.push('');
+
+  const visit = (nodeId: string, level: number) => {
+    const node = nodeMap.get(nodeId);
+    if (!node) return;
+    const indent = '  '.repeat(level);
+    lines.push(`${indent}- ${node.text || 'Sem título'}`);
+    (node.childrenIds || []).forEach(cid => visit(cid, level + 1));
+  };
+
+  (root.childrenIds || []).forEach(cid => visit(cid, 0));
+
+  const mdContent = lines.join('\n');
+  const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${board.title.replace(/\s+/g, '_')}_outline.md`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
