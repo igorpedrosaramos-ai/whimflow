@@ -55,16 +55,30 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
+  // ─── DRAG STATE ──────────────────────────────────────────────────────────────
+  // draggingNodeId: React state (causa re-render para mostrar/esconder ghost)
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const [dropTargetNodeId, setDropTargetNodeId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside'>('inside');
+
+  // Posição do cursor em viewport coords (atualiza via ref + state para evitar re-renders excessivos)
+  const dragCursorRef = useRef<{ x: number; y: number } | null>(null);
   const [dragCursorPos, setDragCursorPos] = useState<{ x: number; y: number } | null>(null);
-  // Posição de tela do nó-fonte quando o arraste começa (centro do card original)
+
+  // Posição do CENTRO do nó-fonte no viewport (capturada no momento exato do início do drag)
   const dragSourceScreenPosRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Evita que um clique simples inicie arraste do nó acidentalmente
+  // Ref síncrono do ID sendo arrastado (para lógica dentro dos event listeners)
+  const draggingIdRef = useRef<string | null>(null);
+  const dropTargetRef = useRef<{ id: string | null; pos: 'before' | 'after' | 'inside' }>({ id: null, pos: 'inside' });
+
+  // Evita drag acidental em clique simples (threshold 4px)
   const dragPendingRef = useRef<{ id: string; clientX: number; clientY: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // ─── RAF para posição do ghost (suave, sem re-renders excessivos) ──────────
+  const rafRef = useRef<number | null>(null);
 
   // Sincroniza início de edição direta quando um novo nó é criado
   useEffect(() => {
@@ -169,35 +183,34 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     }
   }, [editingId]);
 
-  // ARRASTE SEGURO PARA MUDAR DE SETOR / REPARENTALIZAR
+  // ─── DRAG: início ────────────────────────────────────────────────────────────
   const handleMouseDown = (node: MindMapNode, e: React.MouseEvent) => {
     if (editingId === node.id) return;
     if (e.button !== 0) return;
     e.stopPropagation();
 
-    // Se o nó já estiver em uma seleção múltipla, preserva o grupo para permitir arrastar em bloco
     const isAlreadySelected = selectedNodeIds && selectedNodeIds.includes(node.id);
     if (!isAlreadySelected && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
       onSelectNode(node.id);
     }
 
-    // Se for nó raiz, não arrasta
     if (node.side === 'root') return;
 
-    // Registra clique inicial, mas só ativa drag se o cursor se mover > 4px
     dragPendingRef.current = { id: node.id, clientX: e.clientX, clientY: e.clientY };
   };
 
+  // ─── DRAG: mouse move + mouse up (global) ────────────────────────────────────
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      // Ativa o arraste somente se houve deslocamento real (> 4px)
-      if (dragPendingRef.current && !draggingNodeId) {
+      // Ativa o arraste somente após threshold de 4px
+      if (dragPendingRef.current && !draggingIdRef.current) {
         const dx = Math.abs(e.clientX - dragPendingRef.current.clientX);
         const dy = Math.abs(e.clientY - dragPendingRef.current.clientY);
         if (dx > 4 || dy > 4) {
           const pendingId = dragPendingRef.current.id;
-          setDraggingNodeId(pendingId);
-          // Captura o centro do card original no momento em que o drag começa
+          draggingIdRef.current = pendingId;
+
+          // Captura síncronamente o centro do card no viewport
           const el = document.getElementById(`node-${pendingId}`);
           if (el) {
             const rect = el.getBoundingClientRect();
@@ -205,47 +218,62 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               x: rect.left + rect.width / 2,
               y: rect.top + rect.height / 2
             };
+          } else {
+            dragSourceScreenPosRef.current = { x: e.clientX, y: e.clientY };
           }
+
+          // Dispara o re-render para mostrar o ghost
+          setDraggingNodeId(pendingId);
+          setDragCursorPos({ x: e.clientX, y: e.clientY });
         }
       }
 
-      if (!draggingNodeId) return;
+      if (!draggingIdRef.current) return;
 
-      // Coordenadas de tela fixas para ancoragem perfeita sob o cursor do mouse
-      setDragCursorPos({ x: e.clientX, y: e.clientY });
+      // Atualiza posição via RAF — evita re-renders desnecessários em 60fps
+      dragCursorRef.current = { x: e.clientX, y: e.clientY };
+      if (rafRef.current === null) {
+        rafRef.current = requestAnimationFrame(() => {
+          rafRef.current = null;
+          if (dragCursorRef.current) {
+            setDragCursorPos({ ...dragCursorRef.current });
+          }
+        });
+      }
 
-      // Detecta sobre qual nó o cursor está passando para mudar de setor ou reordenar
+      // Hit-test: detecta o nó sob o cursor (ignora o próprio nó arrastado e o ghost)
       const elements = document.elementsFromPoint(e.clientX, e.clientY);
-      const targetCard = elements.find(el => 
-        el.classList.contains('mindmap-node-card') && el.id !== `node-${draggingNodeId}`
+      const targetCard = elements.find(el =>
+        el.classList.contains('mindmap-node-card') &&
+        el.id !== `node-${draggingIdRef.current}` &&
+        !el.classList.contains('drag-ghost-card')
       );
+
       if (targetCard) {
         const targetId = targetCard.id.replace('node-', '');
         const targetNode = nodeMap.get(targetId);
-        const draggedNode = nodeMap.get(draggingNodeId);
 
-        if (targetNode && draggedNode) {
+        if (targetNode) {
           const rect = targetCard.getBoundingClientRect();
           const relY = (e.clientY - rect.top) / rect.height;
 
+          let pos: 'before' | 'after' | 'inside';
           if (targetNode.side === 'root') {
-            setDropTargetNodeId(targetId);
-            setDropPosition('inside');
-          } else if (relY < 0.35) {
-            // Parte superior do card: Reordenar para ANTES deste irmão
-            setDropTargetNodeId(targetId);
-            setDropPosition('before');
-          } else if (relY > 0.65) {
-            // Parte inferior do card: Reordenar para DEPOIS deste irmão
-            setDropTargetNodeId(targetId);
-            setDropPosition('after');
+            pos = 'inside';
+          } else if (relY < 0.30) {
+            pos = 'before';
+          } else if (relY > 0.70) {
+            pos = 'after';
           } else {
-            // Centro do card: Anexar como filho deste setor
-            setDropTargetNodeId(targetId);
-            setDropPosition('inside');
+            pos = 'inside';
           }
+
+          dropTargetRef.current = { id: targetId, pos };
+          setDropTargetNodeId(targetId);
+          setDropPosition(pos);
         }
       } else {
+        dropTargetRef.current = { id: null, pos: 'inside' };
         setDropTargetNodeId(null);
         setDropPosition('inside');
       }
@@ -253,33 +281,47 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
     const handleMouseUp = () => {
       dragPendingRef.current = null;
-      if (draggingNodeId && dropTargetNodeId && draggingNodeId !== dropTargetNodeId) {
+
+      const dragId = draggingIdRef.current;
+      const { id: targetId, pos } = dropTargetRef.current;
+
+      if (dragId && targetId && dragId !== targetId) {
         if (onReorderInsertNode) {
-          onReorderInsertNode(draggingNodeId, dropTargetNodeId, dropPosition);
+          onReorderInsertNode(dragId, targetId, pos);
         } else {
-          onReparentNode(draggingNodeId, dropTargetNodeId);
+          onReparentNode(dragId, targetId);
         }
       }
+
+      // Reset completo do estado de drag
+      draggingIdRef.current = null;
+      dragSourceScreenPosRef.current = null;
+      dragCursorRef.current = null;
+      dropTargetRef.current = { id: null, pos: 'inside' };
+
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+
       setDraggingNodeId(null);
       setDropTargetNodeId(null);
       setDropPosition('inside');
       setDragCursorPos(null);
-      dragSourceScreenPosRef.current = null;
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
     window.addEventListener('mouseup', handleMouseUp);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingNodeId, dropTargetNodeId, dropPosition, onReparentNode, onReorderInsertNode, pan, zoom, nodeMap]);
+  }, [onReparentNode, onReorderInsertNode, nodeMap]);
 
-  // RENDERIZAÇÃO DAS LINHAS CONECTORAS (Bézier ou Retas, com portas distribuídas e cores do ramo)
+  // ─── CONECTORES SVG ──────────────────────────────────────────────────────────
   const renderConnectors = () => {
     const paths: React.ReactElement[] = [];
 
-    // Agrupa filhos visíveis por nó-pai para distribuir portas de conexão na borda
     const parentChildrenMap = new Map<string, MindMapNode[]>();
     nodes.forEach(child => {
       if (!child.parentId || !isNodeVisible(child)) return;
@@ -297,7 +339,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       if (!parent) return;
       const pPos = getNodePos(parent);
 
-      // Ordena os filhos por sua coordenada Y calculada
       children.sort((a, b) => {
         const aPos = getNodePos(a);
         const bPos = getNodePos(b);
@@ -313,9 +354,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
         const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
 
-        // Distribuição uniforme elegante das portas ao longo da borda vertical
-        const startY = numChildren <= 1 
-          ? pPos.y + pPos.height / 2 
+        const startY = numChildren <= 1
+          ? pPos.y + pPos.height / 2
           : pPos.y + pad + (usableHeight * index) / (numChildren - 1);
 
         const endX = isChildOnLeft ? cPos.x + cPos.width : cPos.x;
@@ -325,6 +365,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const isSelected = selectedNodeId === child.id || selectedNodeId === parent.id;
         const lineStyle = child.lineStyle || 'bezier';
 
+        // Nó arrastado: linha fica mais transparente (indica que está "em voo")
+        const isDraggingThis = draggingNodeId === child.id;
+
         let pathData = '';
         if (lineStyle === 'straight') {
           pathData = `M ${startX} ${startY} L ${endX} ${endY}`;
@@ -333,7 +376,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         }
 
         paths.push(
-          <g key={`conn-${child.id}`}>
+          <g key={`conn-${child.id}`} style={{ opacity: isDraggingThis ? 0.2 : 1, transition: 'opacity 0.15s ease' }}>
             <path
               d={pathData}
               fill="none"
@@ -375,6 +418,138 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       >
         {paths}
       </svg>
+    );
+  };
+
+  // ─── GHOST CARD + CONNECTOR LINE (Whimsical-style) ───────────────────────────
+  const renderDragGhost = () => {
+    if (!draggingNodeId || !dragCursorPos) return null;
+
+    const dragNode = nodeMap.get(draggingNodeId);
+    if (!dragNode) return null;
+
+    const nodeColor = dragNode.color || '#6366f1';
+    const borderStyle = dragNode.borderStyle || 'accent';
+
+    // Estilo igual ao card real
+    let ghostBg = 'var(--bg-surface)';
+    let ghostBorder = `1.5px solid var(--border-subtle)`;
+    let ghostBorderLeft: string | undefined = undefined;
+
+    if (borderStyle === 'fill') {
+      ghostBg = nodeColor;
+      ghostBorder = `2px solid ${nodeColor}`;
+    } else if (borderStyle === 'border') {
+      ghostBg = 'var(--bg-surface)';
+      ghostBorder = `2px solid ${nodeColor}`;
+    } else {
+      // accent
+      ghostBg = 'var(--bg-surface)';
+      ghostBorder = `1.5px solid var(--border-subtle)`;
+      ghostBorderLeft = `4px solid ${nodeColor}`;
+    }
+
+    const src = dragSourceScreenPosRef.current;
+    const cx = dragCursorPos.x;
+    const cy = dragCursorPos.y;
+
+    // Bézier: da posição original até o cursor (igual ao Whimsical — curva horizontal)
+    let bezierD = '';
+    if (src) {
+      const cp1x = src.x + (cx - src.x) * 0.5;
+      const cp2x = src.x + (cx - src.x) * 0.5;
+      bezierD = `M ${src.x} ${src.y} C ${cp1x} ${src.y}, ${cp2x} ${cy}, ${cx} ${cy}`;
+    }
+
+    return (
+      <>
+        {/* SVG de tela cheia para a linha conectora "elástica" */}
+        {src && (
+          <svg
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              width: '100vw',
+              height: '100vh',
+              pointerEvents: 'none',
+              zIndex: 9998,
+              overflow: 'visible'
+            }}
+          >
+            {/* Glow suave por baixo */}
+            <path
+              d={bezierD}
+              fill="none"
+              stroke={nodeColor}
+              strokeWidth={5}
+              strokeLinecap="round"
+              opacity={0.15}
+            />
+            {/* Linha tracejada principal — animada via CSS */}
+            <path
+              className="drag-connector-line"
+              d={bezierD}
+              fill="none"
+              stroke={nodeColor}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeDasharray="8 5"
+              opacity={0.9}
+            />
+            {/* Ponto de ancora no nó-fonte */}
+            <circle cx={src.x} cy={src.y} r={4} fill={nodeColor} opacity={0.55} />
+            <circle cx={src.x} cy={src.y} r={7} fill="none" stroke={nodeColor} strokeWidth={1} opacity={0.25} />
+            {/* Ponto no cursor */}
+            <circle cx={cx} cy={cy} r={3.5} fill={nodeColor} opacity={0.95} />
+            <circle cx={cx} cy={cy} r={7} fill="none" stroke={nodeColor} strokeWidth={1.5} opacity={0.5} />
+          </svg>
+        )}
+
+        {/* Card fantasma real — cópia visual exata do nó, flutuando no cursor */}
+        <div
+          className="mindmap-node-card drag-ghost-card"
+          style={{
+            position: 'fixed',
+            left: `${cx}px`,
+            top: `${cy}px`,
+            // offset de -50% para centrar, leve rotação e lift de escala (Trello feel)
+            transform: 'translate(-50%, -50%) rotate(-2deg) scale(1.07)',
+            pointerEvents: 'none',
+            zIndex: 10000,
+            backgroundColor: ghostBg,
+            border: ghostBorder,
+            borderLeft: ghostBorderLeft,
+            borderRadius: '6px',
+            padding: '8px 14px',
+            fontWeight: 500,
+            fontSize: '13.5px',
+            color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
+            boxShadow: `0 24px 60px rgba(0,0,0,0.6), 0 0 0 1px ${nodeColor}44`,
+            opacity: 0.95,
+            whiteSpace: 'nowrap',
+            letterSpacing: '-0.01em',
+            userSelect: 'none',
+            willChange: 'transform'
+          }}
+        >
+          <span style={{
+            color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
+            fontSize: '13.5px',
+            fontWeight: 500
+          }}>
+            {dragNode.text}
+          </span>
+          {/* Overlay de brilho sutil no topo */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '6px',
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.07) 0%, transparent 55%)',
+            pointerEvents: 'none'
+          }} />
+        </div>
+      </>
     );
   };
 
@@ -429,12 +604,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const isDropTarget = dropTargetNodeId === node.id;
         const childCount = countDescendants(node.id);
         const hasChildren = node.childrenIds && node.childrenIds.length > 0;
+        const isDraggingThis = draggingNodeId === node.id;
 
         const pos = getNodePos(node);
         const nodeColor = node.color || '#6366f1';
         const borderStyle = node.borderStyle || 'accent';
 
-        // Estilização com base na preferência do usuário
         let bg = 'var(--bg-surface)';
         let border = `1.5px solid ${isSelected ? nodeColor : 'var(--border-subtle)'}`;
         let borderLeft = undefined;
@@ -449,7 +624,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           bg = 'var(--bg-surface)';
           border = `2px solid ${nodeColor}`;
         } else {
-          // accent (estilo clássico corporativo com borda esquerda viva)
           bg = 'var(--bg-surface)';
           borderLeft = `4px solid ${nodeColor}`;
         }
@@ -458,18 +632,18 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           <div
             key={node.id}
             id={`node-${node.id}`}
-            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isDropTarget && dropPosition === 'inside' ? 'drop-target-inside' : ''}`}
+            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isDropTarget && dropPosition === 'inside' ? 'drop-inside-active' : ''}`}
             style={{
               left: `${pos.x}px`,
               top: `${pos.y}px`,
               width: `${pos.width}px`,
               minWidth: `${pos.width}px`,
               minHeight: `${pos.height}px`,
-              backgroundColor: isDropTarget && dropPosition === 'inside' ? 'rgba(13, 148, 136, 0.2)' : bg,
+              backgroundColor: isDropTarget && dropPosition === 'inside' ? 'rgba(13, 148, 136, 0.15)' : bg,
               border: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
               borderLeft: isMultiSelected ? undefined : borderLeft,
               outline: isDropTarget && dropPosition === 'inside'
-                ? '2.5px solid var(--accent-teal, #0d9488)'
+                ? '2px solid var(--accent-teal, #0d9488)'
                 : isMultiSelected
                 ? '2px solid var(--accent-purple, #6366f1)'
                 : (isSelected ? `2px solid ${nodeColor}` : undefined),
@@ -478,16 +652,18 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               zIndex: isDropTarget ? 45 : (isSelected ? 35 : 20),
               padding: isRoot ? '12px 24px' : '8px 14px',
               whiteSpace: 'nowrap',
-              opacity: draggingNodeId === node.id ? 0.45 : 1,
-              cursor: isRoot ? 'default' : (draggingNodeId === node.id ? 'grabbing' : 'grab'),
-              filter: draggingNodeId === node.id ? 'grayscale(0.3)' : undefined
+              // Nó-fonte durante drag: semi-transparente + desfocado (como o Whimsical)
+              opacity: isDraggingThis ? 0.4 : 1,
+              filter: isDraggingThis ? 'grayscale(0.4) blur(0.5px)' : undefined,
+              transition: isDraggingThis ? 'none' : 'opacity 0.15s ease, filter 0.15s ease',
+              cursor: isRoot ? 'default' : (isDraggingThis ? 'grabbing' : 'grab'),
+              pointerEvents: isDraggingThis ? 'none' : undefined
             }}
             onClick={(e) => {
               e.stopPropagation();
-              // Se clicar com Ctrl ou Shift, alterna na seleção múltipla
               if (e.ctrlKey || e.metaKey || e.shiftKey) {
                 const current = selectedNodeIds || [];
-                const next = current.includes(node.id) 
+                const next = current.includes(node.id)
                   ? current.filter(id => id !== node.id)
                   : [...current, node.id];
                 onSelectMultipleNodes?.(next);
@@ -500,7 +676,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             onMouseLeave={() => setHoveredNodeId(null)}
             onMouseDown={(e) => handleMouseDown(node, e)}
           >
-            {/* Indicador Visual Limpo e Corporativo de Reordenação (Linha elegante estilo Notion/Whimsical) */}
+            {/* Indicadores de Drop Reordenação — linha estilo Notion */}
             {isDropTarget && dropPosition === 'before' && (
               <div style={{
                 position: 'absolute',
@@ -572,7 +748,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 }}
               />
             ) : (
-              <span style={{ 
+              <span style={{
                 userSelect: 'none',
                 color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
                 fontSize: isRoot ? '16px' : '13.5px',
@@ -614,10 +790,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </div>
             )}
 
-            {/* Botões Externos de Adicionar (+ Filho à direita / + Irmão abaixo) */}
+            {/* Botões Externos de Adicionar */}
             {(isSelected || isHovered) && !isEditing && !draggingNodeId && (
               <>
-                {/* 1. Botão Adicionar Filho à Direita */}
+                {/* Adicionar Filho à Direita */}
                 <div
                   style={{
                     position: 'absolute',
@@ -661,7 +837,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   </div>
                 </div>
 
-                {/* 2. Botão Adicionar Irmão Abaixo */}
+                {/* Adicionar Irmão Abaixo */}
                 {!isRoot && (
                   <div
                     style={{
@@ -720,122 +896,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         );
       })}
 
-      {/* Ghost fantasma animado — Trello-style card + linha conectora ao nó original */}
-      {draggingNodeId && dragCursorPos && (() => {
-        const dragNode = nodeMap.get(draggingNodeId);
-        if (!dragNode) return null;
-
-        const nodeColor = dragNode.color || '#6366f1';
-        const borderStyle = dragNode.borderStyle || 'accent';
-
-        let ghostBg = 'var(--bg-surface)';
-        let ghostBorder = `2px solid ${nodeColor}`;
-        let ghostBorderLeft: string | undefined = undefined;
-
-        if (borderStyle === 'fill') {
-          ghostBg = nodeColor;
-          ghostBorder = `2px solid ${nodeColor}`;
-        } else if (borderStyle === 'border') {
-          ghostBg = 'var(--bg-surface)';
-          ghostBorder = `2px solid ${nodeColor}`;
-        } else {
-          ghostBg = 'var(--bg-surface)';
-          ghostBorder = `1.5px solid var(--border-subtle)`;
-          ghostBorderLeft = `4px solid ${nodeColor}`;
-        }
-
-        const src = dragSourceScreenPosRef.current;
-        const cx = dragCursorPos.x;
-        const cy = dragCursorPos.y;
-
-        // Curva de Bézier da posição original até o cursor
-        const midX = (src ? src.x : cx) + ((cx - (src ? src.x : cx)) * 0.5);
-        const bezierD = src
-          ? `M ${src.x} ${src.y} C ${midX} ${src.y}, ${midX} ${cy}, ${cx} ${cy}`
-          : '';
-
-        return (
-          <>
-            {/* SVG overlay: linha conectora animada do nó-fonte ao cursor */}
-            {src && (
-              <svg
-                style={{
-                  position: 'fixed',
-                  inset: 0,
-                  width: '100vw',
-                  height: '100vh',
-                  pointerEvents: 'none',
-                  zIndex: 9998,
-                  overflow: 'visible'
-                }}
-              >
-                {/* Linha de sombra (glow) */}
-                <path
-                  d={bezierD}
-                  fill="none"
-                  stroke={nodeColor}
-                  strokeWidth={6}
-                  strokeLinecap="round"
-                  opacity={0.18}
-                />
-                {/* Linha principal tracejada */}
-                <path
-                  d={bezierD}
-                  fill="none"
-                  stroke={nodeColor}
-                  strokeWidth={2.2}
-                  strokeLinecap="round"
-                  strokeDasharray="7 5"
-                  opacity={0.85}
-                  style={{ animation: 'drag-dash 0.4s linear infinite' }}
-                />
-                {/* Ponto de origem */}
-                <circle cx={src.x} cy={src.y} r={5} fill={nodeColor} opacity={0.6} />
-                {/* Ponto de destino (cursor) */}
-                <circle cx={cx} cy={cy} r={4} fill={nodeColor} opacity={0.9} />
-                <circle cx={cx} cy={cy} r={8} fill="none" stroke={nodeColor} strokeWidth={1.5} opacity={0.4} />
-              </svg>
-            )}
-
-            {/* Card fantasma — idêntico ao card original, flutuando sob o cursor */}
-            <div
-              className="drag-ghost-card"
-              style={{
-                position: 'fixed',
-                left: `${cx}px`,
-                top: `${cy}px`,
-                transform: 'translate(-50%, -52%) rotate(-2.5deg) scale(1.06)',
-                pointerEvents: 'none',
-                zIndex: 10000,
-                backgroundColor: ghostBg,
-                border: ghostBorder,
-                borderLeft: ghostBorderLeft,
-                borderRadius: '6px',
-                padding: '8px 14px',
-                fontWeight: 500,
-                fontSize: '13.5px',
-                color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
-                boxShadow: `0 20px 50px rgba(0,0,0,0.55), 0 0 0 1.5px ${nodeColor}66`,
-                opacity: 0.96,
-                whiteSpace: 'nowrap',
-                letterSpacing: '-0.01em',
-                backdropFilter: 'blur(4px)',
-                transition: 'transform 0.08s ease'
-              }}
-            >
-              {dragNode.text}
-              {/* Brilho sutil no topo do card */}
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '6px',
-                background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 60%)',
-                pointerEvents: 'none'
-              }} />
-            </div>
-          </>
-        );
-      })()}
+      {/* Ghost Card + Linha Elástica (Whimsical-style) — renderizado FORA do canvas transform */}
+      {renderDragGhost()}
     </>
   );
 };
