@@ -271,9 +271,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
           if (targetNode?.side === 'root' || e.clientX > rect.right - 25) {
             foundPos = 'inside';
-          } else if (relY < 0.32) {
+          } else if (relY < 0.20) {
             foundPos = 'before';
-          } else if (relY > 0.68) {
+          } else if (relY > 0.80) {
             foundPos = 'after';
           } else {
             foundPos = 'inside';
@@ -311,8 +311,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 foundPos = 'inside';
               } else {
                 const relY = (e.clientY - rect.top) / rect.height;
-                if (relY < 0.32) foundPos = 'before';
-                else if (relY > 0.68) foundPos = 'after';
+                if (relY < 0.20) foundPos = 'before';
+                else if (relY > 0.80) foundPos = 'after';
                 else foundPos = 'inside';
               }
             }
