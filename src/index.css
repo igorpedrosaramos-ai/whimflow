@@ -361,6 +361,21 @@ html, body, #root {
   background-color: var(--border-subtle);
 }
 
+.nav-action-btn.presentation {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16) 0%, rgba(13, 148, 136, 0.16) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  transition: all 0.2s ease;
+}
+.nav-action-btn.presentation:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.28) 0%, rgba(13, 148, 136, 0.28) 100%);
+  border-color: rgba(99, 102, 241, 0.8);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.35);
+  transform: translateY(-1px);
+}
+
 /* Responsividade Mobile & Tablet */
 @media (max-width: 768px) {
   .nav-btn-text {

@@ -240,10 +240,10 @@ export const TopNav: React.FC<TopNavProps> = ({
         {/* Apresentar */}
         <button
           onClick={onStartPresentation}
-          className="nav-action-btn secondary"
+          className="nav-action-btn presentation"
           title="Modo Apresentação Executiva em Tela Cheia (F5)"
         >
-          <Play size={14} />
+          <Play size={13} fill="currentColor" />
           <span className="nav-btn-text">Apresentar</span>
         </button>
 

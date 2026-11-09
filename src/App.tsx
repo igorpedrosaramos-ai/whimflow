@@ -1327,6 +1327,7 @@ export const App: React.FC = () => {
       {isPresentationOpen && (
         <PresentationView
           board={activeBoard}
+          initialSelectedNodeId={selectedNodeId}
           onClose={() => setIsPresentationOpen(false)}
         />
       )}
