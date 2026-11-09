@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Plus } from 'lucide-react';
 import { MindMapNode } from '../types';
 import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
@@ -59,6 +59,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [dropTargetNodeId, setDropTargetNodeId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | 'inside'>('inside');
   const [dragCursorPos, setDragCursorPos] = useState<{ x: number; y: number } | null>(null);
+  // Posição de tela do nó-fonte quando o arraste começa (centro do card original)
+  const dragSourceScreenPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Evita que um clique simples inicie arraste do nó acidentalmente
   const dragPendingRef = useRef<{ id: string; clientX: number; clientY: number } | null>(null);
@@ -193,7 +195,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const dx = Math.abs(e.clientX - dragPendingRef.current.clientX);
         const dy = Math.abs(e.clientY - dragPendingRef.current.clientY);
         if (dx > 4 || dy > 4) {
-          setDraggingNodeId(dragPendingRef.current.id);
+          const pendingId = dragPendingRef.current.id;
+          setDraggingNodeId(pendingId);
+          // Captura o centro do card original no momento em que o drag começa
+          const el = document.getElementById(`node-${pendingId}`);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            dragSourceScreenPosRef.current = {
+              x: rect.left + rect.width / 2,
+              y: rect.top + rect.height / 2
+            };
+          }
         }
       }
 
@@ -252,6 +264,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       setDropTargetNodeId(null);
       setDropPosition('inside');
       setDragCursorPos(null);
+      dragSourceScreenPosRef.current = null;
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -445,7 +458,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           <div
             key={node.id}
             id={`node-${node.id}`}
-            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''}`}
+            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isDropTarget && dropPosition === 'inside' ? 'drop-target-inside' : ''}`}
             style={{
               left: `${pos.x}px`,
               top: `${pos.y}px`,
@@ -465,8 +478,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               zIndex: isDropTarget ? 45 : (isSelected ? 35 : 20),
               padding: isRoot ? '12px 24px' : '8px 14px',
               whiteSpace: 'nowrap',
-              opacity: draggingNodeId === node.id ? 0.35 : 1,
-              cursor: isRoot ? 'default' : (draggingNodeId === node.id ? 'grabbing' : 'grab')
+              opacity: draggingNodeId === node.id ? 0.45 : 1,
+              cursor: isRoot ? 'default' : (draggingNodeId === node.id ? 'grabbing' : 'grab'),
+              filter: draggingNodeId === node.id ? 'grayscale(0.3)' : undefined
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -706,33 +720,122 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         );
       })}
 
-      {/* Cartão Fantasma Limpo durante o Arraste (Posicionamento Fixo Exato sob o Cursor) */}
-      {draggingNodeId && dragCursorPos && nodeMap.get(draggingNodeId) && (
-        <div
-          style={{
-            position: 'fixed',
-            left: `${dragCursorPos.x}px`,
-            top: `${dragCursorPos.y}px`,
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none',
-            zIndex: 10000,
-            backgroundColor: nodeMap.get(draggingNodeId)?.color || 'var(--accent-purple)',
-            color: '#ffffff',
-            padding: '7px 16px',
-            borderRadius: '6px',
-            fontWeight: 600,
-            fontSize: '13px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            border: '1.5px solid #ffffff',
-            opacity: 0.9,
-            whiteSpace: 'nowrap',
-            minWidth: '60px',
-            minHeight: '28px'
-          }}
-        >
-          {nodeMap.get(draggingNodeId)?.text || ''}
-        </div>
-      )}
+      {/* Ghost fantasma animado — Trello-style card + linha conectora ao nó original */}
+      {draggingNodeId && dragCursorPos && (() => {
+        const dragNode = nodeMap.get(draggingNodeId);
+        if (!dragNode) return null;
+
+        const nodeColor = dragNode.color || '#6366f1';
+        const borderStyle = dragNode.borderStyle || 'accent';
+
+        let ghostBg = 'var(--bg-surface)';
+        let ghostBorder = `2px solid ${nodeColor}`;
+        let ghostBorderLeft: string | undefined = undefined;
+
+        if (borderStyle === 'fill') {
+          ghostBg = nodeColor;
+          ghostBorder = `2px solid ${nodeColor}`;
+        } else if (borderStyle === 'border') {
+          ghostBg = 'var(--bg-surface)';
+          ghostBorder = `2px solid ${nodeColor}`;
+        } else {
+          ghostBg = 'var(--bg-surface)';
+          ghostBorder = `1.5px solid var(--border-subtle)`;
+          ghostBorderLeft = `4px solid ${nodeColor}`;
+        }
+
+        const src = dragSourceScreenPosRef.current;
+        const cx = dragCursorPos.x;
+        const cy = dragCursorPos.y;
+
+        // Curva de Bézier da posição original até o cursor
+        const midX = (src ? src.x : cx) + ((cx - (src ? src.x : cx)) * 0.5);
+        const bezierD = src
+          ? `M ${src.x} ${src.y} C ${midX} ${src.y}, ${midX} ${cy}, ${cx} ${cy}`
+          : '';
+
+        return (
+          <>
+            {/* SVG overlay: linha conectora animada do nó-fonte ao cursor */}
+            {src && (
+              <svg
+                style={{
+                  position: 'fixed',
+                  inset: 0,
+                  width: '100vw',
+                  height: '100vh',
+                  pointerEvents: 'none',
+                  zIndex: 9998,
+                  overflow: 'visible'
+                }}
+              >
+                {/* Linha de sombra (glow) */}
+                <path
+                  d={bezierD}
+                  fill="none"
+                  stroke={nodeColor}
+                  strokeWidth={6}
+                  strokeLinecap="round"
+                  opacity={0.18}
+                />
+                {/* Linha principal tracejada */}
+                <path
+                  d={bezierD}
+                  fill="none"
+                  stroke={nodeColor}
+                  strokeWidth={2.2}
+                  strokeLinecap="round"
+                  strokeDasharray="7 5"
+                  opacity={0.85}
+                  style={{ animation: 'drag-dash 0.4s linear infinite' }}
+                />
+                {/* Ponto de origem */}
+                <circle cx={src.x} cy={src.y} r={5} fill={nodeColor} opacity={0.6} />
+                {/* Ponto de destino (cursor) */}
+                <circle cx={cx} cy={cy} r={4} fill={nodeColor} opacity={0.9} />
+                <circle cx={cx} cy={cy} r={8} fill="none" stroke={nodeColor} strokeWidth={1.5} opacity={0.4} />
+              </svg>
+            )}
+
+            {/* Card fantasma — idêntico ao card original, flutuando sob o cursor */}
+            <div
+              className="drag-ghost-card"
+              style={{
+                position: 'fixed',
+                left: `${cx}px`,
+                top: `${cy}px`,
+                transform: 'translate(-50%, -52%) rotate(-2.5deg) scale(1.06)',
+                pointerEvents: 'none',
+                zIndex: 10000,
+                backgroundColor: ghostBg,
+                border: ghostBorder,
+                borderLeft: ghostBorderLeft,
+                borderRadius: '6px',
+                padding: '8px 14px',
+                fontWeight: 500,
+                fontSize: '13.5px',
+                color: borderStyle === 'fill' ? '#ffffff' : 'var(--text-primary)',
+                boxShadow: `0 20px 50px rgba(0,0,0,0.55), 0 0 0 1.5px ${nodeColor}66`,
+                opacity: 0.96,
+                whiteSpace: 'nowrap',
+                letterSpacing: '-0.01em',
+                backdropFilter: 'blur(4px)',
+                transition: 'transform 0.08s ease'
+              }}
+            >
+              {dragNode.text}
+              {/* Brilho sutil no topo do card */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '6px',
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 60%)',
+                pointerEvents: 'none'
+              }} />
+            </div>
+          </>
+        );
+      })()}
     </>
   );
 };
