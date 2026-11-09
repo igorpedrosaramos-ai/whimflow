@@ -355,7 +355,11 @@ export const App: React.FC = () => {
     setBoards(prev => [newBoard, ...prev]);
     setActiveBoardId(newId);
     setIsTemplateModalOpen(false);
-    setCurrentView('editor');
+    if (template.previewType === 'doc') {
+      setCurrentView('doc');
+    } else {
+      setCurrentView('editor');
+    }
     setTimeout(() => fitView(newBoard.mindMapNodes), 100);
   }, [fitView]);
 

@@ -47,8 +47,14 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
                           t.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     if (searchQuery.trim()) return matchesSearch;
     if (activeCategory === 'all') return true;
-    if (activeCategory === 'suggested') return t.category === 'suggested' || t.category === 'popular';
+    if (activeCategory === 'suggested') return t.category === 'suggested' || t.category === 'popular' || ['tpl-simple-org-chart', 'tpl-ios-wireframe', 'tpl-product-wireflow', 'tpl-digital-sketchbook', 'tpl-brainstorming', 'tpl-user-research-process', 'tpl-sitemap-variations', 'tpl-simple-flowchart', 'tpl-team-heartbeat'].includes(t.id);
     if (activeCategory === 'workspace') return true;
+    if (activeCategory === 'popular') return t.category === 'popular' || t.category === 'suggested' || ['tpl-simple-org-chart', 'tpl-sitemap-mindmap', 'tpl-brainstorming', 'tpl-ios-wireframe', 'tpl-user-research-process'].includes(t.id);
+    if (activeCategory === 'diagrams') return t.category === 'diagrams' || ['orgchart', 'mindmap', 'flowchart'].includes(t.previewType);
+    if (activeCategory === 'product') return t.category === 'product' || t.previewType === 'doc';
+    if (activeCategory === 'project') return t.category === 'project' || ['timeline', 'gantt'].includes(t.previewType);
+    if (activeCategory === 'whiteboarding') return t.category === 'whiteboarding' || ['stickies', 'sketchbook'].includes(t.previewType);
+    if (activeCategory === 'wireframes') return t.category === 'wireframes' || ['wireframe', 'wireflow'].includes(t.previewType);
     return t.category === activeCategory;
   });
 
@@ -221,7 +227,122 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
       );
     }
 
-    // Default wireframe
+    if (template.previewType === 'wireflow') {
+      return (
+        <svg viewBox="0 0 380 200" style={{ width: '100%', height: '100%', backgroundColor: '#ffffff' }}>
+          {/* Document / Flow spec on left */}
+          <rect x="25" y="30" width="85" height="110" rx="4" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
+          <rect x="35" y="42" width="65" height="10" rx="2" fill="#94a3b8" />
+          <rect x="35" y="60" width="55" height="6" rx="1.5" fill="#e2e8f0" />
+          <rect x="35" y="72" width="60" height="6" rx="1.5" fill="#e2e8f0" />
+          <rect x="35" y="84" width="45" height="6" rx="1.5" fill="#e2e8f0" />
+          <rect x="35" y="105" width="40" height="16" rx="3" fill="#f59e0b" />
+
+          {/* Arrow pointing right */}
+          <line x1="115" y1="85" x2="145" y2="85" stroke="#64748b" strokeWidth="2" strokeDasharray="3 3" />
+          <polygon points="145,80 155,85 145,90" fill="#64748b" />
+
+          {/* Screen 1 */}
+          <rect x="165" y="20" width="85" height="150" rx="8" fill="#ffffff" stroke="#94a3b8" strokeWidth="1.5" />
+          <rect x="175" y="35" width="65" height="12" rx="2" fill="#e2e8f0" />
+          <rect x="175" y="55" width="65" height="45" rx="3" fill="#f8fafc" stroke="#e2e8f0" strokeWidth="1" />
+          <rect x="175" y="125" width="65" height="18" rx="4" fill="#0284c7" />
+
+          {/* Arrow 2 */}
+          <line x1="255" y1="95" x2="275" y2="95" stroke="#64748b" strokeWidth="2" />
+          <polygon points="275,90 285,95 275,100" fill="#64748b" />
+
+          {/* Screen 2 */}
+          <rect x="290" y="20" width="75" height="150" rx="8" fill="#ffffff" stroke="#94a3b8" strokeWidth="1.5" />
+          <circle cx="327" cy="65" r="18" fill="#ecfdf5" stroke="#10b981" strokeWidth="2" />
+          <path d="M 320 65 L 325 70 L 335 60" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <rect x="300" y="125" width="55" height="18" rx="4" fill="#10b981" />
+        </svg>
+      );
+    }
+
+    if (template.previewType === 'sketchbook') {
+      return (
+        <svg viewBox="0 0 380 200" style={{ width: '100%', height: '100%', backgroundColor: '#ffffff' }}>
+          <rect x="20" y="20" width="340" height="160" rx="6" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1.5" />
+          <line x1="20" y1="42" x2="360" y2="42" stroke="#e2e8f0" strokeWidth="1.5" />
+          <circle cx="34" cy="31" r="3.5" fill="#f87171" />
+          <circle cx="45" cy="31" r="3.5" fill="#fbbf24" />
+          <circle cx="56" cy="31" r="3.5" fill="#34d399" />
+          <rect x="40" y="55" width="60" height="60" rx="2" fill="#fef08a" stroke="#fde047" strokeWidth="1" />
+          <rect x="110" y="55" width="60" height="60" rx="2" fill="#e9d5ff" stroke="#d8b4fe" strokeWidth="1" />
+          <rect x="185" y="55" width="155" height="105" rx="4" fill="#ffffff" stroke="#94a3b8" strokeWidth="1.5" />
+          <rect x="195" y="65" width="135" height="16" rx="2" fill="#e2e8f0" />
+          <rect x="195" y="90" width="60" height="55" rx="3" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="1" />
+          <rect x="265" y="90" width="65" height="20" rx="3" fill="#0284c7" />
+          <path d="M 80 135 C 110 155, 140 145, 180 140" fill="none" stroke="#6366f1" strokeWidth="2" strokeDasharray="4 2" />
+        </svg>
+      );
+    }
+
+    if (template.previewType === 'doc') {
+      return (
+        <svg viewBox="0 0 380 200" style={{ width: '100%', height: '100%', backgroundColor: '#ffffff' }}>
+          <rect x="50" y="15" width="280" height="170" rx="4" fill="#ffffff" stroke="#cbd5e1" strokeWidth="1.5" />
+          <rect x="50" y="15" width="280" height="32" rx="4" fill="#1e293b" />
+          <text x="70" y="35" fontSize="10" fontWeight="600" fill="#94a3b8">Author: <tspan fill="#ffffff">Product Team</tspan></text>
+          <text x="230" y="35" fontSize="10" fontWeight="600" fill="#94a3b8">Status: <tspan fill="#34d399">● Active</tspan></text>
+          <text x="70" y="70" fontSize="13" fontWeight="700" fill="#0f172a">Executive Summary & Objectives</text>
+          <line x1="70" y1="88" x2="300" y2="88" stroke="#e2e8f0" strokeWidth="4" strokeLinecap="round" />
+          <line x1="70" y1="102" x2="280" y2="102" stroke="#e2e8f0" strokeWidth="4" strokeLinecap="round" />
+          <line x1="70" y1="116" x2="240" y2="116" stroke="#e2e8f0" strokeWidth="4" strokeLinecap="round" />
+          <text x="70" y="145" fontSize="11" fontWeight="700" fill="#0284c7">Key Findings & Action Items</text>
+          <circle cx="74" cy="160" r="3" fill="#10b981" />
+          <line x1="84" y1="160" x2="260" y2="160" stroke="#cbd5e1" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      );
+    }
+
+    if (template.previewType === 'timeline') {
+      return (
+        <svg viewBox="0 0 380 200" style={{ width: '100%', height: '100%', backgroundColor: '#ffffff' }}>
+          <line x1="30" y1="100" x2="350" y2="100" stroke="#cbd5e1" strokeWidth="3" />
+          <circle cx="60" cy="100" r="8" fill="#3b82f6" />
+          <text x="60" y="80" textAnchor="middle" fontSize="10" fontWeight="700" fill="#3b82f6">Q1</text>
+          <rect x="30" y="115" width="60" height="34" rx="3" fill="#eff6ff" stroke="#bfdbfe" strokeWidth="1" />
+          <text x="60" y="132" textAnchor="middle" fontSize="8" fontWeight="600" fill="#1e40af">Prototype</text>
+          <circle cx="150" cy="100" r="8" fill="#10b981" />
+          <text x="150" y="80" textAnchor="middle" fontSize="10" fontWeight="700" fill="#10b981">Q2</text>
+          <rect x="120" y="115" width="60" height="34" rx="3" fill="#ecfdf5" stroke="#a7f3d0" strokeWidth="1" />
+          <text x="150" y="132" textAnchor="middle" fontSize="8" fontWeight="600" fill="#065f46">MVP Beta</text>
+          <circle cx="240" cy="100" r="8" fill="#f59e0b" />
+          <text x="240" y="80" textAnchor="middle" fontSize="10" fontWeight="700" fill="#f59e0b">Q3</text>
+          <rect x="210" y="115" width="60" height="34" rx="3" fill="#fffbeb" stroke="#fde68a" strokeWidth="1" />
+          <text x="240" y="132" textAnchor="middle" fontSize="8" fontWeight="600" fill="#92400e">Public GA</text>
+          <circle cx="320" cy="100" r="8" fill="#8b5cf6" />
+          <text x="320" y="80" textAnchor="middle" fontSize="10" fontWeight="700" fill="#8b5cf6">Q4</text>
+          <rect x="290" y="115" width="60" height="34" rx="3" fill="#f5f3ff" stroke="#ddd6fe" strokeWidth="1" />
+          <text x="320" y="132" textAnchor="middle" fontSize="8" fontWeight="600" fill="#5b21b6">Scale</text>
+        </svg>
+      );
+    }
+
+    if (template.previewType === 'gantt') {
+      return (
+        <svg viewBox="0 0 380 200" style={{ width: '100%', height: '100%', backgroundColor: '#ffffff' }}>
+          <line x1="40" y1="30" x2="350" y2="30" stroke="#e2e8f0" strokeWidth="1" />
+          <line x1="40" y1="65" x2="350" y2="65" stroke="#e2e8f0" strokeWidth="1" />
+          <line x1="40" y1="100" x2="350" y2="100" stroke="#e2e8f0" strokeWidth="1" />
+          <line x1="40" y1="135" x2="350" y2="135" stroke="#e2e8f0" strokeWidth="1" />
+          <line x1="40" y1="170" x2="350" y2="170" stroke="#e2e8f0" strokeWidth="1" />
+          <rect x="50" y="40" width="120" height="18" rx="4" fill="#3b82f6" />
+          <text x="60" y="53" fontSize="9" fontWeight="600" fill="#ffffff">Architecture</text>
+          <rect x="130" y="75" width="140" height="18" rx="4" fill="#10b981" />
+          <text x="140" y="88" fontSize="9" fontWeight="600" fill="#ffffff">Frontend UI Build</text>
+          <rect x="220" y="110" width="100" height="18" rx="4" fill="#f59e0b" />
+          <text x="230" y="123" fontSize="9" fontWeight="600" fill="#ffffff">API Testing</text>
+          <rect x="280" y="145" width="60" height="18" rx="4" fill="#8b5cf6" />
+          <text x="288" y="158" fontSize="9" fontWeight="600" fill="#ffffff">Launch</text>
+        </svg>
+      );
+    }
+
+    // Default wireframe (iOS Wireframe Kit)
     return (
       <svg viewBox="0 0 380 200" style={{ width: '100%', height: '100%', backgroundColor: '#ffffff' }}>
         <rect x="60" y="20" width="80" height="150" rx="8" fill="#ffffff" stroke="#94a3b8" strokeWidth="2" />
@@ -567,7 +688,15 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
               }}
             >
               <h2 style={{ fontSize: '16px', fontWeight: 600, color: '#f8fafc', margin: 0 }}>
-                Suggested templates for boards
+                {activeCategory === 'suggested' ? 'Suggested templates for boards' :
+                 activeCategory === 'workspace' ? `Templates in ${workspaceName}` :
+                 activeCategory === 'popular' ? 'Popular templates' :
+                 activeCategory === 'diagrams' ? 'Diagrams & Mind Maps' :
+                 activeCategory === 'product' ? 'Product documentation templates' :
+                 activeCategory === 'project' ? 'Project management templates' :
+                 activeCategory === 'whiteboarding' ? 'Whiteboarding & Workshops' :
+                 activeCategory === 'wireframes' ? 'Wireframe kits & User flows' :
+                 activeCategory === 'all' ? 'All templates' : 'Templates'}
               </h2>
               <button
                 onClick={onClose}
