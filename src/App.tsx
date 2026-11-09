@@ -1486,28 +1486,29 @@ export const App: React.FC = () => {
           workspaceName="teste"
         />
 
-        {/* Toolbar Flutuante */}
-        <Toolbar
-          currentTool={currentTool}
-          onSelectTool={setCurrentTool}
-          onAddConnectedNode={handleAddConnectedNode}
-          onAddSticky={handleAddSticky}
-          onAddWireframe={handleAddWireframe}
-          onAddText={() => handleAddSticky()}
-          onStartPresentation={() => setIsPresentationOpen(true)}
-          onOpenAI={() => setIsAIModalOpen(true)}
-          onTogglePresentPanel={() => setIsPresentSidePanelOpen(prev => !prev)}
-        />
-
-        {/* Canvas Principal */}
+        {/* Canvas Principal com Toolbar Flutuante Embutida */}
         <div
           id="main-canvas-area"
+          style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
           className={`canvas-container ${isPanning || currentTool === 'hand' ? 'panning' : currentTool === 'draw' ? 'drawing' : ''}`}
           onWheel={handleWheel}
           onMouseDown={handleMouseDownCanvas}
           onMouseMove={handleMouseMoveCanvas}
           onMouseUp={handleMouseUpCanvas}
         >
+          {/* Toolbar Flutuante Autêntica Whimsical (Sempre dentro do Canvas, NUNCA sobrepõe a barra lateral) */}
+          <Toolbar
+            currentTool={currentTool}
+            onSelectTool={setCurrentTool}
+            onAddConnectedNode={handleAddConnectedNode}
+            onAddSticky={handleAddSticky}
+            onAddWireframe={handleAddWireframe}
+            onAddText={() => handleAddSticky()}
+            onStartPresentation={() => setIsPresentationOpen(true)}
+            onOpenAI={() => setIsAIModalOpen(true)}
+            onTogglePresentPanel={() => setIsPresentSidePanelOpen(prev => !prev)}
+          />
+
           {/* Fundo Pontilhado */}
           <div className="canvas-background" />
 

@@ -48,7 +48,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       style={{
         position: 'absolute',
         left: '20px',
-        top: '70px',
+        top: '20px',
         zIndex: 100,
         backgroundColor: '#1b212c',
         border: '1px solid #2c3647',
@@ -61,6 +61,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         boxShadow: '0 10px 30px rgba(0, 0, 0, 0.45)',
         userSelect: 'none'
       }}
+      onMouseDown={e => e.stopPropagation()}
+      onClick={e => e.stopPropagation()}
     >
       {/* Grupo Superior de Modos de Diagrama */}
       <button
