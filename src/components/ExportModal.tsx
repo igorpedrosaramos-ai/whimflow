@@ -8,6 +8,7 @@ interface ExportModalProps {
   activeBoard: Board;
   onImportBoard: (board: Board) => void;
   onResetBoard: () => void;
+  onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
@@ -15,11 +16,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   onClose,
   activeBoard,
   onImportBoard,
-  onResetBoard
+  onResetBoard,
+  onShowToast
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
+
+  const notify = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (onShowToast) {
+      onShowToast(msg, type);
+    }
+  };
 
   // Exportar para JSON
   const handleExportJSON = () => {
@@ -30,6 +38,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+    notify('Backup JSON gerado e baixado com sucesso!', 'success');
   };
 
   // Importar de JSON
@@ -43,13 +52,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         const imported = JSON.parse(event.target?.result as string);
         if (imported && imported.mindMapNodes) {
           onImportBoard(imported);
-          alert('Quadro importado com sucesso!');
+          notify('Quadro importado com sucesso!', 'success');
           onClose();
         } else {
-          alert('Arquivo JSON inválido para formato de projeto do Mapa Mental Turbine.');
+          notify('Arquivo JSON inválido para formato de projeto do Whimflow.', 'error');
         }
       } catch (err) {
-        alert('Erro ao processar o arquivo JSON.');
+        notify('Erro ao processar o arquivo JSON.', 'error');
       }
     };
     reader.readAsText(file);
@@ -61,7 +70,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     if (!container) return;
 
     // Notificação rápida
-    alert('Para capturar a imagem em resolução total, você pode usar o atalho de captura nativa do Windows (Win + Shift + S) ou imprimir diretamente para PDF via Ctrl + P!');
+    notify('Para exportar em alta fidelidade, utilize a opção "Exportar PNG" do menu Share!', 'info');
   };
 
   return (

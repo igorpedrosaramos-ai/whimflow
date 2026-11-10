@@ -43,6 +43,8 @@ interface TopNavProps {
   onOpenVersionHistory?: () => void;
   onOpenBoardStats?: () => void;
   workspaceName?: string;
+  isStarred?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
@@ -64,7 +66,9 @@ export const TopNav: React.FC<TopNavProps> = ({
   onOpenVersionHistory,
   onOpenBoardStats,
   totalObjects = 0,
-  workspaceName = 'teste'
+  workspaceName = 'teste',
+  isStarred = false,
+  onToggleFavorite
 }) => {
   const isDark = theme === 'dark';
 
@@ -206,7 +210,23 @@ export const TopNav: React.FC<TopNavProps> = ({
         </div>
 
         {/* Estrela de Favorito */}
-        <Star size={14} color="#94a3b8" style={{ cursor: 'pointer', flexShrink: 0 }} />
+        <button
+          onClick={onToggleFavorite}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: '4px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            color: isStarred ? '#f59e0b' : '#94a3b8',
+            borderRadius: '4px',
+            transition: 'transform 0.15s, color 0.15s'
+          }}
+          title={isStarred ? 'Remover dos Favoritos' : 'Marcar como Favorito'}
+        >
+          <Star size={14} fill={isStarred ? '#f59e0b' : 'none'} color={isStarred ? '#f59e0b' : '#94a3b8'} />
+        </button>
       </div>
 
       {/* Direita: Presença, Compartilhar, Apresentar, Atalhos */}

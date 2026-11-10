@@ -38,6 +38,7 @@ interface DashboardViewProps {
   onRenameBoard: (boardId: string, newTitle: string) => void;
   onOpenTrash?: () => void;
   onOpenSearch?: () => void;
+  onOpenShortcuts?: () => void;
   workspaceName?: string;
   theme?: 'dark' | 'light';
 }
@@ -55,6 +56,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onRenameBoard,
   onOpenTrash,
   onOpenSearch,
+  onOpenShortcuts,
   workspaceName = 'teste',
   theme = 'light'
 }) => {
@@ -64,10 +66,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [activeBoardMenuId, setActiveBoardMenuId] = useState<string | null>(null);
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'recent' | 'private'>('all');
+  const [sortOption, setSortOption] = useState<'created-desc' | 'created-asc' | 'alpha' | 'modified'>('created-desc');
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
-  const filteredBoards = boards.filter(b => 
-    b.title.toLowerCase().includes(searchFilter.toLowerCase())
-  );
+  let displayBoards = boards.filter(b => {
+    if (searchFilter.trim() && !b.title.toLowerCase().includes(searchFilter.toLowerCase())) {
+      return false;
+    }
+    if (categoryFilter === 'private') {
+      return !!b.isPrivate;
+    }
+    return true;
+  });
+
+  if (categoryFilter === 'recent') {
+    displayBoards = [...displayBoards].sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
+  } else if (sortOption === 'created-desc') {
+    displayBoards = [...displayBoards].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  } else if (sortOption === 'created-asc') {
+    displayBoards = [...displayBoards].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  } else if (sortOption === 'alpha') {
+    displayBoards = [...displayBoards].sort((a, b) => a.title.localeCompare(b.title));
+  } else if (sortOption === 'modified') {
+    displayBoards = [...displayBoards].sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+  }
 
   const isDark = theme === 'dark';
 
@@ -88,14 +112,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ========================================================================= */}
       <aside
         style={{
-          width: '260px',
+          width: isSidebarCollapsed ? '0px' : '260px',
           backgroundColor: '#161920',
-          borderRight: '1px solid #232936',
+          borderRight: isSidebarCollapsed ? 'none' : '1px solid #232936',
           display: 'flex',
           flexDirection: 'column',
           color: '#94a3b8',
           userSelect: 'none',
-          flexShrink: 0
+          flexShrink: 0,
+          overflow: 'hidden',
+          transition: 'width 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
         {/* Topo do Menu: Switcher de Espaço de Trabalho */}
@@ -105,12 +131,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '14px 16px',
-            borderBottom: '1px solid #202633'
+            borderBottom: '1px solid #202633',
+            minWidth: '260px'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
             {/* Ícone de Toggle Lateral */}
             <button
+              onClick={() => setIsSidebarCollapsed(true)}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -118,7 +146,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 cursor: 'pointer',
                 padding: '4px',
                 display: 'flex',
-                alignItems: 'center'
+                alignItems: 'center',
+                borderRadius: '4px'
               }}
               title="Recolher barra lateral"
             >
@@ -178,6 +207,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 10px', gap: '2px', flex: 1, overflowY: 'auto' }}>
           {/* Recent */}
           <button
+            onClick={() => setCategoryFilter('recent')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -185,20 +215,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               padding: '7px 12px',
               borderRadius: '6px',
               border: 'none',
-              background: 'transparent',
-              color: '#94a3b8',
+              background: categoryFilter === 'recent' ? '#232b38' : 'transparent',
+              color: categoryFilter === 'recent' ? '#f8fafc' : '#94a3b8',
               fontSize: '13px',
-              fontWeight: 500,
+              fontWeight: categoryFilter === 'recent' ? 600 : 500,
               cursor: 'pointer',
-              textAlign: 'left'
+              textAlign: 'left',
+              transition: 'all 0.15s ease'
             }}
           >
-            <Clock size={16} color="#64748b" />
+            <Clock size={16} color={categoryFilter === 'recent' ? '#818cf8' : '#64748b'} />
             <span>Recent</span>
           </button>
 
           {/* PRIVATE */}
           <div
+            onClick={() => setCategoryFilter(categoryFilter === 'private' ? 'all' : 'private')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -206,12 +238,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               padding: '10px 12px 4px 12px',
               fontSize: '11px',
               fontWeight: 700,
-              color: '#64748b',
+              color: categoryFilter === 'private' ? '#818cf8' : '#64748b',
               letterSpacing: '0.05em',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              borderRadius: '4px'
             }}
+            title="Filtrar quadros privados"
           >
-            <ChevronRight size={13} color="#64748b" />
+            <ChevronRight size={13} color={categoryFilter === 'private' ? '#818cf8' : '#64748b'} />
             <span>PRIVATE</span>
           </div>
 
@@ -235,6 +269,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Everyone at workspace (ITEM ATIVO SELECIONADO) */}
           <button
+            onClick={() => setCategoryFilter('all')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -242,15 +277,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               padding: '7px 12px 7px 24px',
               borderRadius: '6px',
               border: 'none',
-              background: '#232b38',
-              color: '#f8fafc',
+              background: categoryFilter === 'all' ? '#232b38' : 'transparent',
+              color: categoryFilter === 'all' ? '#f8fafc' : '#94a3b8',
               fontSize: '13px',
-              fontWeight: 600,
+              fontWeight: categoryFilter === 'all' ? 600 : 500,
               cursor: 'pointer',
-              textAlign: 'left'
+              textAlign: 'left',
+              transition: 'all 0.15s ease'
             }}
           >
-            <Users size={15} color="#818cf8" />
+            <Users size={15} color={categoryFilter === 'all' ? '#818cf8' : '#64748b'} />
             <span>Everyone at {workspaceName}</span>
           </button>
         </div>
@@ -320,6 +356,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           {/* Breadcrumbs */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+            {isSidebarCollapsed && (
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: isDark ? '#94a3b8' : '#64748b',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '4px',
+                  marginRight: '4px'
+                }}
+                title="Expandir barra lateral"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                </svg>
+              </button>
+            )}
             <span style={{ color: isDark ? '#94a3b8' : '#64748b', cursor: 'pointer' }}>Teams</span>
             <span style={{ color: '#94a3b8' }}>/</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: isDark ? '#f8fafc' : '#0f172a' }}>
@@ -566,31 +624,146 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             }}
           >
             {/* Filtros à Esquerda */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', position: 'relative' }}>
               <button
+                onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
-                  background: 'transparent',
+                  background: isSortMenuOpen ? (isDark ? '#232b38' : '#e2e8f0') : 'transparent',
                   border: 'none',
-                  color: isDark ? '#94a3b8' : '#475569',
+                  color: isDark ? '#f1f5f9' : '#1e293b',
                   fontSize: '13px',
-                  fontWeight: 500,
-                  cursor: 'pointer'
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '5px 8px',
+                  borderRadius: '6px',
+                  transition: 'background 0.15s'
                 }}
+                title="Ordenar projetos"
               >
-                <span>Date created ↓</span>
+                <span>
+                  {sortOption === 'created-desc' && 'Date created ↓'}
+                  {sortOption === 'created-asc' && 'Date created ↑'}
+                  {sortOption === 'alpha' && 'Title (A - Z)'}
+                  {sortOption === 'modified' && 'Last modified ↓'}
+                </span>
+                <ChevronDown size={13} color="#94a3b8" />
               </button>
 
+              {/* Menu Dropdown de Ordenação */}
+              {isSortMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '6px',
+                    backgroundColor: isDark ? '#1a222f' : '#ffffff',
+                    border: isDark ? '1px solid #2e394b' : '1px solid #cbd5e1',
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+                    zIndex: 50,
+                    minWidth: '220px',
+                    padding: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                  }}
+                >
+                  <button
+                    onClick={() => { setSortOption('created-desc'); setIsSortMenuOpen(false); }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '7px 10px',
+                      background: sortOption === 'created-desc' ? (isDark ? '#263143' : '#f1f5f9') : 'transparent',
+                      border: 'none',
+                      borderRadius: '5px',
+                      color: isDark ? '#f8fafc' : '#0f172a',
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span>Data de criação (recente)</span>
+                    {sortOption === 'created-desc' && <span style={{ color: '#818cf8', fontWeight: 700 }}>✓</span>}
+                  </button>
+                  <button
+                    onClick={() => { setSortOption('created-asc'); setIsSortMenuOpen(false); }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '7px 10px',
+                      background: sortOption === 'created-asc' ? (isDark ? '#263143' : '#f1f5f9') : 'transparent',
+                      border: 'none',
+                      borderRadius: '5px',
+                      color: isDark ? '#f8fafc' : '#0f172a',
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span>Data de criação (antigo)</span>
+                    {sortOption === 'created-asc' && <span style={{ color: '#818cf8', fontWeight: 700 }}>✓</span>}
+                  </button>
+                  <button
+                    onClick={() => { setSortOption('alpha'); setIsSortMenuOpen(false); }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '7px 10px',
+                      background: sortOption === 'alpha' ? (isDark ? '#263143' : '#f1f5f9') : 'transparent',
+                      border: 'none',
+                      borderRadius: '5px',
+                      color: isDark ? '#f8fafc' : '#0f172a',
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span>Ordem alfabética (A - Z)</span>
+                    {sortOption === 'alpha' && <span style={{ color: '#818cf8', fontWeight: 700 }}>✓</span>}
+                  </button>
+                  <button
+                    onClick={() => { setSortOption('modified'); setIsSortMenuOpen(false); }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '7px 10px',
+                      background: sortOption === 'modified' ? (isDark ? '#263143' : '#f1f5f9') : 'transparent',
+                      border: 'none',
+                      borderRadius: '5px',
+                      color: isDark ? '#f8fafc' : '#0f172a',
+                      fontSize: '12.5px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span>Última modificação</span>
+                    {sortOption === 'modified' && <span style={{ color: '#818cf8', fontWeight: 700 }}>✓</span>}
+                  </button>
+                </div>
+              )}
+
               <button
+                onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
                 style={{
                   background: 'transparent',
                   border: 'none',
                   color: '#64748b',
                   cursor: 'pointer',
-                  padding: '2px 4px'
+                  padding: '4px 6px',
+                  borderRadius: '4px',
+                  display: 'flex',
+                  alignItems: 'center'
                 }}
+                title="Mais opções de ordenação"
               >
                 <MoreHorizontal size={16} />
               </button>
@@ -658,7 +831,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   gap: '20px'
                 }}
               >
-                {filteredBoards.map(board => {
+                {displayBoards.map(board => {
                   const isMenuOpen = activeBoardMenuId === board.id;
                   const isEditing = editingBoardId === board.id;
 
@@ -905,7 +1078,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   overflow: 'hidden'
                 }}
               >
-                {filteredBoards.map(board => (
+                {displayBoards.map(board => (
                   <div
                     key={board.id}
                     onClick={() => onOpenBoard(board.id)}
@@ -950,6 +1123,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           }}
         >
           <button
+            onClick={onOpenSearch}
             style={{
               width: '32px',
               height: '32px',
@@ -963,11 +1137,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
             }}
-            title="Ações Rápidas"
+            title="Ações Rápidas e Busca (Ctrl+K)"
           >
             ⚡
           </button>
           <button
+            onClick={onOpenShortcuts}
             style={{
               width: '32px',
               height: '32px',
@@ -983,7 +1158,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
             }}
-            title="Ajuda"
+            title="Ajuda e Atalhos do Teclado (?)"
           >
             ?
           </button>

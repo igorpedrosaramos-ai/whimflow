@@ -25,13 +25,15 @@ interface ShareModalProps {
   onClose: () => void;
   activeBoard: Board;
   theme?: 'dark' | 'light';
+  onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export const ShareModal: React.FC<ShareModalProps> = ({
   isOpen,
   onClose,
   activeBoard,
-  theme = 'light'
+  theme = 'light',
+  onShowToast
 }) => {
   const [copiedLink, setCopiedLink] = useState(false);
   const [isExportingPPTX, setIsExportingPPTX] = useState(false);
@@ -39,15 +41,26 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [isExportingPNG, setIsExportingPNG] = useState(false);
   const [pngScale, setPngScale] = useState<number>(2);
   const [pngTransparent, setPngTransparent] = useState<boolean>(false);
+  const [exportFeedback, setExportFeedback] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const isDark = theme === 'dark';
   const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://whimflow.vercel.app';
 
+  const notify = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+    if (onShowToast) {
+      onShowToast(msg, type);
+    } else {
+      setExportFeedback(msg);
+      setTimeout(() => setExportFeedback(null), 3000);
+    }
+  };
+
   const handleCopyLink = () => {
     navigator.clipboard.writeText(currentUrl);
     setCopiedLink(true);
+    notify('Link copiado para a área de transferência!', 'success');
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
@@ -55,9 +68,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     try {
       setIsExportingPPTX(true);
       await exportBoardAsPPTX(activeBoard);
+      notify('Apresentação PowerPoint (.pptx) gerada com sucesso!', 'success');
     } catch (e) {
       console.error('Erro ao exportar PPTX:', e);
-      alert('Falha ao gerar PowerPoint. Tente novamente.');
+      notify('Falha ao gerar PowerPoint. Tente novamente.', 'error');
     } finally {
       setIsExportingPPTX(false);
     }
@@ -67,9 +81,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     try {
       setIsExportingPDF(true);
       await exportBoardAsPDF(activeBoard);
+      notify('Documento PDF gerado com sucesso!', 'success');
     } catch (e) {
       console.error('Erro ao exportar PDF:', e);
-      alert('Falha ao gerar PDF. Tente novamente.');
+      notify('Falha ao gerar PDF. Tente novamente.', 'error');
     } finally {
       setIsExportingPDF(false);
     }
@@ -83,9 +98,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         transparent: pngTransparent,
         theme: isDark ? 'dark' : 'light'
       });
+      notify('Imagem PNG em alta resolução exportada com sucesso!', 'success');
     } catch (e) {
       console.error('Erro ao exportar PNG:', e);
-      alert('Falha ao gerar imagem PNG.');
+      notify('Falha ao gerar imagem PNG.', 'error');
     } finally {
       setIsExportingPNG(false);
     }

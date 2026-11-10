@@ -21,6 +21,8 @@ import { AgentDrawer } from './components/AgentDrawer';
 import { TrashModal } from './components/TrashModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { BoardStatsModal } from './components/BoardStatsModal';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { ToastContainer, ToastMessage } from './components/Toast';
 import { BoardVersionSnapshot } from './types';
 import { TemplateItem } from './constants/templatesData';
 import { EXECUTIVE_PALETTE } from './components/NodeContextMenu';
@@ -121,13 +123,27 @@ export const App: React.FC = () => {
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [isBoardStatsOpen, setIsBoardStatsOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Atalho global de busca (Ctrl+K / Cmd+K)
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = `toast-${Date.now()}-${Math.random()}`;
+    setToasts(prev => [...prev, { id, type, message }]);
+  };
+
+  const handleDismissToast = (id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  };
+
+  // Atalho global de busca (Ctrl+K / Cmd+K) e Ajuda (?)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchModalOpen(prev => !prev);
+      } else if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault();
+        setIsShortcutsModalOpen(prev => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -416,7 +432,7 @@ export const App: React.FC = () => {
   // EXCLUIR QUADRO (Move para a Lixeira)
   const handleDeleteBoard = (id: string) => {
     if (boards.length <= 1) {
-      alert('Você precisa manter pelo menos um quadro ativo.');
+      showToast('Você precisa manter pelo menos um quadro ativo.', 'info');
       return;
     }
     const toDelete = boards.find(b => b.id === id);
@@ -1623,6 +1639,7 @@ export const App: React.FC = () => {
           }}
           onOpenTrash={() => setIsTrashModalOpen(true)}
           onOpenSearch={() => setIsSearchModalOpen(true)}
+          onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
           workspaceName="teste"
           theme={theme}
         />
@@ -1680,6 +1697,19 @@ export const App: React.FC = () => {
           onCreateNewBoardWithNodes={handleCreateNewBoardWithNodes}
           theme={theme}
           workspaceName="teste"
+        />
+
+        {/* Modal de Atalhos de Teclado */}
+        <KeyboardShortcutsModal
+          isOpen={isShortcutsModalOpen}
+          onClose={() => setIsShortcutsModalOpen(false)}
+          theme={theme}
+        />
+
+        {/* Notificações Executivas Toast */}
+        <ToastContainer
+          toasts={toasts}
+          onDismiss={handleDismissToast}
         />
       </div>
     );
@@ -1749,6 +1779,12 @@ export const App: React.FC = () => {
         onOpenAgent={() => setIsAgentDrawerOpen(true)}
         onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
         onOpenBoardStats={() => setIsBoardStatsOpen(true)}
+        isStarred={!!activeBoard.isStarred}
+        onToggleFavorite={() => {
+          const nextVal = !activeBoard.isStarred;
+          updateActiveBoard(b => ({ ...b, isStarred: nextVal }));
+          showToast(nextVal ? 'Quadro adicionado aos favoritos!' : 'Quadro removido dos favoritos.', 'info');
+        }}
         workspaceName="teste"
       />
 
@@ -1977,6 +2013,8 @@ export const App: React.FC = () => {
           onUndo={handleUndo}
           onRedo={handleRedo}
           onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
+          onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
+          onOpenSearch={() => setIsSearchModalOpen(true)}
           theme={theme}
         />
       </div>
@@ -2002,6 +2040,8 @@ export const App: React.FC = () => {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         activeBoard={activeBoard}
+        theme={theme}
+        onShowToast={showToast}
       />
 
       {/* Modal de Lixeira */}
@@ -2062,6 +2102,19 @@ export const App: React.FC = () => {
         onCreateNewBoardWithNodes={handleCreateNewBoardWithNodes}
         theme={theme}
         workspaceName="teste"
+      />
+
+      {/* Modal de Atalhos de Teclado */}
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+        theme={theme}
+      />
+
+      {/* Notificações Executivas Toast */}
+      <ToastContainer
+        toasts={toasts}
+        onDismiss={handleDismissToast}
       />
 
       {/* Modo Apresentação */}

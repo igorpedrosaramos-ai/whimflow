@@ -19,6 +19,8 @@ interface ZoomControlsProps {
   onUndo?: () => void;
   onRedo?: () => void;
   onOpenVersionHistory?: () => void;
+  onOpenShortcuts?: () => void;
+  onOpenSearch?: () => void;
   theme?: 'dark' | 'light';
 }
 
@@ -32,6 +34,8 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
   onUndo,
   onRedo,
   onOpenVersionHistory,
+  onOpenShortcuts,
+  onOpenSearch,
   theme = 'light'
 }) => {
   const zoomPercent = Math.round(zoom * 100);
@@ -190,6 +194,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
 
       {/* Ação Rápida */}
       <button
+        onClick={onOpenSearch}
         style={{
           width: '28px',
           height: '28px',
@@ -202,13 +207,14 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Atalhos Rápidos"
+        title="Busca Rápida e Comandos (Ctrl + K)"
       >
         <Zap size={14} />
       </button>
 
       {/* Ajuda */}
       <button
+        onClick={onOpenShortcuts}
         style={{
           width: '28px',
           height: '28px',
@@ -221,7 +227,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Ajuda e Atalhos do Teclado"
+        title="Ajuda e Atalhos do Teclado (?)"
       >
         <HelpCircle size={14} />
       </button>
