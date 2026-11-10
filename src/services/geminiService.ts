@@ -1,17 +1,5 @@
 import { MindMapNode } from '../types';
 
-const DEFAULT_KEY_B64 = 'QVEuQWI4Uk42S2FlR3R6WWFNTnNOdEp4SW5tTWtVRV96N2xKZXpIOXc2czg5alFhdnFQV1E=';
-const GEMINI_API_KEY = (import.meta as any).env?.VITE_GEMINI_API_KEY || (typeof atob !== 'undefined' ? atob(DEFAULT_KEY_B64) : '');
-
-// Modelos Gemini com suporte a generateContent e fallback sequencial
-const GEMINI_MODELS = [
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-flash-lite-latest',
-  'gemini-3.7-flash',
-  'gemini-3.1-flash-lite'
-];
-
 export interface GeminiDiagramResult {
   title: string;
   explanation: string;
@@ -213,7 +201,7 @@ export function layoutNodesTree(rawNodes: Array<{ id: string; text: string; pare
 }
 
 /**
- * Invoca a API oficial do Google Gemini para raciocínio, geração visual de diagramas e resposta agêntica
+ * Invoca o endpoint backend seguro (/api/generate-diagram) que protege a chave do Gemini no servidor
  */
 export async function generateWithGemini(
   prompt: string,
@@ -242,110 +230,38 @@ export async function generateWithGemini(
     return { ...p, modelUsed: 'preset-instant' };
   }
 
-  // Se não for preset exato, chama os modelos Gemini sequencialmente
-  const systemInstruction = `Você é o Agente de Inteligência Artificial do Whimsical / Turbi Flow.
-Sua missão é transformar qualquer solicitação, problema ou ideia de negócio em uma estrutura visual de diagrama profissional, elegante, de alto impacto corporativo e com hierarquia clara.
-
-Você deve responder APENAS com um objeto JSON estruturado estritamente neste formato:
-{
-  "title": "Título conciso e profissional do diagrama",
-  "explanation": "Explicação executiva resumida em 2-3 frases de como o diagrama soluciona o desafio proposto.",
-  "nodes": [
-    {
-      "id": "root",
-      "text": "Tópico Central / Objetivo Principal",
-      "parentId": null,
-      "childrenIds": ["c1", "c2", "c3"],
-      "color": "#7c3aed"
-    },
-    {
-      "id": "c1",
-      "text": "1. Primeiro Pilar Estratégico",
-      "parentId": "root",
-      "childrenIds": ["c1-1"],
-      "color": "#0284c7"
-    },
-    {
-      "id": "c1-1",
-      "text": "Sub-ação detalhada",
-      "parentId": "c1",
-      "childrenIds": [],
-      "color": "#0284c7"
-    }
-  ]
-}
-
-Regras:
-1. Retorne entre 6 e 14 nós bem distribuídos e com conteúdo relevante ao prompt.
-2. Cada nó deve ter um texto claro, profissional e sem enrolação.
-3. Use cores corporativas elegantes (#7c3aed roxo, #0284c7 azul, #10b981 esmeralda, #f59e0b âmbar, #ec4899 rosa).
-4. Não inclua markdown extra, código ou texto fora do JSON.`;
-
-  const parts: any[] = [{ text: prompt }];
-
-  if (imageBase64) {
-    // Adiciona imagem para o Gemini Vision
-    const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    parts.unshift({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: cleanBase64
-      }
+  // Chama o backend seguro em /api/generate-diagram
+  try {
+    const response = await fetch('/api/generate-diagram', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        prompt,
+        imageBase64
+      })
     });
-  }
 
-  let lastError = null;
-
-  for (const model of GEMINI_MODELS) {
-    try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          systemInstruction: { parts: [{ text: systemInstruction }] },
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: 'application/json',
-            maxOutputTokens: 2048
-          }
-        })
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        lastError = errJson.error?.message || `HTTP ${res.status}`;
-        continue;
+    if (response.ok) {
+      const data = await response.json();
+      if (data && Array.isArray(data.nodes) && data.nodes.length > 0) {
+        const formattedNodes = layoutNodesTree(data.nodes);
+        return {
+          title: data.title || prompt.slice(0, 30),
+          explanation: data.explanation || 'Diagrama gerado com inteligência artificial Gemini.',
+          nodes: formattedNodes,
+          modelUsed: data.modelUsed || 'gemini-secure-backend'
+        };
       }
-
-      const data = await res.json();
-      const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (textOutput) {
-        try {
-          const parsed = JSON.parse(textOutput);
-          if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
-            const formattedNodes = layoutNodesTree(parsed.nodes);
-            return {
-              title: parsed.title || prompt.slice(0, 30),
-              explanation: parsed.explanation || 'Diagrama gerado com inteligência artificial Gemini.',
-              nodes: formattedNodes,
-              modelUsed: model
-            };
-          }
-        } catch (jsonErr) {
-          console.warn(`[Gemini] Falha ao fazer parse do JSON no modelo ${model}:`, jsonErr);
-        }
-      }
-    } catch (err: any) {
-      lastError = err.message;
+    } else {
+      console.warn(`[Backend AI] Resposta com status ${response.status}`);
     }
+  } catch (err) {
+    console.warn('[Backend AI] Falha na comunicação com o backend:', err);
   }
 
-  console.warn('[Gemini] Fallback inteligente ativado devido a:', lastError);
-
-  // Fallback inteligente garantido caso a rede esteja indisponível
+  // Fallback inteligente garantido caso o servidor ou a rede externa falhem
   const fallbackNodes: MindMapNode[] = [
     { id: 'root', text: prompt.length > 35 ? prompt.slice(0, 35) + '...' : prompt, x: 0, y: 0, width: 230, height: 48, parentId: null, childrenIds: ['fb-1', 'fb-2', 'fb-3'], color: '#7c3aed', borderStyle: 'fill', side: 'root' },
     { id: 'fb-1', text: '1. Diagnóstico & Descoberta', x: -280, y: -60, width: 200, height: 42, parentId: 'root', childrenIds: ['fb-1-sub'], color: '#3b82f6', borderStyle: 'border', side: 'left' },
