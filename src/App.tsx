@@ -750,6 +750,7 @@ export const App: React.FC = () => {
               selectedNodeId={selectedNodeId}
               selectedNodeIds={selectedNodeIds}
               editingNodeId={editingNodeId}
+              layoutType={activeBoard.layoutType}
               onClearEditingNodeId={() => setEditingNodeId(null)}
               onSelectNode={(id) => {
                 setSelectedNodeId(id);

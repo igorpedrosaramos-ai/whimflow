@@ -24,6 +24,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Simple Org Chart',
       workspaceId: 'ws-default',
+      layoutType: 'orgchart',
       mindMapNodes: [
         { id: 'root', text: 'Role Title\nFull Name', x: 0, y: -140, width: 170, height: 52, parentId: null, childrenIds: ['vp-eng', 'vp-prod', 'vp-sales', 'vp-mktg'], collapsed: false, color: '#6366f1', borderStyle: 'border', lineStyle: 'stepped', side: 'root' },
         { id: 'vp-eng', text: 'Role Title\nFull Name', x: -360, y: -10, width: 165, height: 48, parentId: 'root', childrenIds: ['eng-lead-fe', 'eng-lead-be'], collapsed: false, color: '#8b5cf6', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
@@ -63,6 +64,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Sitemap with Mind Maps',
       workspaceId: 'ws-default',
+      layoutType: 'bidirectional',
       mindMapNodes: [
         { id: 'root', text: 'Platform Sitemap', x: 0, y: 0, width: 180, height: 46, parentId: null, childrenIds: ['mkt-site', 'app-portal'], collapsed: false, color: '#8b5cf6', borderStyle: 'fill', lineStyle: 'bezier', side: 'root' },
         { id: 'mkt-site', text: 'Marketing Website', x: -280, y: 0, width: 180, height: 44, parentId: 'root', childrenIds: ['page-home', 'page-pricing', 'page-blog'], collapsed: false, color: '#ec4899', borderStyle: 'border', side: 'left' },
@@ -95,6 +97,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Starter Sitemap',
       workspaceId: 'ws-default',
+      layoutType: 'bidirectional',
       mindMapNodes: [
         { id: 'root', text: 'Website Homepage', x: 0, y: 0, width: 170, height: 46, parentId: null, childrenIds: ['nav-prod', 'nav-sol', 'nav-res', 'nav-comp'], collapsed: false, color: '#8b5cf6', borderStyle: 'fill', lineStyle: 'bezier', side: 'root' },
         { id: 'nav-prod', text: 'Products', x: 260, y: -100, width: 140, height: 40, parentId: 'root', childrenIds: ['prod-core', 'prod-integrations'], collapsed: false, color: '#0284c7', borderStyle: 'border', side: 'right' },
@@ -119,7 +122,7 @@ export const TEMPLATES: TemplateItem[] = [
     }
   },
 
-  // 4. SITE MAP VARIATIONS
+  // 4. SITE MAP VARIATIONS (Fiel à Foto 2 do Whimsical)
   {
     id: 'tpl-sitemap-variations',
     title: 'Site Map Variations',
@@ -131,17 +134,14 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Site Map Variations',
       workspaceId: 'ws-default',
+      layoutType: 'bidirectional',
       mindMapNodes: [
-        { id: 'root', text: 'Sitemap Variations Matrix', x: 0, y: 0, width: 210, height: 48, parentId: null, childrenIds: ['v1-flat', 'v2-deep', 'v3-hybrid'], collapsed: false, color: '#6366f1', borderStyle: 'fill', lineStyle: 'bezier', side: 'root' },
-        { id: 'v1-flat', text: 'Variation A: Flat IA (3 Clicks Max)', x: -300, y: -80, width: 230, height: 44, parentId: 'root', childrenIds: ['v1-item1', 'v1-item2'], color: '#ec4899', borderStyle: 'border', side: 'left' },
-        { id: 'v1-item1', text: 'Direct Mega-Menu Categories', x: -540, y: -110, width: 195, height: 38, parentId: 'v1-flat', childrenIds: [], color: '#ec4899', borderStyle: 'accent', side: 'left' },
-        { id: 'v1-item2', text: 'Search-First Discovery Index', x: -540, y: -50, width: 195, height: 38, parentId: 'v1-flat', childrenIds: [], color: '#ec4899', borderStyle: 'accent', side: 'left' },
-        { id: 'v2-deep', text: 'Variation B: Deep Taxonomy (Enterprise)', x: 300, y: -80, width: 250, height: 44, parentId: 'root', childrenIds: ['v2-item1', 'v2-item2'], color: '#0284c7', borderStyle: 'border', side: 'right' },
-        { id: 'v2-item1', text: 'Tiered Category > Sector > SKU', x: 580, y: -110, width: 215, height: 38, parentId: 'v2-deep', childrenIds: [], color: '#0284c7', borderStyle: 'accent', side: 'right' },
-        { id: 'v2-item2', text: 'Compliance & Governance Hub', x: 580, y: -50, width: 215, height: 38, parentId: 'v2-deep', childrenIds: [], color: '#0284c7', borderStyle: 'accent', side: 'right' },
-        { id: 'v3-hybrid', text: 'Variation C: Hybrid Role-Based Navigation', x: 0, y: 140, width: 270, height: 44, parentId: 'root', childrenIds: ['v3-dev', 'v3-lead'], color: '#10b981', borderStyle: 'border', side: 'root' },
-        { id: 'v3-dev', text: 'Developer Portal (API & SDKs)', x: -160, y: 220, width: 200, height: 38, parentId: 'v3-hybrid', childrenIds: [], color: '#10b981', borderStyle: 'accent', side: 'left' },
-        { id: 'v3-lead', text: 'Executive Overview (KPIs & ROI)', x: 160, y: 220, width: 210, height: 38, parentId: 'v3-hybrid', childrenIds: [], color: '#10b981', borderStyle: 'accent', side: 'right' }
+        { id: 'root', text: 'Platform', x: 0, y: 0, width: 140, height: 46, parentId: null, childrenIds: ['mkt-site', 'user-dash', 'docs-hub', 'shop-store', 'dev-portal'], collapsed: false, color: '#7c3aed', borderStyle: 'fill', lineStyle: 'bezier', side: 'root' },
+        { id: 'mkt-site', text: 'Marketing Website', x: -280, y: -70, width: 170, height: 42, parentId: 'root', childrenIds: [], color: '#ec4899', borderStyle: 'border', side: 'left' },
+        { id: 'user-dash', text: 'User Dashboard', x: -280, y: 70, width: 165, height: 42, parentId: 'root', childrenIds: [], color: '#8b5cf6', borderStyle: 'border', side: 'left' },
+        { id: 'docs-hub', text: 'Documentation Hub', x: 280, y: -90, width: 180, height: 42, parentId: 'root', childrenIds: [], color: '#10b981', borderStyle: 'border', side: 'right' },
+        { id: 'shop-store', text: 'E-Commerce Store', x: 280, y: 0, width: 170, height: 42, parentId: 'root', childrenIds: [], color: '#f59e0b', borderStyle: 'border', side: 'right' },
+        { id: 'dev-portal', text: 'API & Developer Portal', x: 280, y: 90, width: 195, height: 42, parentId: 'root', childrenIds: [], color: '#06b6d4', borderStyle: 'border', side: 'right' }
       ],
       shapes: [],
       connectors: [],
@@ -164,6 +164,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Simple Flowchart',
       workspaceId: 'ws-default',
+      layoutType: 'orgchart',
       mindMapNodes: [
         { id: 'root', text: 'Start: User Registration Event', x: 0, y: -100, width: 210, height: 46, parentId: null, childrenIds: ['step-verify'], collapsed: false, color: '#6366f1', borderStyle: 'fill', lineStyle: 'stepped', side: 'root' },
         { id: 'step-verify', text: 'Decision: Business Email Domain?', x: 0, y: 0, width: 240, height: 48, parentId: 'root', childrenIds: ['branch-corp', 'branch-public'], collapsed: false, color: '#f59e0b', borderStyle: 'border', lineStyle: 'stepped', side: 'root' },
@@ -181,7 +182,7 @@ export const TEMPLATES: TemplateItem[] = [
     }
   },
 
-  // 6. PRODUCT TEAM POD STRUCTURE
+  // 6. PRODUCT TEAM POD STRUCTURE (Fiel à Foto 3 do Whimsical)
   {
     id: 'tpl-product-pod-structure',
     title: 'Product Team Pod Structure',
@@ -193,17 +194,27 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Product Team Pod Structure',
       workspaceId: 'ws-default',
+      layoutType: 'orgchart',
       mindMapNodes: [
-        { id: 'root', text: 'VP of Product\nElena Rostova', x: 0, y: -130, width: 180, height: 52, parentId: null, childrenIds: ['pod-growth', 'pod-core', 'pod-mobile'], collapsed: false, color: '#7c3aed', borderStyle: 'border', lineStyle: 'stepped', side: 'root' },
-        { id: 'pod-growth', text: 'Pod 1: Growth & Activation\nSarah Chen (Lead PM)', x: -340, y: 0, width: 220, height: 50, parentId: 'root', childrenIds: ['eng-growth-1', 'eng-growth-2'], collapsed: false, color: '#ec4899', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
-        { id: 'eng-growth-1', text: 'Senior Full-Stack\nMarcus Bell', x: -440, y: 100, width: 160, height: 44, parentId: 'pod-growth', childrenIds: [], color: '#ec4899', borderStyle: 'accent', side: 'left' },
-        { id: 'eng-growth-2', text: 'Product Designer\nChloe Vance', x: -260, y: 100, width: 160, height: 44, parentId: 'pod-growth', childrenIds: [], color: '#ec4899', borderStyle: 'accent', side: 'left' },
-        { id: 'pod-core', text: 'Pod 2: Core Canvas & Engine\nDavid Kim (Staff PM)', x: 0, y: 0, width: 220, height: 50, parentId: 'root', childrenIds: ['eng-core-1', 'eng-core-2'], collapsed: false, color: '#0284c7', borderStyle: 'border', lineStyle: 'stepped', side: 'root' },
-        { id: 'eng-core-1', text: 'Graphics & WebGL Lead\nAlex Mercer', x: -100, y: 100, width: 170, height: 44, parentId: 'pod-core', childrenIds: [], color: '#0284c7', borderStyle: 'accent', side: 'root' },
-        { id: 'eng-core-2', text: 'Real-time WebSocket Architect\nLucas Silva', x: 100, y: 100, width: 195, height: 44, parentId: 'pod-core', childrenIds: [], color: '#0284c7', borderStyle: 'accent', side: 'root' },
-        { id: 'pod-mobile', text: 'Pod 3: Mobile Apps (iOS/Android)\nJessica Wu (Lead PM)', x: 340, y: 0, width: 230, height: 50, parentId: 'root', childrenIds: ['eng-mob-1', 'eng-mob-2'], collapsed: false, color: '#10b981', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
-        { id: 'eng-mob-1', text: 'Senior Swift Engineer\nMateo Rossi', x: 260, y: 100, width: 165, height: 44, parentId: 'pod-mobile', childrenIds: [], color: '#10b981', borderStyle: 'accent', side: 'right' },
-        { id: 'eng-mob-2', text: 'Kotlin Specialist\nAmina Diop', x: 440, y: 100, width: 165, height: 44, parentId: 'pod-mobile', childrenIds: [], color: '#10b981', borderStyle: 'accent', side: 'right' }
+        { id: 'root', text: 'Role Title\nFull Name', x: 0, y: -130, width: 140, height: 48, parentId: null, childrenIds: ['pod-purple', 'pod-blue', 'pod-teal', 'pod-orange'], collapsed: false, color: '#6366f1', borderStyle: 'border', lineStyle: 'stepped', side: 'root' },
+        // Pod 1 (Roxo)
+        { id: 'pod-purple', text: 'Role Title\nFull Name', x: -360, y: 0, width: 135, height: 46, parentId: 'root', childrenIds: ['purp-sub1', 'purp-sub2'], collapsed: false, color: '#8b5cf6', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
+        { id: 'purp-sub1', text: 'Role Title\nFull Name', x: -440, y: 90, width: 130, height: 44, parentId: 'pod-purple', childrenIds: [], color: '#8b5cf6', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
+        { id: 'purp-sub2', text: 'Role Title\nFull Name', x: -280, y: 90, width: 130, height: 44, parentId: 'pod-purple', childrenIds: ['purp-leaf'], color: '#8b5cf6', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
+        { id: 'purp-leaf', text: 'Role Title\nFull Name', x: -280, y: 170, width: 130, height: 44, parentId: 'purp-sub2', childrenIds: [], color: '#8b5cf6', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
+        // Pod 2 (Azul)
+        { id: 'pod-blue', text: 'Role Title\nFull Name', x: -120, y: 0, width: 135, height: 46, parentId: 'root', childrenIds: ['blue-sub1'], collapsed: false, color: '#0284c7', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
+        { id: 'blue-sub1', text: 'Role Title\nFull Name', x: -120, y: 90, width: 130, height: 44, parentId: 'pod-blue', childrenIds: ['blue-leaf'], color: '#0284c7', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
+        { id: 'blue-leaf', text: 'Role Title\nFull Name', x: -120, y: 170, width: 130, height: 44, parentId: 'blue-sub1', childrenIds: [], color: '#0284c7', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
+        // Pod 3 (Teal)
+        { id: 'pod-teal', text: 'Role Title\nFull Name', x: 120, y: 0, width: 135, height: 46, parentId: 'root', childrenIds: ['teal-sub1', 'teal-sub2'], collapsed: false, color: '#0d9488', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
+        { id: 'teal-sub1', text: 'Role Title\nFull Name', x: 40, y: 90, width: 130, height: 44, parentId: 'pod-teal', childrenIds: [], color: '#0d9488', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
+        { id: 'teal-sub2', text: 'Role Title\nFull Name', x: 200, y: 90, width: 130, height: 44, parentId: 'pod-teal', childrenIds: [], color: '#0d9488', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
+        // Pod 4 (Laranja)
+        { id: 'pod-orange', text: 'Role Title\nFull Name', x: 360, y: 0, width: 135, height: 46, parentId: 'root', childrenIds: ['org-sub1', 'org-sub2'], collapsed: false, color: '#ea580c', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
+        { id: 'org-sub1', text: 'Role Title\nFull Name', x: 280, y: 90, width: 130, height: 44, parentId: 'pod-orange', childrenIds: ['org-leaf'], color: '#ea580c', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
+        { id: 'org-leaf', text: 'Role Title\nFull Name', x: 280, y: 170, width: 130, height: 44, parentId: 'org-sub1', childrenIds: [], color: '#ea580c', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
+        { id: 'org-sub2', text: 'Role Title\nFull Name', x: 440, y: 90, width: 130, height: 44, parentId: 'pod-orange', childrenIds: [], color: '#ea580c', borderStyle: 'border', lineStyle: 'stepped', side: 'right' }
       ],
       shapes: [],
       connectors: [],
@@ -226,6 +237,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Brainstorming Workshop',
       workspaceId: 'ws-default',
+      layoutType: 'free',
       mindMapNodes: [
         { id: 'root', text: 'Design Thinking Session\nTheme: Next-Gen Canvas', x: 0, y: 0, width: 220, height: 50, parentId: null, childrenIds: ['cat-pain', 'cat-ideas', 'cat-quick'], color: '#eab308', borderStyle: 'fill', lineStyle: 'bezier', side: 'root' },
         { id: 'cat-pain', text: 'User Pain Points', x: -290, y: -70, width: 185, height: 42, parentId: 'root', childrenIds: [], color: '#ef4444', borderStyle: 'border', side: 'left' },
@@ -260,6 +272,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Digital Sketchbook',
       workspaceId: 'ws-default',
+      layoutType: 'free',
       mindMapNodes: [
         { id: 'root', text: 'Digital Sketchbook\nConcept Explorations', x: 0, y: -120, width: 210, height: 48, parentId: null, childrenIds: ['s-ui', 's-ux'], color: '#6366f1', borderStyle: 'border', side: 'root' },
         { id: 's-ui', text: 'Visual UI Direction', x: -260, y: -120, width: 170, height: 40, parentId: 'root', childrenIds: [], color: '#0284c7', borderStyle: 'accent', side: 'left' },
@@ -292,6 +305,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'iOS Wireframe Kit',
       workspaceId: 'ws-default',
+      layoutType: 'free',
       mindMapNodes: [
         { id: 'root', text: 'Mobile Application UX\niOS Component Architecture', x: 0, y: -160, width: 220, height: 48, parentId: null, childrenIds: ['screen-auth', 'screen-feed', 'screen-settings'], color: '#0284c7', borderStyle: 'fill', side: 'root' },
         { id: 'screen-auth', text: 'Screen 1: Authentication', x: -320, y: -60, width: 190, height: 40, parentId: 'root', childrenIds: [], color: '#0284c7', borderStyle: 'border', side: 'left' },
@@ -329,6 +343,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Simple Product Wireflow',
       workspaceId: 'ws-default',
+      layoutType: 'free',
       mindMapNodes: [
         { id: 'root', text: 'E-commerce Checkout Wireflow\nStep-by-Step Conversion Funnel', x: 0, y: -160, width: 240, height: 48, parentId: null, childrenIds: ['flow-cart', 'flow-pay', 'flow-success'], color: '#7c3aed', borderStyle: 'fill', lineStyle: 'stepped', side: 'root' },
         { id: 'flow-cart', text: 'Step 1: Shopping Cart Review', x: -320, y: -60, width: 220, height: 42, parentId: 'root', childrenIds: [], color: '#0284c7', borderStyle: 'border', side: 'left' },
@@ -365,6 +380,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'User Research Process',
       workspaceId: 'ws-default',
+      layoutType: 'bidirectional',
       mindMapNodes: [
         { id: 'root', text: 'User Research Synthesis\nQ4 Discovery Findings', x: 0, y: 0, width: 210, height: 48, parentId: null, childrenIds: ['ur-sit', 'ur-goal', 'ur-act'], color: '#0284c7', borderStyle: 'fill', side: 'root' },
         { id: 'ur-sit', text: 'Situation (What we know)', x: -280, y: -50, width: 195, height: 42, parentId: 'root', childrenIds: [], color: '#0284c7', borderStyle: 'border', side: 'left' },
@@ -395,6 +411,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Team Heartbeat',
       workspaceId: 'ws-default',
+      layoutType: 'bidirectional',
       mindMapNodes: [
         { id: 'root', text: 'Weekly Team Heartbeat\nSprint 42 Sync', x: 0, y: 0, width: 200, height: 48, parentId: null, childrenIds: ['hb-ship', 'hb-block', 'hb-next'], color: '#8b5cf6', borderStyle: 'fill', side: 'root' },
         { id: 'hb-ship', text: 'What we shipped 🚢', x: -280, y: -50, width: 180, height: 42, parentId: 'root', childrenIds: [], color: '#10b981', borderStyle: 'border', side: 'left' },
@@ -413,7 +430,7 @@ export const TEMPLATES: TemplateItem[] = [
     }
   },
 
-  // 13. STARTER PROJECT TIMELINE
+  // 13. STARTER PROJECT TIMELINE (Fiel à Foto 4 do Whimsical)
   {
     id: 'tpl-project-timeline',
     title: 'Starter Project Timeline',
@@ -425,16 +442,17 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Starter Project Timeline',
       workspaceId: 'ws-default',
+      layoutType: 'timeline',
       mindMapNodes: [
-        { id: 'root', text: 'Annual Project Roadmap\n2026 Engineering & Product', x: 0, y: -120, width: 230, height: 48, parentId: null, childrenIds: ['q1', 'q2', 'q3', 'q4'], color: '#7c3aed', borderStyle: 'fill', lineStyle: 'stepped', side: 'root' },
-        { id: 'q1', text: 'Q1: Foundation & Core Canvas', x: -360, y: -10, width: 215, height: 44, parentId: 'root', childrenIds: ['q1-m1'], color: '#3b82f6', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
-        { id: 'q1-m1', text: 'Milestone: 60fps Tree Layout Engine', x: -360, y: 75, width: 230, height: 40, parentId: 'q1', childrenIds: [], color: '#3b82f6', borderStyle: 'accent', side: 'left' },
-        { id: 'q2', text: 'Q2: AI Assistant & Templates', x: -120, y: -10, width: 205, height: 44, parentId: 'root', childrenIds: ['q2-m1'], color: '#10b981', borderStyle: 'border', lineStyle: 'stepped', side: 'left' },
-        { id: 'q2-m1', text: 'Milestone: Gemini API Ask Agent', x: -120, y: 75, width: 215, height: 40, parentId: 'q2', childrenIds: [], color: '#10b981', borderStyle: 'accent', side: 'left' },
-        { id: 'q3', text: 'Q3: Full Whimsical Parity', x: 120, y: -10, width: 195, height: 44, parentId: 'root', childrenIds: ['q3-m1'], color: '#f59e0b', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
-        { id: 'q3-m1', text: 'Milestone: Realtime Collab & Docs', x: 120, y: 75, width: 220, height: 40, parentId: 'q3', childrenIds: [], color: '#f59e0b', borderStyle: 'accent', side: 'right' },
-        { id: 'q4', text: 'Q4: Enterprise Scale', x: 360, y: -10, width: 185, height: 44, parentId: 'root', childrenIds: ['q4-m1'], color: '#ec4899', borderStyle: 'border', lineStyle: 'stepped', side: 'right' },
-        { id: 'q4-m1', text: 'Milestone: SOC2 & SSO Auth', x: 360, y: 75, width: 195, height: 40, parentId: 'q4', childrenIds: [], color: '#ec4899', borderStyle: 'accent', side: 'right' }
+        { id: 'root', text: 'Starter Project Timeline', x: 0, y: -120, width: 220, height: 46, parentId: null, childrenIds: ['q1', 'q2', 'q3', 'q4'], color: '#6366f1', borderStyle: 'fill', lineStyle: 'straight', side: 'root' },
+        { id: 'q1', text: 'Q1', x: -330, y: 0, width: 64, height: 36, parentId: 'root', childrenIds: ['proto'], color: '#3b82f6', borderStyle: 'border', bold: true, side: 'root' },
+        { id: 'proto', text: 'Prototype', x: -330, y: 76, width: 130, height: 42, parentId: 'q1', childrenIds: [], color: '#3b82f6', borderStyle: 'border', side: 'root' },
+        { id: 'q2', text: 'Q2', x: -110, y: 0, width: 64, height: 36, parentId: 'root', childrenIds: ['beta'], color: '#10b981', borderStyle: 'border', bold: true, side: 'root' },
+        { id: 'beta', text: 'MVP Beta', x: -110, y: 76, width: 130, height: 42, parentId: 'q2', childrenIds: [], color: '#10b981', borderStyle: 'border', side: 'root' },
+        { id: 'q3', text: 'Q3', x: 110, y: 0, width: 64, height: 36, parentId: 'root', childrenIds: ['ga'], color: '#f59e0b', borderStyle: 'border', bold: true, side: 'root' },
+        { id: 'ga', text: 'Public GA', x: 110, y: 76, width: 130, height: 42, parentId: 'q3', childrenIds: [], color: '#f59e0b', borderStyle: 'border', side: 'root' },
+        { id: 'q4', text: 'Q4', x: 330, y: 0, width: 64, height: 36, parentId: 'root', childrenIds: ['scale'], color: '#8b5cf6', borderStyle: 'border', bold: true, side: 'root' },
+        { id: 'scale', text: 'Scale', x: 330, y: 76, width: 130, height: 42, parentId: 'q4', childrenIds: [], color: '#8b5cf6', borderStyle: 'border', side: 'root' }
       ],
       shapes: [],
       connectors: [],
@@ -457,6 +475,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Starter Gantt Chart Timeline',
       workspaceId: 'ws-default',
+      layoutType: 'free',
       mindMapNodes: [
         { id: 'root', text: 'Release Schedule Gantt\nVersion 2.0 Launch', x: 0, y: -100, width: 200, height: 46, parentId: null, childrenIds: ['g-track1', 'g-track2'], color: '#0d9488', borderStyle: 'fill', side: 'root' },
         { id: 'g-track1', text: 'Track 1: Frontend & Design (Weeks 1-4)', x: -260, y: 0, width: 245, height: 42, parentId: 'root', childrenIds: [], color: '#0284c7', borderStyle: 'border', side: 'left' },
@@ -488,6 +507,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Initiative Strategy One-Pager',
       workspaceId: 'ws-default',
+      layoutType: 'bidirectional',
       mindMapNodes: [
         { id: 'root', text: 'Strategy One-Pager\nInitiative Core Brief', x: 0, y: 0, width: 190, height: 48, parentId: null, childrenIds: ['strat-what', 'strat-why', 'strat-goals', 'strat-metrics'], color: '#7c3aed', borderStyle: 'fill', side: 'root' },
         { id: 'strat-what', text: '1. What is it?\nCore 1-sentence product definition', x: -280, y: -60, width: 235, height: 46, parentId: 'root', childrenIds: [], color: '#0284c7', borderStyle: 'border', side: 'left' },

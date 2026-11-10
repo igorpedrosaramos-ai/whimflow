@@ -10,38 +10,63 @@ export interface ComputedNodeLayout {
 
 /**
  * Calcula a largura estimada do nó baseada no tamanho do texto
- * Garante que o texto fique em linha única limpa (sem quebras estranhas)
+ * Garante que o texto fique em linha legível e elegante
  */
 export function estimateNodeDimensions(node: MindMapNode): { width: number; height: number } {
-  if (node.side === 'root') {
-    const textLen = (node.text || '').length;
-    const iconPadding = node.icon ? 24 : 0;
-    return { width: Math.max(180, Math.round(textLen * 9.5 + 56 + iconPadding)), height: 48 };
+  // Se largura e altura explícitas válidas foram fornecidas pelo template, respeita-as
+  if (node.width && node.height && node.width > 40 && node.height > 24) {
+    return { width: node.width, height: node.height };
   }
+
   const text = node.text || '';
-  const textLen = text.length;
-  if (textLen === 0) {
+  const lines = text.split('\n');
+  const isMultiline = lines.length > 1;
+  const maxLineLen = Math.max(...lines.map(l => l.length), 0);
+
+  if (node.side === 'root') {
+    const iconPadding = node.icon ? 24 : 0;
+    const width = isMultiline
+      ? Math.max(160, Math.round(maxLineLen * 9.2 + 50 + iconPadding))
+      : Math.max(160, Math.round(text.length * 9.5 + 56 + iconPadding));
+    const height = isMultiline ? Math.max(50, lines.length * 24 + 8) : 48;
+    return { width, height };
+  }
+
+  if (text.length === 0) {
     return { width: 100, height: 38 };
   }
 
-  // Medição proporcional precisa sem corte arbitrário (zero sobreposição com nós-filhos)
-  // ~8.8px por caractere no corpo 13.5px com folga de padding lateral e possíveis badges
+  // Tratamento especial para nós curtos como marcos de timeline ('Q1', 'Q2', etc.)
+  if (text.length <= 4 && !isMultiline) {
+    return { width: 64, height: 36 };
+  }
+
   const hasChildBadge = Boolean(node.childrenIds && node.childrenIds.length > 0 && node.collapsed);
-  const badgePadding = hasChildBadge ? 36 : 0;
+  const badgePadding = hasChildBadge ? 34 : 0;
   const iconPadding = node.icon ? 22 : 0;
   const linkPadding = node.link ? 20 : 0;
   const charMultiplier = node.fontSize === 'small' ? 7.8 : node.fontSize === 'large' ? 10.2 : (node.bold ? 9.4 : 8.8);
-  const basePadding = 42; // 14px padding esquerdo + 14px padding direito + folga segura
+  const basePadding = 38;
 
-  const width = Math.max(110, Math.round(textLen * charMultiplier + basePadding + badgePadding + iconPadding + linkPadding));
-  const height = node.fontSize === 'large' ? 44 : node.fontSize === 'small' ? 34 : 38;
+  const width = Math.max(
+    100,
+    Math.round((isMultiline ? maxLineLen : text.length) * charMultiplier + basePadding + badgePadding + iconPadding + linkPadding)
+  );
+  const height = isMultiline
+    ? Math.max(48, lines.length * 22 + 8)
+    : (node.fontSize === 'large' ? 44 : node.fontSize === 'small' ? 34 : 38);
+
   return { width, height };
 }
 
 /**
- * Algoritmo Tidy Tree Horizontal para Mapas Mentais (Idêntico ao Whimsical)
- * Calcula recursivamente a altura de cada ramificação e distribui os nós
- * garantindo ZERO sobreposição, 100% de responsividade e conexões contínuas.
+ * Algoritmo Multi-Layout para Mapas Mentais, Organogramas e Cronogramas
+ * Suporta:
+ * 1. 'bidirectional' (Mapa Mental Canônico do Whimsical com ramificações balanceadas à esquerda e à direita)
+ * 2. 'orgchart' (Organograma e Pods Verticais de Cima para Baixo com nós filhos centralizados)
+ * 3. 'timeline' (Cronograma Horizontal com marcos Q1..Q4 no eixo e entregáveis abaixo)
+ * 4. 'right' (Árvore Horizontal Tradicional Unilateral)
+ * 5. 'free' (Posicionamento Livre Preservado)
  */
 export function calculateMindMapLayout(
   nodes: MindMapNode[],
@@ -51,6 +76,7 @@ export function calculateMindMapLayout(
     verticalGap?: number;
     rootX?: number;
     rootY?: number;
+    layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'timeline' | 'free';
   } = {}
 ): Map<string, ComputedNodeLayout> {
   const horizontalGap = options.horizontalGap ?? 100;
@@ -65,16 +91,13 @@ export function calculateMindMapLayout(
   if (!rootNode) return new Map();
   const effectiveRootId = rootNode.id;
 
-  // Sanitização e normalização robusta da hierarquia da árvore:
-  // Constrói uma relação pai->filhos estritamente consistente
+  // Sanitização e normalização da hierarquia pai -> filhos
   const childrenMap = new Map<string, string[]>();
   nodes.forEach(n => {
-    // Começa com os filhos declarados válidos
     const valid = (n.childrenIds || []).filter(cid => cid !== n.id && nodeMap.has(cid));
     childrenMap.set(n.id, [...new Set(valid)]);
   });
 
-  // Sincroniza parentId -> children: se child.parentId === parent.id, adiciona na lista
   nodes.forEach(child => {
     if (child.id === effectiveRootId) return;
     if (child.parentId && nodeMap.has(child.parentId)) {
@@ -86,8 +109,7 @@ export function calculateMindMapLayout(
     }
   });
 
-  // Previne nós órfãos: se algum nó não-raiz não estiver em nenhum ramo acessível a partir da raiz,
-  // conecta-o à raiz para garantir que NUNCA fique sobreposto ou invisível
+  // Previne nós órfãos
   const visited = new Set<string>();
   function markReachable(id: string) {
     visited.add(id);
@@ -100,7 +122,6 @@ export function calculateMindMapLayout(
 
   nodes.forEach(n => {
     if (n.id !== effectiveRootId && !visited.has(n.id)) {
-      // Anexa nó órfão à raiz
       const rootChildren = childrenMap.get(effectiveRootId) || [];
       if (!rootChildren.includes(n.id)) {
         rootChildren.push(n.id);
@@ -111,15 +132,197 @@ export function calculateMindMapLayout(
 
   const layoutMap = new Map<string, ComputedNodeLayout>();
 
-  // Passo 1: Pós-Ordem - Calcular a altura de cada subárvore recursivamente
+  // 1. Determinação / Auto-detecção do tipo de Layout
+  let effectiveLayout = options.layoutType;
+  if (!effectiveLayout) {
+    const rootText = (rootNode.text || '').toLowerCase();
+    const hasLeftNodes = nodes.some(n => n.side === 'left');
+    const isTimelineText = rootText.includes('timeline') || rootText.includes('roadmap') || rootText.includes('cronograma');
+    const isOrgText = rootText.includes('org chart') || rootText.includes('pod structure') || rootText.includes('organograma');
+
+    if (isTimelineText) {
+      effectiveLayout = 'timeline';
+    } else if (isOrgText) {
+      effectiveLayout = 'orgchart';
+    } else if (hasLeftNodes) {
+      effectiveLayout = 'bidirectional';
+    } else {
+      effectiveLayout = 'bidirectional';
+    }
+  }
+
+  // -------------------------------------------------------------
+  // MODO A: LAYOUT LIVRE PRESERVADO ('free')
+  // -------------------------------------------------------------
+  if (effectiveLayout === 'free') {
+    nodes.forEach(n => {
+      const { width, height } = estimateNodeDimensions(n);
+      layoutMap.set(n.id, {
+        x: typeof n.x === 'number' ? n.x : 0,
+        y: typeof n.y === 'number' ? n.y : 0,
+        width: n.width || width,
+        height: n.height || height,
+        subtreeHeight: height
+      });
+    });
+    return layoutMap;
+  }
+
+  // -------------------------------------------------------------
+  // MODO B: CRONOGRAMA / TIMELINE HORIZONTAL ('timeline')
+  // -------------------------------------------------------------
+  if (effectiveLayout === 'timeline') {
+    const { width: rootW, height: rootH } = estimateNodeDimensions(rootNode);
+    layoutMap.set(rootNode.id, {
+      x: rootX - rootW / 2,
+      y: rootY - 120,
+      width: rootW,
+      height: rootH,
+      subtreeHeight: rootH
+    });
+
+    const milestones = childrenMap.get(rootNode.id) || [];
+    const mCount = milestones.length;
+    const timelineStep = 240;
+    const startX = rootX - ((mCount - 1) * timelineStep) / 2;
+
+    milestones.forEach((mId, idx) => {
+      const mNode = nodeMap.get(mId);
+      if (!mNode) return;
+      const { width: mW, height: mH } = estimateNodeDimensions(mNode);
+      const mX = startX + idx * timelineStep;
+      const mY = rootY;
+
+      layoutMap.set(mId, {
+        x: mX - mW / 2,
+        y: mY,
+        width: mW,
+        height: mH,
+        subtreeHeight: mH
+      });
+
+      // Cards e entregáveis abaixo de cada marco
+      const tasks = childrenMap.get(mId) || [];
+      let taskY = mY + mH + 40;
+      tasks.forEach(tId => {
+        const tNode = nodeMap.get(tId);
+        if (!tNode) return;
+        const { width: tW, height: tH } = estimateNodeDimensions(tNode);
+        layoutMap.set(tId, {
+          x: mX - tW / 2,
+          y: taskY,
+          width: tW,
+          height: tH,
+          subtreeHeight: tH
+        });
+        taskY += tH + 16;
+      });
+    });
+
+    return layoutMap;
+  }
+
+  // -------------------------------------------------------------
+  // MODO C: ORGANOGRAMA / ÁRVORE VERTICAL ('orgchart')
+  // -------------------------------------------------------------
+  if (effectiveLayout === 'orgchart') {
+    const vGap = options.verticalGap ?? 64;
+    const hGap = options.horizontalGap ?? 36;
+
+    // Pós-ordem: calcula largura total necessária para cada subárvore
+    function computeSubtreeWidth(nodeId: string): number {
+      const node = nodeMap.get(nodeId);
+      if (!node) return 0;
+      const { width, height } = estimateNodeDimensions(node);
+      const childrenIds = childrenMap.get(nodeId) || [];
+
+      if (node.collapsed || childrenIds.length === 0) {
+        const subtreeWidth = width + hGap;
+        layoutMap.set(nodeId, { x: 0, y: 0, width, height, subtreeHeight: subtreeWidth });
+        return subtreeWidth;
+      }
+
+      let totalWidth = 0;
+      childrenIds.forEach(cid => {
+        totalWidth += computeSubtreeWidth(cid);
+      });
+
+      const subtreeWidth = Math.max(width + hGap, totalWidth);
+      layoutMap.set(nodeId, { x: 0, y: 0, width, height, subtreeHeight: subtreeWidth });
+      return subtreeWidth;
+    }
+
+    computeSubtreeWidth(effectiveRootId);
+
+    // Pré-ordem: distribui nós verticalmente para baixo e horizontalmente centralizados
+    const rootLayout = layoutMap.get(effectiveRootId)!;
+    rootLayout.x = rootX - rootLayout.width / 2;
+    rootLayout.y = rootY;
+
+    function positionOrgChildren(parentId: string) {
+      const parent = nodeMap.get(parentId);
+      const pLayout = layoutMap.get(parentId);
+      if (!parent || !pLayout || parent.collapsed) return;
+
+      const childrenIds = childrenMap.get(parentId) || [];
+      if (childrenIds.length === 0) return;
+
+      let totalSubtreeWidth = 0;
+      childrenIds.forEach(cid => {
+        totalSubtreeWidth += layoutMap.get(cid)?.subtreeHeight || 0;
+      });
+
+      const parentCenterX = pLayout.x + pLayout.width / 2;
+      let currentX = parentCenterX - totalSubtreeWidth / 2;
+      const nextY = pLayout.y + pLayout.height + vGap;
+
+      childrenIds.forEach(cid => {
+        const cLayout = layoutMap.get(cid);
+        if (!cLayout) return;
+
+        const cCenterX = currentX + cLayout.subtreeHeight / 2;
+        cLayout.x = cCenterX - cLayout.width / 2;
+        cLayout.y = nextY;
+
+        currentX += cLayout.subtreeHeight;
+
+        positionOrgChildren(cid);
+      });
+    }
+
+    positionOrgChildren(effectiveRootId);
+    return layoutMap;
+  }
+
+  // -------------------------------------------------------------
+  // MODO D: MAPA MENTAL BI-DIRECIONAL ('bidirectional' - WHIMSICAL CANÔNICO)
+  // -------------------------------------------------------------
+  const rootChildren = childrenMap.get(effectiveRootId) || [];
+  const leftChildren: string[] = [];
+  const rightChildren: string[] = [];
+
+  rootChildren.forEach(cid => {
+    const child = nodeMap.get(cid);
+    if (child?.side === 'left') {
+      leftChildren.push(cid);
+    } else if (child?.side === 'right') {
+      rightChildren.push(cid);
+    } else {
+      if (leftChildren.length < rightChildren.length) {
+        leftChildren.push(cid);
+      } else {
+        rightChildren.push(cid);
+      }
+    }
+  });
+
+  // Função para calcular a altura recursiva de ramos
   function computeSubtreeHeight(nodeId: string): number {
     const node = nodeMap.get(nodeId);
     if (!node) return 0;
-
     const { width, height } = estimateNodeDimensions(node);
     const childrenIds = childrenMap.get(nodeId) || [];
 
-    // Se estiver colapsado ou for folha
     if (node.collapsed || childrenIds.length === 0) {
       const subtreeHeight = height + verticalGap;
       layoutMap.set(nodeId, { x: 0, y: 0, width, height, subtreeHeight });
@@ -127,8 +330,8 @@ export function calculateMindMapLayout(
     }
 
     let childrenTotalHeight = 0;
-    childrenIds.forEach(childId => {
-      childrenTotalHeight += computeSubtreeHeight(childId);
+    childrenIds.forEach(cid => {
+      childrenTotalHeight += computeSubtreeHeight(cid);
     });
 
     const subtreeHeight = Math.max(height + verticalGap, childrenTotalHeight);
@@ -136,50 +339,109 @@ export function calculateMindMapLayout(
     return subtreeHeight;
   }
 
-  computeSubtreeHeight(effectiveRootId);
+  // Raiz posicionada no centro
+  const { width: rootW, height: rootH } = estimateNodeDimensions(rootNode);
+  layoutMap.set(effectiveRootId, {
+    x: rootX - rootW / 2,
+    y: rootY - rootH / 2,
+    width: rootW,
+    height: rootH,
+    subtreeHeight: rootH
+  });
 
-  // Passo 2: Pré-Ordem - Posicionar nós na grade horizontal com base na altura calculada
-  const rootLayout = layoutMap.get(effectiveRootId)!;
-  if (rootLayout) {
-    rootLayout.x = rootX;
-    rootLayout.y = rootY;
-  }
+  leftChildren.forEach(cid => computeSubtreeHeight(cid));
+  rightChildren.forEach(cid => computeSubtreeHeight(cid));
 
-  function positionChildren(parentId: string) {
-    const parent = nodeMap.get(parentId);
-    const parentLayout = layoutMap.get(parentId);
-    if (!parent || !parentLayout || parent.collapsed) return;
+  const rootCenterX = rootX;
+  const rootCenterY = rootY;
 
-    const childrenIds = childrenMap.get(parentId) || [];
-    if (childrenIds.length === 0) return;
+  // Ramo Esquerdo: ramifica em direção a -X
+  let totalLeftHeight = 0;
+  leftChildren.forEach(cid => {
+    totalLeftHeight += layoutMap.get(cid)?.subtreeHeight || 0;
+  });
+  let currentLeftY = rootCenterY - totalLeftHeight / 2;
 
-    let totalChildrenHeight = 0;
+  function positionBranchLeft(nodeId: string) {
+    const parentLayout = layoutMap.get(nodeId);
+    if (!parentLayout) return;
+
+    const childrenIds = childrenMap.get(nodeId) || [];
+    if (childrenIds.length === 0 || nodeMap.get(nodeId)?.collapsed) return;
+
+    let childrenHeight = 0;
     childrenIds.forEach(cid => {
-      const childLayout = layoutMap.get(cid);
-      if (childLayout) totalChildrenHeight += childLayout.subtreeHeight;
+      childrenHeight += layoutMap.get(cid)?.subtreeHeight || 0;
     });
 
-    // Centraliza os ramos-filhos no eixo Y relativo ao pai
-    const parentCenterY = parentLayout.y + parentLayout.height / 2;
-    let currentY = parentCenterY - totalChildrenHeight / 2;
+    let curY = (parentLayout.y + parentLayout.height / 2) - childrenHeight / 2;
 
     childrenIds.forEach(cid => {
-      const child = nodeMap.get(cid);
-      const childLayout = layoutMap.get(cid);
-      if (!child || !childLayout) return;
+      const cLayout = layoutMap.get(cid);
+      if (!cLayout) return;
 
-      const childCenterY = currentY + childLayout.subtreeHeight / 2;
-      childLayout.x = parentLayout.x + parentLayout.width + horizontalGap;
-      childLayout.y = childCenterY - childLayout.height / 2;
+      cLayout.x = parentLayout.x - cLayout.width - horizontalGap;
+      cLayout.y = (curY + cLayout.subtreeHeight / 2) - cLayout.height / 2;
+      curY += cLayout.subtreeHeight;
 
-      currentY += childLayout.subtreeHeight;
-
-      // Recursão para o próximo nível
-      positionChildren(cid);
+      positionBranchLeft(cid);
     });
   }
 
-  positionChildren(effectiveRootId);
+  leftChildren.forEach(cid => {
+    const cLayout = layoutMap.get(cid);
+    if (!cLayout) return;
+
+    cLayout.x = rootCenterX - rootW / 2 - cLayout.width - horizontalGap;
+    cLayout.y = (currentLeftY + cLayout.subtreeHeight / 2) - cLayout.height / 2;
+    currentLeftY += cLayout.subtreeHeight;
+
+    positionBranchLeft(cid);
+  });
+
+  // Ramo Direito: ramifica em direção a +X
+  let totalRightHeight = 0;
+  rightChildren.forEach(cid => {
+    totalRightHeight += layoutMap.get(cid)?.subtreeHeight || 0;
+  });
+  let currentRightY = rootCenterY - totalRightHeight / 2;
+
+  function positionBranchRight(nodeId: string) {
+    const parentLayout = layoutMap.get(nodeId);
+    if (!parentLayout) return;
+
+    const childrenIds = childrenMap.get(nodeId) || [];
+    if (childrenIds.length === 0 || nodeMap.get(nodeId)?.collapsed) return;
+
+    let childrenHeight = 0;
+    childrenIds.forEach(cid => {
+      childrenHeight += layoutMap.get(cid)?.subtreeHeight || 0;
+    });
+
+    let curY = (parentLayout.y + parentLayout.height / 2) - childrenHeight / 2;
+
+    childrenIds.forEach(cid => {
+      const cLayout = layoutMap.get(cid);
+      if (!cLayout) return;
+
+      cLayout.x = parentLayout.x + parentLayout.width + horizontalGap;
+      cLayout.y = (curY + cLayout.subtreeHeight / 2) - cLayout.height / 2;
+      curY += cLayout.subtreeHeight;
+
+      positionBranchRight(cid);
+    });
+  }
+
+  rightChildren.forEach(cid => {
+    const cLayout = layoutMap.get(cid);
+    if (!cLayout) return;
+
+    cLayout.x = rootCenterX + rootW / 2 + horizontalGap;
+    cLayout.y = (currentRightY + cLayout.subtreeHeight / 2) - cLayout.height / 2;
+    currentRightY += cLayout.subtreeHeight;
+
+    positionBranchRight(cid);
+  });
 
   return layoutMap;
 }
@@ -187,7 +449,6 @@ export function calculateMindMapLayout(
 /**
  * Curva Bézier Cúbica Suave (Spline) orgânica idêntica ao Whimsical
  * Suporta conexões tanto para a direita quanto para a esquerda (bi-direcional)
- * com transições suaves e tangentes horizontais nas extremidades dos nós.
  */
 export function getBezierPath(
   startX: number,
@@ -202,10 +463,7 @@ export function getBezierPath(
 }
 
 /**
- * Purga e Normalização Definitiva de Nós do Mapa Mental:
- * Elimina nós em branco, nós contendo apenas traço '-', 'Novo Quadrado', 'Novo nó'
- * e reparenta automaticamente os filhos válidos para o nó superior, garantindo
- * ZERO espaços em branco soltos e conexões consistentes.
+ * Purga e Normalização Definitiva de Nós do Mapa Mental
  */
 export function cleanAndNormalizeMindMap(nodes: MindMapNode[]): MindMapNode[] {
   if (!nodes || nodes.length === 0) return [];
@@ -227,7 +485,6 @@ export function cleanAndNormalizeMindMap(nodes: MindMapNode[]): MindMapNode[] {
   const nodeMap = new Map<string, MindMapNode>();
   nodes.forEach(n => nodeMap.set(n.id, { ...n, childrenIds: [...(n.childrenIds || [])] }));
 
-  // Coleta todos os nós inválidos
   const invalidIds = new Set<string>();
   nodes.forEach(n => {
     if (isInvalid(n)) invalidIds.add(n.id);
@@ -237,7 +494,6 @@ export function cleanAndNormalizeMindMap(nodes: MindMapNode[]): MindMapNode[] {
     return nodes;
   }
 
-  // Reparenta os filhos dos nós inválidos para o pai do nó inválido
   invalidIds.forEach(badId => {
     const badNode = nodeMap.get(badId);
     if (!badNode) return;
@@ -255,12 +511,10 @@ export function cleanAndNormalizeMindMap(nodes: MindMapNode[]): MindMapNode[] {
           }
         }
       });
-      // Remove badNode da lista de filhos do pai
       parentNode.childrenIds = parentNode.childrenIds.filter(id => id !== badId);
     }
   });
 
-  // Filtra os nós inválidos e higieniza as referências de childrenIds
   const result: MindMapNode[] = [];
   nodeMap.forEach((n, id) => {
     if (!invalidIds.has(id)) {

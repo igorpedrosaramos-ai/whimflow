@@ -137,6 +137,7 @@ export interface Board {
   updatedAt: string;
   isPrivate?: boolean;
   isStarred?: boolean;
+  layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'timeline' | 'free';
   docContent?: string;
   discussions?: DocDiscussion[];
   historySnapshots?: BoardVersionSnapshot[];

@@ -10,6 +10,7 @@ interface MindMapCanvasProps {
   selectedNodeId: string | null;
   selectedNodeIds?: string[];
   editingNodeId?: string | null;
+  layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'timeline' | 'free';
   onClearEditingNodeId?: () => void;
   onSelectNode: (id: string | null) => void;
   onSelectMultipleNodes?: (ids: string[]) => void;
@@ -37,6 +38,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   selectedNodeId,
   selectedNodeIds = [],
   editingNodeId,
+  layoutType,
   onClearEditingNodeId,
   onSelectNode,
   onSelectMultipleNodes,
@@ -116,17 +118,29 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     return map;
   }, [effectiveNodes]);
 
+  // Determina o layout efetivo (passado explicitamente pelo board/template ou auto-detectado com elegância)
+  const effectiveLayout = useMemo(() => {
+    if (layoutType) return layoutType;
+    const root = effectiveNodes.find(n => n.side === 'root') || effectiveNodes[0];
+    const rootText = (root?.text || '').toLowerCase();
+    if (rootText.includes('timeline') || rootText.includes('roadmap') || rootText.includes('cronograma')) return 'timeline';
+    if (rootText.includes('org chart') || rootText.includes('pod structure') || rootText.includes('organograma')) return 'orgchart';
+    if (effectiveNodes.some(n => n.side === 'left')) return 'bidirectional';
+    return 'bidirectional';
+  }, [layoutType, effectiveNodes]);
+
   // Layout base da árvore - 100% Responsivo e sem sobreposição
   const layoutMap = useMemo(() => {
     const root = effectiveNodes.find(n => n.side === 'root') || effectiveNodes[0];
     if (!root) return new Map();
     return calculateMindMapLayout(effectiveNodes, root.id, {
       horizontalGap: 100,
-      verticalGap: 18,
+      verticalGap: effectiveLayout === 'orgchart' ? 56 : 18,
       rootX: 0,
-      rootY: 0
+      rootY: 0,
+      layoutType: effectiveLayout
     });
-  }, [effectiveNodes]);
+  }, [effectiveNodes, effectiveLayout]);
 
   // Posição final calculada estritamente pelo algoritmo responsivo (Zero entrelaçamento)
   const getNodePos = (node: MindMapNode) => {
@@ -422,15 +436,71 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       parentChildrenMap.get(child.parentId)!.push(child);
     });
 
+    // Se for timeline: renderizar o eixo horizontal conectando os marcos
+    if (effectiveLayout === 'timeline') {
+      const rootNode = effectiveNodes.find(n => n.side === 'root') || effectiveNodes[0];
+      const milestones = (rootNode?.childrenIds || [])
+        .map(id => nodeMap.get(id))
+        .filter((n): n is MindMapNode => Boolean(n));
+
+      if (milestones.length > 0) {
+        const sorted = [...milestones].sort((a, b) => getNodePos(a).x - getNodePos(b).x);
+        const firstPos = getNodePos(sorted[0]);
+        const lastPos = getNodePos(sorted[sorted.length - 1]);
+        const axisY = firstPos.y + firstPos.height / 2;
+        const axisStartX = firstPos.x - 50;
+        const axisEndX = lastPos.x + lastPos.width + 50;
+
+        // Linha principal do eixo horizontal do cronograma (estilo Whimsical)
+        paths.push(
+          <line
+            key="timeline-axis-bar"
+            x1={axisStartX}
+            y1={axisY}
+            x2={axisEndX}
+            y2={axisY}
+            stroke="#cbd5e1"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+          />
+        );
+
+        // Se o root estiver acima, conectar o cabeçalho ao eixo
+        if (rootNode) {
+          const rPos = getNodePos(rootNode);
+          paths.push(
+            <line
+              key="root-to-timeline-axis"
+              x1={rPos.x + rPos.width / 2}
+              y1={rPos.y + rPos.height}
+              x2={rPos.x + rPos.width / 2}
+              y2={axisY - 18}
+              stroke="#94a3b8"
+              strokeWidth="1.8"
+              strokeDasharray="4 3"
+            />
+          );
+        }
+      }
+    }
+
     parentChildrenMap.forEach((children, parentId) => {
       const parent = nodeMap.get(parentId);
       if (!parent) return;
       const pPos = getNodePos(parent);
 
+      // No modo timeline, a linha horizontal do eixo já unifica o root aos marcos
+      if (effectiveLayout === 'timeline' && parent.side === 'root') {
+        return;
+      }
+
+      const isOrgChart = effectiveLayout === 'orgchart';
+      const isTimeline = effectiveLayout === 'timeline';
+
       children.sort((a, b) => {
         const aPos = getNodePos(a);
         const bPos = getNodePos(b);
-        return aPos.y - bPos.y;
+        return isOrgChart || isTimeline ? aPos.x - bPos.x : aPos.y - bPos.y;
       });
 
       const numChildren = children.length;
@@ -439,31 +509,54 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
       children.forEach((child, index) => {
         const cPos = getNodePos(child);
-        const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
-        const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
-
-        const startY = numChildren <= 1
-          ? pPos.y + pPos.height / 2
-          : pPos.y + pad + (usableHeight * index) / (numChildren - 1);
-
-        const endX = isChildOnLeft ? cPos.x + cPos.width : cPos.x;
-        const endY = cPos.y + cPos.height / 2;
-
         const strokeColor = child.color || parent.color || '#6366f1';
         const isSelected = selectedNodeId === child.id || selectedNodeId === parent.id;
-        const lineStyle = child.lineStyle || 'bezier';
-
-        // Nó arrastado: linha fica mais transparente (indica que está "em voo")
+        const lineStyle = child.lineStyle || (isOrgChart ? 'stepped' : (isTimeline ? 'straight' : 'bezier'));
         const isDraggingThis = draggingNodeId === child.id;
 
+        // Determina se a conexão deve ser vertical (topo para base)
+        const isVertical = isOrgChart || isTimeline || (cPos.y >= pPos.y + pPos.height * 0.7 && Math.abs(cPos.x - pPos.x) < 400);
+
         let pathData = '';
-        if (lineStyle === 'straight') {
-          pathData = `M ${startX} ${startY} L ${endX} ${endY}`;
-        } else if (lineStyle === 'stepped') {
-          const midX = (startX + endX) / 2;
-          pathData = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+        let endX = 0;
+        let endY = 0;
+
+        if (isVertical) {
+          const startX = pPos.x + pPos.width / 2;
+          const startY = pPos.y + pPos.height;
+          endX = cPos.x + cPos.width / 2;
+          endY = cPos.y;
+
+          if (lineStyle === 'straight' || (isTimeline && Math.abs(startX - endX) < 10)) {
+            pathData = `M ${startX} ${startY} L ${endX} ${endY}`;
+          } else if (lineStyle === 'stepped' || isOrgChart) {
+            const midY = startY + (endY - startY) * 0.5;
+            pathData = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
+          } else {
+            const dy = Math.abs(endY - startY);
+            const cpY = startY + dy * 0.5;
+            pathData = `M ${startX} ${startY} C ${startX} ${cpY}, ${endX} ${cpY}, ${endX} ${endY}`;
+          }
         } else {
-          pathData = getBezierPath(startX, startY, endX, endY);
+          // Conexão Horizontal / Bi-direcional
+          const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
+          const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
+
+          const startY = numChildren <= 1
+            ? pPos.y + pPos.height / 2
+            : pPos.y + pad + (usableHeight * index) / (numChildren - 1);
+
+          endX = isChildOnLeft ? cPos.x + cPos.width : cPos.x;
+          endY = cPos.y + cPos.height / 2;
+
+          if (lineStyle === 'straight') {
+            pathData = `M ${startX} ${startY} L ${endX} ${endY}`;
+          } else if (lineStyle === 'stepped') {
+            const midX = (startX + endX) / 2;
+            pathData = `M ${startX} ${startY} L ${midX} ${startY} L ${midX} ${endY} L ${endX} ${endY}`;
+          } else {
+            pathData = getBezierPath(startX, startY, endX, endY);
+          }
         }
 
         paths.push(

@@ -61,7 +61,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
                           t.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
     if (searchQuery.trim()) return matchesSearch;
     if (activeCategory === 'all') return true;
-    if (activeCategory === 'suggested') return t.category === 'suggested' || t.category === 'popular' || ['tpl-simple-org-chart', 'tpl-ios-wireframe', 'tpl-product-wireflow', 'tpl-digital-sketchbook', 'tpl-brainstorming', 'tpl-user-research-process', 'tpl-sitemap-variations', 'tpl-simple-flowchart', 'tpl-team-heartbeat'].includes(t.id);
+    if (activeCategory === 'suggested') return t.category === 'suggested' || t.category === 'popular' || ['tpl-simple-org-chart', 'tpl-ios-wireframe', 'tpl-product-wireflow', 'tpl-digital-sketchbook', 'tpl-brainstorming', 'tpl-user-research-process', 'tpl-sitemap-variations', 'tpl-simple-flowchart', 'tpl-team-heartbeat', 'tpl-project-timeline', 'tpl-product-pod-structure'].includes(t.id);
     if (activeCategory === 'workspace') return true;
     if (activeCategory === 'popular') return t.category === 'popular' || t.category === 'suggested' || ['tpl-simple-org-chart', 'tpl-sitemap-mindmap', 'tpl-brainstorming', 'tpl-ios-wireframe', 'tpl-user-research-process'].includes(t.id);
     if (activeCategory === 'diagrams') return t.category === 'diagrams' || ['orgchart', 'mindmap', 'flowchart'].includes(t.previewType);
@@ -458,6 +458,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
               return (
                 <button
                   key={cat.id}
+                  id={`btn-cat-${cat.id}`}
                   onClick={() => {
                     setActiveCategory(cat.id);
                     setSearchQuery('');
