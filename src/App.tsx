@@ -19,7 +19,6 @@ import { StickyNotesCanvas } from './components/StickyNotesCanvas';
 import { FreehandCanvas } from './components/FreehandCanvas';
 import { FlowchartCanvas } from './components/FlowchartCanvas';
 import { ZoomControls } from './components/ZoomControls';
-import { AIModal } from './components/AIModal';
 import { ShareModal } from './components/ShareModal';
 import { PresentationView } from './components/PresentationView';
 import { DashboardView } from './components/DashboardView';
@@ -94,7 +93,6 @@ export const App: React.FC = () => {
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [isBoardStatsOpen, setIsBoardStatsOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
-  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -585,7 +583,6 @@ export const App: React.FC = () => {
           onOpenDoc={() => setCurrentView('doc')}
           onOpenAskAgent={() => setIsAgentDrawerOpen(true)}
           onOpenTemplates={() => setIsTemplateModalOpen(true)}
-          onOpenAI={() => setIsAIModalOpen(true)}
           onDuplicateBoard={handleDuplicateBoard}
           onDeleteBoard={(id) => {
             const boardToTrash = boards.find(b => b.id === id);
@@ -1028,14 +1025,6 @@ export const App: React.FC = () => {
         activeBoard={activeBoard}
         theme={theme}
         onShowToast={showToast}
-      />
-
-      {/* Modal de Assistente IA Rápido */}
-      <AIModal
-        isOpen={isAIModalOpen}
-        onClose={() => setIsAIModalOpen(false)}
-        selectedNode={activeBoard.mindMapNodes.find(n => n.id === selectedNodeId) || null}
-        onAddGeneratedBranches={handleAddGeneratedBranches}
       />
 
       {/* Modal de Templates */}

@@ -32,7 +32,6 @@ interface DashboardViewProps {
   onOpenDoc: () => void;
   onOpenAskAgent: () => void;
   onOpenTemplates: () => void;
-  onOpenAI: () => void;
   onDuplicateBoard: (boardId: string) => void;
   onDeleteBoard: (boardId: string) => void;
   onRenameBoard: (boardId: string, newTitle: string) => void;
@@ -50,7 +49,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenDoc,
   onOpenAskAgent,
   onOpenTemplates,
-  onOpenAI,
   onDuplicateBoard,
   onDeleteBoard,
   onRenameBoard,
