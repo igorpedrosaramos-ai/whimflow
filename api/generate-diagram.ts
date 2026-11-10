@@ -13,7 +13,7 @@ const GEMINI_MODELS = [
 
 export async function handleGenerateDiagram(body: any, apiKey?: string) {
   const SERVER_DEFAULT_KEY = typeof Buffer !== 'undefined' 
-    ? Buffer.from('QVEuQWI4Uk42S2FlR3R6WWFNTnNOdEp4SW5tTWtVRV96N2xKZXpIOXc2czg5alFhdnFQV1E=', 'base64').toString('utf8') 
+    ? Buffer.from('QVEuQWI4Uk42S2FlR3R6WWFNbnNOdEp4SW5tTWtVRV96N2xKZXpIOXc2czg5alFhdnFQV1E=', 'base64').toString('utf8') 
     : '';
   const key = apiKey || process.env.GEMINI_API_KEY || SERVER_DEFAULT_KEY;
   if (!key) {
