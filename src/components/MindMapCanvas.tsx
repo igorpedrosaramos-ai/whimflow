@@ -87,6 +87,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   // ─── RAF para posição do ghost (suave, sem re-renders excessivos) ──────────
   const rafRef = useRef<number | null>(null);
 
+  // Ref síncrono para seleção múltipla sem race conditions de render
+  const selectedNodeIdsRef = useRef<string[]>(selectedNodeIds || []);
+  useEffect(() => {
+    selectedNodeIdsRef.current = selectedNodeIds || [];
+  }, [selectedNodeIds]);
+
   // Sincroniza início de edição direta quando um novo nó é criado
   useEffect(() => {
     if (editingNodeId) {
@@ -145,9 +151,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   // Posição final calculada estritamente pelo algoritmo responsivo (Zero entrelaçamento)
   const getNodePos = (node: MindMapNode) => {
     const computed = layoutMap.get(node.id);
+    const baseX = computed ? computed.x : (node.x || 0);
+    const baseY = computed ? computed.y : (node.y || 0);
     return {
-      x: computed ? computed.x : (node.x || 0),
-      y: computed ? computed.y : (node.y || 0),
+      x: baseX + (node.offsetX || 0),
+      y: baseY + (node.offsetY || 0),
       width: computed ? computed.width : 160,
       height: computed ? computed.height : 40
     };
@@ -990,12 +998,14 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             onClick={(e) => {
               e.stopPropagation();
               if (e.ctrlKey || e.metaKey || e.shiftKey) {
-                const current = selectedNodeIds || [];
+                const current = selectedNodeIdsRef.current || [];
                 const next = current.includes(node.id)
                   ? current.filter(id => id !== node.id)
                   : [...current, node.id];
+                selectedNodeIdsRef.current = next;
                 onSelectMultipleNodes?.(next);
               } else {
+                selectedNodeIdsRef.current = [node.id];
                 onSelectNode(node.id);
               }
             }}

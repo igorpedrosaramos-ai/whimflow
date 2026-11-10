@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
+  AlignLeft, 
+  AlignCenter, 
+  AlignRight, 
+  AlignStartVertical, 
+  AlignVerticalDistributeCenter,
+  Copy, 
+  Trash2 
+} from 'lucide-react';
+import { 
   Board, 
   ToolType, 
   MindMapNode, 
@@ -35,6 +44,7 @@ import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { QuickSparkModal } from './components/QuickSparkModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { TemplateItem } from './constants/templatesData';
+import { calculateMindMapLayout } from './utils/treeLayout';
 import { useCanvasNavigation } from './hooks/useCanvasNavigation';
 import { useBoardStorage } from './hooks/useBoardStorage';
 import { useBoardOperations } from './hooks/useBoardOperations';
@@ -534,36 +544,131 @@ export const App: React.FC = () => {
     setTimeout(() => fitView(newBoard.mindMapNodes), 100);
   };
 
-  // Alinhamento em Lote dos Nós
-  const handleBatchAlignNodes = (alignment: 'left' | 'center' | 'right') => {
+  // Alinhamento em Lote dos Nós com Cálculo Geométrico e Fixação de Coordenadas Visuais
+  const handleBatchAlignNodes = (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-v' | 'distribute-h') => {
     if (selectedNodeIds.length <= 1) return;
     updateActiveBoard(board => {
-      const selectedNodes = board.mindMapNodes.filter(n => selectedNodeIds.includes(n.id));
-      if (selectedNodes.length === 0) return board;
+      // 1. Obter posições visuais REAIS de todos os nós na tela no momento do clique
+      const layoutMap = calculateMindMapLayout(board.mindMapNodes, 'root', {
+        layoutType: board.layoutType,
+        horizontalGap: 100,
+        verticalGap: board.layoutType === 'orgchart' ? 56 : 18,
+        rootX: 0,
+        rootY: 0
+      });
 
-      let targetX = selectedNodes[0].x;
+      // Mapeamento das posições visuais atuais de cada nó
+      const visualPositions = new Map<string, { x: number; y: number; width: number; height: number }>();
+      board.mindMapNodes.forEach(n => {
+        const computed = layoutMap.get(n.id);
+        const curX = (computed ? computed.x : (n.x || 0)) + (n.offsetX || 0);
+        const curY = (computed ? computed.y : (n.y || 0)) + (n.offsetY || 0);
+        const curW = computed ? computed.width : (n.width || 140);
+        const curH = computed ? computed.height : (n.height || 40);
+        visualPositions.set(n.id, { x: curX, y: curY, width: curW, height: curH });
+      });
+
+      const selectedNodes = board.mindMapNodes.filter(n => selectedNodeIds.includes(n.id) && n.side !== 'root');
+      if (selectedNodes.length <= 1) return board;
+
+      const selectedPosList = selectedNodes.map(n => ({
+        id: n.id,
+        node: n,
+        ...visualPositions.get(n.id)!
+      }));
+
+      const targetPosMap = new Map<string, { x?: number; y?: number }>();
+
       if (alignment === 'left') {
-        targetX = Math.min(...selectedNodes.map(n => n.x));
+        const minX = Math.min(...selectedPosList.map(p => p.x));
+        selectedPosList.forEach(p => {
+          targetPosMap.set(p.id, { x: Math.round(minX) });
+        });
+      } else if (alignment === 'center') {
+        const minX = Math.min(...selectedPosList.map(p => p.x));
+        const maxX = Math.max(...selectedPosList.map(p => p.x + p.width));
+        const centerX = (minX + maxX) / 2;
+        selectedPosList.forEach(p => {
+          targetPosMap.set(p.id, { x: Math.round(centerX - p.width / 2) });
+        });
       } else if (alignment === 'right') {
-        targetX = Math.max(...selectedNodes.map(n => n.x + (n.width || 180)));
-      } else {
-        const sumX = selectedNodes.reduce((acc, n) => acc + n.x + (n.width || 180) / 2, 0);
-        targetX = sumX / selectedNodes.length;
+        const maxX = Math.max(...selectedPosList.map(p => p.x + p.width));
+        selectedPosList.forEach(p => {
+          targetPosMap.set(p.id, { x: Math.round(maxX - p.width) });
+        });
+      } else if (alignment === 'top') {
+        const minY = Math.min(...selectedPosList.map(p => p.y));
+        selectedPosList.forEach(p => {
+          targetPosMap.set(p.id, { y: Math.round(minY) });
+        });
+      } else if (alignment === 'middle') {
+        const minY = Math.min(...selectedPosList.map(p => p.y));
+        const maxY = Math.max(...selectedPosList.map(p => p.y + p.height));
+        const centerY = (minY + maxY) / 2;
+        selectedPosList.forEach(p => {
+          targetPosMap.set(p.id, { y: Math.round(centerY - p.height / 2) });
+        });
+      } else if (alignment === 'bottom') {
+        const maxY = Math.max(...selectedPosList.map(p => p.y + p.height));
+        selectedPosList.forEach(p => {
+          targetPosMap.set(p.id, { y: Math.round(maxY - p.height) });
+        });
+      } else if (alignment === 'distribute-v') {
+        const sorted = [...selectedPosList].sort((a, b) => a.y - b.y);
+        const firstY = sorted[0].y;
+        const lastY = sorted[sorted.length - 1].y;
+        const totalSpan = lastY - firstY;
+        const step = sorted.length > 1 ? totalSpan / (sorted.length - 1) : 0;
+        sorted.forEach((p, idx) => {
+          targetPosMap.set(p.id, { y: Math.round(firstY + idx * step) });
+        });
+      } else if (alignment === 'distribute-h') {
+        const sorted = [...selectedPosList].sort((a, b) => a.x - b.x);
+        const firstX = sorted[0].x;
+        const lastX = sorted[sorted.length - 1].x;
+        const totalSpan = lastX - firstX;
+        const step = sorted.length > 1 ? totalSpan / (sorted.length - 1) : 0;
+        sorted.forEach((p, idx) => {
+          targetPosMap.set(p.id, { x: Math.round(firstX + idx * step) });
+        });
       }
+
+      // 2. Aplica as novas posições e fixa as posições visuais de todos os nós existentes
+      const newMindMapNodes = board.mindMapNodes.map(n => {
+        const cur = visualPositions.get(n.id) || { x: n.x || 0, y: n.y || 0, width: n.width || 140, height: n.height || 40 };
+        const target = targetPosMap.get(n.id);
+        const finalX = target && target.x !== undefined ? target.x : cur.x;
+        const finalY = target && target.y !== undefined ? target.y : cur.y;
+
+        return {
+          ...n,
+          x: finalX,
+          y: finalY,
+          width: cur.width,
+          height: cur.height,
+          offsetX: 0,
+          offsetY: 0
+        };
+      });
 
       return {
         ...board,
-        mindMapNodes: board.mindMapNodes.map(n => {
-          if (!selectedNodeIds.includes(n.id) || n.side === 'root') return n;
-          const nodeWidth = n.width || 180;
-          let newX = targetX;
-          if (alignment === 'right') newX = targetX - nodeWidth;
-          if (alignment === 'center') newX = targetX - nodeWidth / 2;
-          return { ...n, x: Math.round(newX), offsetX: 0 };
-        })
+        layoutType: 'free', // Muda para layout livre para que o alinhamento manual persista com fidelidade
+        mindMapNodes: newMindMapNodes
       };
     });
-    showToast(`Nós alinhados à ${alignment === 'left' ? 'esquerda' : alignment === 'right' ? 'direita' : 'ao centro'}.`);
+
+    const alignLabels: Record<string, string> = {
+      'left': 'à esquerda',
+      'center': 'ao centro',
+      'right': 'à direita',
+      'top': 'ao topo',
+      'middle': 'ao meio',
+      'bottom': 'à base',
+      'distribute-v': 'com distribuição vertical uniforme',
+      'distribute-h': 'com distribuição horizontal uniforme'
+    };
+    showToast(`Nós alinhados ${alignLabels[alignment] || ''} com sucesso.`);
   };
 
   const totalObjects = (activeBoard.mindMapNodes?.length || 0) + 
@@ -858,59 +963,89 @@ export const App: React.FC = () => {
 
         {/* Barra Flutuante de Ações para Seleção Múltipla */}
         {selectedNodeIds.length > 1 && (
-          <div
-            style={{
-              position: 'fixed',
-              bottom: '30px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              zIndex: 1000,
-              backgroundColor: '#1b212c',
-              border: '1px solid #2c3647',
-              borderRadius: '8px',
-              padding: '6px 14px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
-              color: '#f8fafc',
-              fontSize: '13px'
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>{selectedNodeIds.length} nós selecionados</span>
-            <div style={{ width: '1px', height: '14px', backgroundColor: '#334155' }} />
+          <div className="batch-actions-toolbar" id="batch-actions-toolbar">
+            <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: '13px', padding: '0 4px', userSelect: 'none' }}>
+              {selectedNodeIds.length} nós selecionados
+            </span>
+
+            <div className="batch-divider" />
+
             <button
+              id="btn-batch-duplicate"
+              className="batch-action-btn duplicate"
               onClick={() => handleDuplicateMultipleNodes(selectedNodeIds)}
-              style={{ background: 'transparent', border: 'none', color: '#93c5fd', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}
+              title="Duplicar nós selecionados (Ctrl+D)"
             >
-              Duplicar (Ctrl+D)
+              <Copy size={14} />
+              <span>Duplicar (Ctrl+D)</span>
             </button>
+
+            <div className="batch-divider" />
+
+            {/* Alinhamento Horizontal */}
             <button
+              id="btn-batch-align-left"
+              className="batch-action-btn"
               onClick={() => handleBatchAlignNodes('left')}
-              style={{ background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}
-              title="Alinhar à Esquerda"
+              title="Alinhar nós selecionados à esquerda"
             >
-              Alinhar Esq
+              <AlignLeft size={15} />
+              <span>Alinhar à Esquerda</span>
             </button>
+
             <button
+              id="btn-batch-align-center"
+              className="batch-action-btn"
               onClick={() => handleBatchAlignNodes('center')}
-              style={{ background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}
-              title="Alinhar ao Centro"
+              title="Centralizar nós selecionados horizontalmente"
             >
-              Centro
+              <AlignCenter size={15} />
+              <span>Centralizar</span>
             </button>
+
             <button
+              id="btn-batch-align-right"
+              className="batch-action-btn"
               onClick={() => handleBatchAlignNodes('right')}
-              style={{ background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}
-              title="Alinhar à Direita"
+              title="Alinhar nós selecionados à direita"
             >
-              Dir
+              <AlignRight size={15} />
+              <span>Alinhar à Direita</span>
             </button>
+
+            <div className="batch-divider" />
+
+            {/* Alinhamento Vertical e Distribuição */}
             <button
-              onClick={() => handleDeleteMultipleNodes(selectedNodeIds)}
-              style={{ background: 'transparent', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '12px', fontWeight: 500 }}
+              id="btn-batch-align-top"
+              className="batch-action-btn"
+              onClick={() => handleBatchAlignNodes('top')}
+              title="Alinhar nós selecionados ao topo"
             >
-              Excluir
+              <AlignStartVertical size={15} />
+              <span>Ao Topo</span>
+            </button>
+
+            <button
+              id="btn-batch-distribute-v"
+              className="batch-action-btn"
+              onClick={() => handleBatchAlignNodes('distribute-v')}
+              title="Distribuir nós com espaçamento vertical uniforme"
+            >
+              <AlignVerticalDistributeCenter size={15} />
+              <span>Distribuir Vertical</span>
+            </button>
+
+            <div className="batch-divider" />
+
+            <button
+              id="btn-batch-delete"
+              className="batch-action-btn danger"
+              onClick={() => handleDeleteMultipleNodes(selectedNodeIds)}
+              title="Excluir nós selecionados"
+            >
+              <Trash2 size={14} />
+              <span>Excluir</span>
             </button>
           </div>
         )}

@@ -447,3 +447,79 @@ html, body, #root {
   transition: box-shadow 0.15s ease;
   backdrop-filter: blur(4px);
 }
+
+/* =============================================
+   BARRA FLUTUANTE DE AÇÕES EM LOTE (SELEÇÃO MÚLTIPLA)
+   ============================================= */
+.batch-actions-toolbar {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background-color: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+  color: #f8fafc;
+  animation: batch-slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes batch-slide-up {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.batch-action-btn {
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.batch-action-btn:hover {
+  background-color: #1e293b;
+  color: #ffffff;
+}
+
+.batch-action-btn.duplicate {
+  color: #93c5fd;
+}
+.batch-action-btn.duplicate:hover {
+  background-color: rgba(59, 130, 246, 0.18);
+  color: #bfdbfe;
+}
+
+.batch-action-btn.danger {
+  color: #f87171;
+}
+.batch-action-btn.danger:hover {
+  background-color: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.batch-divider {
+  width: 1px;
+  height: 18px;
+  background-color: #334155;
+  margin: 0 2px;
+}
