@@ -26,6 +26,7 @@ interface UseKeyboardShortcutsProps {
   updateActiveBoard: (updater: (board: Board) => Board, pushHistory?: boolean) => void;
   onToggleSearch: () => void;
   onToggleShortcuts: () => void;
+  onToggleQuickSpark?: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -51,7 +52,8 @@ export function useKeyboardShortcuts({
   handleDuplicateMultipleNodes,
   updateActiveBoard,
   onToggleSearch,
-  onToggleShortcuts
+  onToggleShortcuts,
+  onToggleQuickSpark
 }: UseKeyboardShortcutsProps) {
 
   // Atalhos Globais: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z, Ctrl+K, ?
@@ -63,6 +65,12 @@ export function useKeyboardShortcuts({
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         onToggleSearch();
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        onToggleQuickSpark?.();
         return;
       }
 

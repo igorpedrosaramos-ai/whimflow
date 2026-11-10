@@ -21,6 +21,7 @@ interface ZoomControlsProps {
   onOpenVersionHistory?: () => void;
   onOpenShortcuts?: () => void;
   onOpenSearch?: () => void;
+  onOpenQuickSpark?: () => void;
   theme?: 'dark' | 'light';
 }
 
@@ -36,6 +37,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
   onOpenVersionHistory,
   onOpenShortcuts,
   onOpenSearch,
+  onOpenQuickSpark,
   theme = 'light'
 }) => {
   const zoomPercent = Math.round(zoom * 100);
@@ -192,22 +194,23 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
       {/* Divisor */}
       <div style={{ width: '1px', height: '18px', backgroundColor: isDark ? '#2e384b' : '#e2e8f0', margin: '0 3px' }} />
 
-      {/* Ação Rápida */}
+      {/* Ação Rápida Whimflow Spark */}
       <button
-        onClick={onOpenSearch}
+        id="btn-zoom-spark"
+        onClick={onOpenQuickSpark || onOpenSearch}
         style={{
           width: '28px',
           height: '28px',
           borderRadius: '5px',
           border: 'none',
           backgroundColor: 'transparent',
-          color: isDark ? '#f1f5f9' : '#475569',
+          color: '#f59e0b',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Busca Rápida e Comandos (Ctrl + K)"
+        title="Whimflow Spark: Criador Relâmpago e Text-to-Map (Ctrl+J)"
       >
         <Zap size={14} />
       </button>

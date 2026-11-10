@@ -38,6 +38,7 @@ interface DashboardViewProps {
   onOpenTrash?: () => void;
   onOpenSearch?: () => void;
   onOpenShortcuts?: () => void;
+  onOpenQuickSpark?: () => void;
   workspaceName?: string;
   theme?: 'dark' | 'light';
 }
@@ -55,6 +56,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenTrash,
   onOpenSearch,
   onOpenShortcuts,
+  onOpenQuickSpark,
   workspaceName = 'teste',
   theme = 'light'
 }) => {
@@ -1108,21 +1110,32 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           }}
         >
           <button
-            onClick={onOpenSearch}
+            id="btn-dashboard-spark"
+            onClick={onOpenQuickSpark || onOpenSearch}
             style={{
               width: '32px',
               height: '32px',
               borderRadius: '6px',
               backgroundColor: isDark ? '#232b38' : '#ffffff',
               border: isDark ? '1px solid #333f52' : '1px solid #e2e8f0',
-              color: isDark ? '#f1f5f9' : '#475569',
+              color: '#f59e0b',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
+              fontSize: '15px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              transition: 'transform 0.15s ease, border-color 0.15s ease'
             }}
-            title="Ações Rápidas e Busca (Ctrl+K)"
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'scale(1.08)';
+              e.currentTarget.style.borderColor = '#f59e0b';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.borderColor = isDark ? '#333f52' : '#e2e8f0';
+            }}
+            title="Whimflow Spark: Criação Relâmpago, Text-to-Map e Frameworks (Ctrl+J)"
           >
             ⚡
           </button>

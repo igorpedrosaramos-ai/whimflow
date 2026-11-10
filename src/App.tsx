@@ -32,6 +32,7 @@ import { TrashModal } from './components/TrashModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { BoardStatsModal } from './components/BoardStatsModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { QuickSparkModal } from './components/QuickSparkModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { TemplateItem } from './constants/templatesData';
 import { useCanvasNavigation } from './hooks/useCanvasNavigation';
@@ -94,6 +95,7 @@ export const App: React.FC = () => {
   const [isBoardStatsOpen, setIsBoardStatsOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isQuickSparkOpen, setIsQuickSparkOpen] = useState(false);
   const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -204,7 +206,8 @@ export const App: React.FC = () => {
     handleDuplicateMultipleNodes,
     updateActiveBoard,
     onToggleSearch: () => setIsSearchModalOpen(prev => !prev),
-    onToggleShortcuts: () => setIsShortcutsModalOpen(prev => !prev)
+    onToggleShortcuts: () => setIsShortcutsModalOpen(prev => !prev),
+    onToggleQuickSpark: () => setIsQuickSparkOpen(prev => !prev)
   });
 
   // Abertura de Quadro
@@ -598,6 +601,7 @@ export const App: React.FC = () => {
           onOpenTrash={() => setIsTrashModalOpen(true)}
           onOpenSearch={() => setIsSearchModalOpen(true)}
           onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
+          onOpenQuickSpark={() => setIsQuickSparkOpen(true)}
           theme={theme}
           workspaceName="teste"
         />
@@ -930,6 +934,7 @@ export const App: React.FC = () => {
             onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
             onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
             onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenQuickSpark={() => setIsQuickSparkOpen(true)}
             theme={theme}
           />
         </div>
@@ -968,6 +973,17 @@ export const App: React.FC = () => {
         isOpen={isShortcutsModalOpen}
         onClose={() => setIsShortcutsModalOpen(false)}
         theme={theme}
+      />
+
+      {/* Modal Whimflow Spark: Central de Criação Relâmpago e Text-to-Map */}
+      <QuickSparkModal
+        isOpen={isQuickSparkOpen}
+        onClose={() => setIsQuickSparkOpen(false)}
+        onCreateBoardWithNodes={(title, nodes) => {
+          handleGenerateFromAgent(title, title, nodes);
+        }}
+        theme={theme}
+        workspaceName="teste"
       />
 
       {/* Modal de Compartilhamento */}
