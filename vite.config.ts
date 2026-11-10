@@ -38,6 +38,27 @@ export default defineConfig(({ mode }) => {
         }
       }
     ],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('jspdf')) {
+              return 'vendor-pdf';
+            }
+            if (id.includes('pptxgenjs')) {
+              return 'vendor-ppt';
+            }
+            if (id.includes('html2canvas')) {
+              return 'vendor-canvas';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+          }
+        }
+      },
+      chunkSizeWarningLimit: 600
+    },
     server: {
       port: 3000,
       host: true

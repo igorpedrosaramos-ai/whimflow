@@ -359,38 +359,63 @@ export const App: React.FC = () => {
   const isMarqueeActiveRef = useRef(false);
 
   useEffect(() => {
+    let rAFId: number | null = null;
+
     const handleWindowMouseMove = (e: MouseEvent) => {
-      if (isMarqueeActiveRef.current && marqueeStartRef.current) {
-        const dx = Math.abs(e.clientX - marqueeStartRef.current.x);
-        const dy = Math.abs(e.clientY - marqueeStartRef.current.y);
-        if (dx > 4 || dy > 4) {
-          const x1 = Math.min(marqueeStartRef.current.x, e.clientX);
-          const y1 = Math.min(marqueeStartRef.current.y, e.clientY);
-          const x2 = Math.max(marqueeStartRef.current.x, e.clientX);
-          const y2 = Math.max(marqueeStartRef.current.y, e.clientY);
-          setMarqueeRect({ x1, y1, x2, y2 });
+      if (!isMarqueeActiveRef.current || !marqueeStartRef.current) return;
 
-          const hitIds: string[] = [];
-          activeBoard.mindMapNodes.forEach(node => {
-            const el = document.getElementById(`node-${node.id}`);
-            if (!el) return;
-            const rect = el.getBoundingClientRect();
-            if (rect.right >= x1 && rect.left <= x2 && rect.bottom >= y1 && rect.top <= y2) {
-              hitIds.push(node.id);
-            }
-          });
+      const startX = marqueeStartRef.current.x;
+      const startY = marqueeStartRef.current.y;
+      const curX = e.clientX;
+      const curY = e.clientY;
 
-          setSelectedNodeIds(hitIds);
-          if (hitIds.length === 1) {
-            setSelectedNodeId(hitIds[0]);
-          } else if (hitIds.length === 0) {
-            setSelectedNodeId(null);
+      const dx = Math.abs(curX - startX);
+      const dy = Math.abs(curY - startY);
+      if (dx <= 4 && dy <= 4) return;
+
+      const x1 = Math.min(startX, curX);
+      const y1 = Math.min(startY, curY);
+      const x2 = Math.max(startX, curX);
+      const y2 = Math.max(startY, curY);
+
+      setMarqueeRect({ x1, y1, x2, y2 });
+
+      // Otimização de Performance: Cálculo matemático direto no espaço do canvas
+      // Zero Layout Thrashing (zero getBoundingClientRect) com throttle via requestAnimationFrame
+      if (rAFId !== null) cancelAnimationFrame(rAFId);
+
+      rAFId = requestAnimationFrame(() => {
+        const canvasX1 = (x1 - pan.x) / zoom;
+        const canvasY1 = (y1 - pan.y) / zoom;
+        const canvasX2 = (x2 - pan.x) / zoom;
+        const canvasY2 = (y2 - pan.y) / zoom;
+
+        const hitIds: string[] = [];
+        activeBoard.mindMapNodes.forEach(node => {
+          const nw = node.width || 180;
+          const nh = node.height || 42;
+          const nx = (node.x || 0) + (node.offsetX || 0);
+          const ny = (node.y || 0) + (node.offsetY || 0);
+
+          if (nx + nw >= canvasX1 && nx <= canvasX2 && ny + nh >= canvasY1 && ny <= canvasY2) {
+            hitIds.push(node.id);
           }
+        });
+
+        setSelectedNodeIds(hitIds);
+        if (hitIds.length === 1) {
+          setSelectedNodeId(hitIds[0]);
+        } else if (hitIds.length === 0) {
+          setSelectedNodeId(null);
         }
-      }
+      });
     };
 
     const handleWindowMouseUp = () => {
+      if (rAFId !== null) {
+        cancelAnimationFrame(rAFId);
+        rAFId = null;
+      }
       if (isMarqueeActiveRef.current) {
         if (!marqueeRect) {
           setSelectedNodeId(null);
@@ -407,10 +432,11 @@ export const App: React.FC = () => {
     window.addEventListener('mousemove', handleWindowMouseMove);
     window.addEventListener('mouseup', handleWindowMouseUp);
     return () => {
+      if (rAFId !== null) cancelAnimationFrame(rAFId);
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [marqueeRect, activeBoard.mindMapNodes]);
+  }, [marqueeRect, activeBoard.mindMapNodes, pan, zoom]);
 
   // Eventos de Mouse no Canvas
   const handleMouseDownCanvas = (e: React.MouseEvent) => {
