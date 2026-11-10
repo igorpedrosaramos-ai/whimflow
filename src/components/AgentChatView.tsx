@@ -14,6 +14,7 @@ import {
   Users
 } from 'lucide-react';
 import { Board, MindMapNode } from '../types';
+import { generateWithGemini } from '../services/geminiService';
 
 interface AgentChatViewProps {
   onGenerateBoard: (prompt: string, title?: string, nodes?: MindMapNode[]) => void;
@@ -98,21 +99,18 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
     }
   ];
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!prompt.trim() || isGenerating) return;
     setIsGenerating(true);
 
-    const generatedNodes: MindMapNode[] = [
-      { id: 'root', text: prompt.slice(0, 40), x: 0, y: 0, width: 200, height: 48, parentId: null, childrenIds: ['r1', 'r2', 'r3'], color: '#0d9488', borderStyle: 'fill' as const, lineStyle: 'bezier' as const, side: 'root' as const },
-      { id: 'r1', text: 'Visão Estratégica & Objetivos', x: -260, y: -50, width: 195, height: 42, parentId: 'root', childrenIds: [], color: '#3b82f6', borderStyle: 'border' as const, side: 'left' as const },
-      { id: 'r2', text: 'Execução Tática & Entregáveis', x: 260, y: -50, width: 195, height: 42, parentId: 'root', childrenIds: [], color: '#10b981', borderStyle: 'border' as const, side: 'right' as const },
-      { id: 'r3', text: 'Métricas de Sucesso & KPIs', x: 260, y: 50, width: 190, height: 42, parentId: 'root', childrenIds: [], color: '#f59e0b', borderStyle: 'border' as const, side: 'right' as const }
-    ];
-
-    setTimeout(() => {
+    try {
+      const result = await generateWithGemini(prompt);
       setIsGenerating(false);
-      onGenerateBoard(prompt, prompt.slice(0, 30), generatedNodes);
-    }, 600);
+      onGenerateBoard(prompt, result.title, result.nodes);
+    } catch {
+      setIsGenerating(false);
+      onGenerateBoard(prompt, prompt.slice(0, 30));
+    }
   };
 
   return (
@@ -164,12 +162,6 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
 
         {/* Presença e Ações */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} style={{ width: '6px', height: '6px', borderRadius: '1px', backgroundColor: '#10b981' }} />
-            ))}
-          </div>
-
           <div
             style={{
               width: '20px',

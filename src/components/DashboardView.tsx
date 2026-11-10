@@ -381,21 +381,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Search size={16} />
             </button>
 
-            {/* Tecla de Atalhos */}
+            {/* Agente Turbi AI (Sparkles - Conectado ao Gemini) */}
             <button
-              onClick={onOpenSearch}
+              id="btn-dash-agent"
+              onClick={onOpenAskAgent}
               style={{
                 background: 'transparent',
                 border: 'none',
-                color: '#64748b',
+                color: '#0d9488',
                 cursor: 'pointer',
                 padding: '4px',
                 display: 'flex',
                 alignItems: 'center'
               }}
-              title="Comandos / Atalhos (Ctrl+K)"
+              title="Ask Turbi Agent (Gemini AI)"
             >
-              <Command size={16} />
+              <Sparkles size={16} />
             </button>
           </div>
         </header>

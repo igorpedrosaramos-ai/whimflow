@@ -14,7 +14,8 @@ import {
   Users,
   Grid,
   Clock,
-  BarChart2
+  BarChart2,
+  Sparkles
 } from 'lucide-react';
 import { Board } from '../types';
 
@@ -38,6 +39,7 @@ interface TopNavProps {
   onRedo?: () => void;
   onNavigateToDashboard?: () => void;
   onOpenSearch?: () => void;
+  onOpenAgent?: () => void;
   onOpenVersionHistory?: () => void;
   onOpenBoardStats?: () => void;
   workspaceName?: string;
@@ -58,6 +60,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   onToggleTheme,
   onNavigateToDashboard,
   onOpenSearch,
+  onOpenAgent,
   onOpenVersionHistory,
   onOpenBoardStats,
   totalObjects = 0,
@@ -357,6 +360,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 
         {/* Busca */}
         <button
+          id="btn-topnav-search"
           onClick={onOpenSearch}
           style={{
             background: 'transparent',
@@ -371,6 +375,26 @@ export const TopNav: React.FC<TopNavProps> = ({
         >
           <Search size={16} />
         </button>
+
+        {/* Agente AI (Sparkles - Conectado ao Gemini) */}
+        {onOpenAgent && (
+          <button
+            id="btn-topnav-agent"
+            onClick={onOpenAgent}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#0d9488',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+            title="Ask Turbi Agent (Gemini AI)"
+          >
+            <Sparkles size={16} />
+          </button>
+        )}
 
         {/* Alternador de Tema */}
         <button

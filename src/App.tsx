@@ -17,6 +17,7 @@ import { AgentChatView } from './components/AgentChatView';
 import { TemplateModal } from './components/TemplateModal';
 import { PresentSidePanel } from './components/PresentSidePanel';
 import { SearchModal } from './components/SearchModal';
+import { AgentDrawer } from './components/AgentDrawer';
 import { TrashModal } from './components/TrashModal';
 import { VersionHistoryModal } from './components/VersionHistoryModal';
 import { BoardStatsModal } from './components/BoardStatsModal';
@@ -116,6 +117,7 @@ export const App: React.FC = () => {
   // Modais de Lixeira e Busca Global
   const [trashBoards, setTrashBoards] = useState<Board[]>([]);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [isAgentDrawerOpen, setIsAgentDrawerOpen] = useState(false);
   const [isTrashModalOpen, setIsTrashModalOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [isBoardStatsOpen, setIsBoardStatsOpen] = useState(false);
@@ -1546,6 +1548,39 @@ export const App: React.FC = () => {
     }, 100);
   };
 
+  const handleInsertNodesToCurrentBoard = (nodes: MindMapNode[], title?: string) => {
+    if (!activeBoard) return;
+    updateActiveBoard(prev => {
+      const isBlank = prev.mindMapNodes.length <= 1 && (!prev.mindMapNodes[0] || prev.mindMapNodes[0].text === 'untitled' || prev.mindMapNodes[0].text === prev.title);
+      if (isBlank) {
+        return {
+          ...prev,
+          title: title || prev.title,
+          mindMapNodes: nodes,
+          updatedAt: new Date().toISOString()
+        };
+      }
+      const maxX = Math.max(...prev.mindMapNodes.map(n => n.x + (n.width || 180)), 0);
+      const timestamp = Date.now();
+      const offsetNodes = nodes.map(n => ({
+        ...n,
+        id: `${n.id}-${timestamp}`,
+        parentId: n.parentId ? `${n.parentId}-${timestamp}` : null,
+        childrenIds: (n.childrenIds || []).map(cid => `${cid}-${timestamp}`),
+        x: n.x + maxX + 260
+      }));
+      return {
+        ...prev,
+        mindMapNodes: [...prev.mindMapNodes, ...offsetNodes],
+        updatedAt: new Date().toISOString()
+      };
+    });
+  };
+
+  const handleCreateNewBoardWithNodes = (title: string, nodes: MindMapNode[]) => {
+    handleGenerateFromAgent(title, title, nodes);
+  };
+
   const totalObjects = 
     activeBoard.mindMapNodes.length + 
     activeBoard.stickies.length + 
@@ -1578,7 +1613,7 @@ export const App: React.FC = () => {
           onOpenBoard={handleOpenBoard}
           onCreateNewBoard={(title) => handleCreateNewBoard(title || 'untitled')}
           onOpenDoc={() => setCurrentView('doc')}
-          onOpenAskAgent={() => setCurrentView('agent')}
+          onOpenAskAgent={() => setIsAgentDrawerOpen(true)}
           onOpenTemplates={() => setIsTemplateModalOpen(true)}
           onOpenAI={() => setIsAIModalOpen(true)}
           onDuplicateBoard={handleDuplicateBoard}
@@ -1635,6 +1670,16 @@ export const App: React.FC = () => {
           onOpenTemplates={() => setIsTemplateModalOpen(true)}
           workspaceName="teste"
           theme={theme}
+        />
+
+        {/* Gaveta Lateral Flutuante do Agente Turbi AI (Gemini) */}
+        <AgentDrawer
+          isOpen={isAgentDrawerOpen}
+          onClose={() => setIsAgentDrawerOpen(false)}
+          onInsertNodesToCurrentBoard={handleInsertNodesToCurrentBoard}
+          onCreateNewBoardWithNodes={handleCreateNewBoardWithNodes}
+          theme={theme}
+          workspaceName="teste"
         />
       </div>
     );
@@ -1701,6 +1746,7 @@ export const App: React.FC = () => {
         onRedo={handleRedo}
         onNavigateToDashboard={() => setCurrentView('dashboard')}
         onOpenSearch={() => setIsSearchModalOpen(true)}
+        onOpenAgent={() => setIsAgentDrawerOpen(true)}
         onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
         onOpenBoardStats={() => setIsBoardStatsOpen(true)}
         workspaceName="teste"
@@ -2006,6 +2052,16 @@ export const App: React.FC = () => {
         onClose={() => setIsBoardStatsOpen(false)}
         board={activeBoard}
         theme={theme}
+      />
+
+      {/* Gaveta Lateral Flutuante do Agente Turbi AI (Gemini) */}
+      <AgentDrawer
+        isOpen={isAgentDrawerOpen}
+        onClose={() => setIsAgentDrawerOpen(false)}
+        onInsertNodesToCurrentBoard={handleInsertNodesToCurrentBoard}
+        onCreateNewBoardWithNodes={handleCreateNewBoardWithNodes}
+        theme={theme}
+        workspaceName="teste"
       />
 
       {/* Modo Apresentação */}
