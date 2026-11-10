@@ -995,72 +995,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </a>
             )}
 
-            {/* Alça de Adição Rápida: Filho (+) ao passar o mouse */}
-            {isHovered && !isDraggingThis && !isEditing && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddChildNode(node.id);
-                }}
-                style={{
-                  position: 'absolute',
-                  right: '-9px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  backgroundColor: nodeColor,
-                  color: '#ffffff',
-                  border: '2px solid var(--bg-surface, #ffffff)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                  zIndex: 50,
-                  padding: 0
-                }}
-                title="Adicionar Quadrado Filho (Atalho: Tab)"
-              >
-                <Plus size={11} strokeWidth={3} />
-              </button>
-            )}
-
-            {/* Alça de Adição Rápida: Irmão Abaixo (+) ao passar o mouse (se não for raiz) */}
-            {isHovered && !isDraggingThis && !isEditing && !isRoot && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddSiblingNode(node.id);
-                }}
-                style={{
-                  position: 'absolute',
-                  bottom: '-9px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--bg-elevated, #1e293b)',
-                  color: 'var(--text-primary, #ffffff)',
-                  border: '1.5px solid var(--border-subtle, #334155)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
-                  zIndex: 50,
-                  padding: 0
-                }}
-                title="Adicionar Quadrado Irmão (Atalho: Enter)"
-              >
-                <Plus size={11} strokeWidth={3} />
-              </button>
-            )}
-
             {/* Badge de Ramos Recolhidos */}
             {hasChildren && node.collapsed && (
               <div
@@ -1090,18 +1024,18 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </div>
             )}
 
-            {/* Botões Externos de Adicionar */}
+            {/* Botões Externos de Adicionar (Apenas 1 botão Filho e 1 botão Irmão) */}
             {(isSelected || isHovered) && !isEditing && !draggingNodeId && (
               <>
-                {/* Adicionar Filho à Direita */}
+                {/* Adicionar Filho (à esquerda se o nó for do lado esquerdo, senão à direita) */}
                 <div
                   style={{
                     position: 'absolute',
-                    right: '-42px',
+                    ...(node.side === 'left' ? { left: '-34px' } : { right: '-34px' }),
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    width: '42px',
-                    height: '42px',
+                    width: '34px',
+                    height: '34px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1117,36 +1051,36 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 >
                   <div
                     style={{
-                      width: '26px',
-                      height: '26px',
+                      width: '22px',
+                      height: '22px',
                       borderRadius: '50%',
                       backgroundColor: nodeColor,
                       color: '#ffffff',
-                      border: '2px solid var(--bg-surface)',
+                      border: '2px solid var(--bg-surface, #ffffff)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.22)',
                       transition: 'transform 0.15s ease'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.15)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.15)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
                   >
-                    <Plus size={15} strokeWidth={2.5} />
+                    <Plus size={13} strokeWidth={2.6} />
                   </div>
                 </div>
 
-                {/* Adicionar Irmão Abaixo */}
+                {/* Adicionar Irmão Abaixo (se não for raiz) */}
                 {!isRoot && (
                   <div
                     style={{
                       position: 'absolute',
-                      bottom: '-34px',
+                      bottom: '-28px',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      width: '42px',
-                      height: '34px',
+                      width: '34px',
+                      height: '28px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -1162,17 +1096,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   >
                     <div
                       style={{
-                        width: '24px',
-                        height: '24px',
+                        width: '22px',
+                        height: '22px',
                         borderRadius: '50%',
-                        backgroundColor: 'var(--bg-surface)',
+                        backgroundColor: 'var(--bg-surface, #ffffff)',
                         color: nodeColor,
                         border: `2px solid ${nodeColor}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
                         transition: 'transform 0.15s ease, background-color 0.15s ease'
                       }}
                       onMouseEnter={(e) => {
@@ -1182,11 +1116,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.backgroundColor = 'var(--bg-surface)';
+                        e.currentTarget.style.backgroundColor = 'var(--bg-surface, #ffffff)';
                         e.currentTarget.style.color = nodeColor;
                       }}
                     >
-                      <Plus size={14} strokeWidth={2.5} />
+                      <Plus size={13} strokeWidth={2.6} />
                     </div>
                   </div>
                 )}
