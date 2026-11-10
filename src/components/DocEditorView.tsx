@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   FileText, 
   ChevronDown, 
@@ -33,6 +33,7 @@ import { Board } from '../types';
 interface DocEditorViewProps {
   board: Board;
   onUpdateTitle: (title: string) => void;
+  onUpdateDocContent?: (content: string) => void;
   onNavigateToDashboard: () => void;
   onOpenTemplates: () => void;
   theme?: 'dark' | 'light';
@@ -42,6 +43,7 @@ interface DocEditorViewProps {
 export const DocEditorView: React.FC<DocEditorViewProps> = ({
   board,
   onUpdateTitle,
+  onUpdateDocContent,
   onNavigateToDashboard,
   onOpenTemplates,
   theme = 'light',
@@ -49,6 +51,9 @@ export const DocEditorView: React.FC<DocEditorViewProps> = ({
 }) => {
   const [title, setTitle] = useState(board.title === 'Novo Projeto' || !board.title ? 'untitled' : board.title);
   const [docContent, setDocContent] = useState(() => {
+    if (typeof board.docContent === 'string') {
+      return board.docContent;
+    }
     // Inicializa com tópicos do quadro se houver
     if (board.mindMapNodes && board.mindMapNodes.length > 1) {
       const root = board.mindMapNodes.find(n => n.side === 'root') || board.mindMapNodes[0];
@@ -57,6 +62,15 @@ export const DocEditorView: React.FC<DocEditorViewProps> = ({
     }
     return '';
   });
+
+  // Sincroniza se o quadro ativo mudar
+  useEffect(() => {
+    if (typeof board.docContent === 'string') {
+      setDocContent(board.docContent);
+    }
+    setTitle(board.title === 'Novo Projeto' || !board.title ? 'untitled' : board.title);
+  }, [board.id]);
+
   const [discussionText, setDiscussionText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isDark = theme === 'dark';
@@ -77,6 +91,7 @@ export const DocEditorView: React.FC<DocEditorViewProps> = ({
 
     const newContent = docContent.substring(0, start) + replacement + docContent.substring(end);
     setDocContent(newContent);
+    onUpdateDocContent?.(newContent);
 
     setTimeout(() => {
       textarea.focus();
@@ -344,7 +359,10 @@ export const DocEditorView: React.FC<DocEditorViewProps> = ({
           <textarea
             ref={textareaRef}
             value={docContent}
-            onChange={e => setDocContent(e.target.value)}
+            onChange={e => {
+              setDocContent(e.target.value);
+              onUpdateDocContent?.(e.target.value);
+            }}
             placeholder="Comece a digitar seu documento executivo aqui... Use Markdown, tópicos, checklists e tabelas. Blocos ilimitados habilitados."
             style={{
               width: '100%',

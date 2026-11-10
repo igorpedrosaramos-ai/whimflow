@@ -28,9 +28,17 @@ import { TemplateItem } from './constants/templatesData';
 import { EXECUTIVE_PALETTE } from './components/NodeContextMenu';
 import { calculateMindMapLayout, cleanAndNormalizeMindMap } from './utils/treeLayout';
 import { parseOutlineText, createNodesFromOutline } from './utils/mindMapImport';
-
-const STORAGE_KEY = 'whimflow_boards_v6';
-const THEME_KEY = 'whimflow_theme';
+import { 
+  loadBoards, 
+  loadBoardsSync, 
+  debouncedSaveBoards, 
+  saveActiveBoardId, 
+  loadActiveBoardId,
+  saveCurrentView,
+  loadCurrentView,
+  STORAGE_KEY,
+  THEME_KEY
+} from './services/storageService';
 
 export const App: React.FC = () => {
   // Garante que a aba do navegador sempre exiba estritamente "Mapa Mental Turbine"
@@ -38,30 +46,16 @@ export const App: React.FC = () => {
     document.title = 'Mapa Mental Turbine';
   }, []);
 
-  // Estado dos Quadros com Purga Total de Nós Fantasmas / Espaços em Branco
+  // Estado dos Quadros com Persistência Robusta em Camadas (IndexedDB + LocalStorage)
   const [boards, setBoards] = useState<Board[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('whimflow_boards_v5');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const sanitized = parsed.map((b: Board) => ({
-            ...b,
-            mindMapNodes: cleanAndNormalizeMindMap(b.mindMapNodes)
-          }));
-          const hasOnegai = sanitized.some((b: Board) => b.id === 'board-onegai');
-          const hasOrion = sanitized.some((b: Board) => b.id === 'board-orion-sushi');
-          const list = [...sanitized];
-          if (!hasOnegai) list.push({ ...ONEGAI_BOARD, mindMapNodes: cleanAndNormalizeMindMap(ONEGAI_BOARD.mindMapNodes) });
-          if (!hasOrion) list.push({ ...ORION_SUSHI_BOARD, mindMapNodes: cleanAndNormalizeMindMap(ORION_SUSHI_BOARD.mindMapNodes) });
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-          } catch (e) {}
-          return list;
-        }
-      }
-    } catch (e) {
-      console.warn('Iniciando com quadros padrão');
+    const loaded = loadBoardsSync();
+    if (loaded && loaded.length > 0) {
+      const hasOnegai = loaded.some((b: Board) => b.id === 'board-onegai');
+      const hasOrion = loaded.some((b: Board) => b.id === 'board-orion-sushi');
+      const list = [...loaded];
+      if (!hasOnegai) list.push({ ...ONEGAI_BOARD, mindMapNodes: cleanAndNormalizeMindMap(ONEGAI_BOARD.mindMapNodes) });
+      if (!hasOrion) list.push({ ...ORION_SUSHI_BOARD, mindMapNodes: cleanAndNormalizeMindMap(ORION_SUSHI_BOARD.mindMapNodes) });
+      return list;
     }
     return INITIAL_BOARDS.map(b => ({
       ...b,
@@ -69,9 +63,26 @@ export const App: React.FC = () => {
     }));
   });
 
+  // Sincronização inicial assíncrona com IndexedDB
+  useEffect(() => {
+    loadBoards().then(dbBoards => {
+      if (dbBoards && dbBoards.length > 0) {
+        setBoards(dbBoards);
+      }
+    });
+  }, []);
+
   const [activeBoardId, setActiveBoardId] = useState<string>(() => {
+    const savedActiveId = loadActiveBoardId();
+    if (savedActiveId && boards.some(b => b.id === savedActiveId)) {
+      return savedActiveId;
+    }
     return boards[0]?.id || BLANK_BOARD.id;
   });
+
+  useEffect(() => {
+    saveActiveBoardId(activeBoardId);
+  }, [activeBoardId]);
 
   // Pilha de Histórico para Desfazer / Refazer
   const [history, setHistory] = useState<Board[]>([]);
@@ -111,8 +122,18 @@ export const App: React.FC = () => {
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
   const isMarqueeActiveRef = useRef(false);
 
-  // Visualização Principal: 'dashboard' | 'editor' | 'doc' | 'agent'
-  const [currentView, setCurrentView] = useState<'dashboard' | 'editor' | 'doc' | 'agent'>('dashboard');
+  // Visualização Principal com Restauração Automática ao Recarregar
+  const [currentView, setCurrentView] = useState<'dashboard' | 'editor' | 'doc' | 'agent'>(() => {
+    const saved = loadCurrentView();
+    if (saved === 'dashboard' || saved === 'editor' || saved === 'doc' || saved === 'agent') {
+      return saved as 'dashboard' | 'editor' | 'doc' | 'agent';
+    }
+    return 'dashboard';
+  });
+
+  useEffect(() => {
+    saveCurrentView(currentView);
+  }, [currentView]);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [isPresentSidePanelOpen, setIsPresentSidePanelOpen] = useState(false);
 
@@ -240,13 +261,9 @@ export const App: React.FC = () => {
     fitView(activeBoard.mindMapNodes);
   }, [activeBoardId]);
 
-  // Salvar no localStorage continuamente
+  // Salvar no IndexedDB e localStorage continuamente com debounce para máxima performance e zero lag
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(boards));
-    } catch (e) {
-      console.error('Falha ao salvar quadros', e);
-    }
+    debouncedSaveBoards(boards, 300);
   }, [boards]);
 
   // Tema
@@ -1722,6 +1739,7 @@ export const App: React.FC = () => {
         <DocEditorView
           board={activeBoard}
           onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
+          onUpdateDocContent={(docContent) => updateActiveBoard(b => ({ ...b, docContent }), false)}
           onNavigateToDashboard={() => setCurrentView('dashboard')}
           onOpenTemplates={() => setIsTemplateModalOpen(true)}
           theme={theme}

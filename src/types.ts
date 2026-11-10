@@ -129,6 +129,7 @@ export interface Board {
   updatedAt: string;
   isPrivate?: boolean;
   isStarred?: boolean;
+  docContent?: string;
   historySnapshots?: BoardVersionSnapshot[];
   mindMapNodes: MindMapNode[];
   shapes: FlowShape[];
