@@ -172,6 +172,27 @@ export const DocEditorView: React.FC<DocEditorViewProps> = ({
           </span>
 
           <button
+            onClick={() => window.print()}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '5px 10px',
+              borderRadius: '5px',
+              border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
+              backgroundColor: isDark ? '#1a222f' : '#f8fafc',
+              color: 'inherit',
+              fontSize: '12px',
+              cursor: 'pointer',
+              fontWeight: 500
+            }}
+            title="Imprimir ou Salvar Documento como PDF"
+          >
+            <FileText size={13} color="#0284c7" />
+            <span>Imprimir / PDF</span>
+          </button>
+
+          <button
             onClick={handleExportMarkdown}
             style={{
               display: 'flex',
