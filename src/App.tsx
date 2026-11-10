@@ -613,8 +613,18 @@ export const App: React.FC = () => {
           board={activeBoard}
           onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
           onUpdateDocContent={(docContent) => updateActiveBoard(b => ({ ...b, docContent }), false)}
+          onUpdateDiscussions={(discussions) => updateActiveBoard(b => ({ ...b, discussions }))}
+          onToggleFavorite={() => {
+            const next = !activeBoard.isStarred;
+            updateActiveBoard(b => ({ ...b, isStarred: next }));
+            showToast(next ? 'Documento favoritado!' : 'Documento removido dos favoritos.', 'info');
+          }}
+          onConvertToMindMap={(title, nodes) => {
+            handleGenerateFromAgent(title, title, nodes);
+          }}
           onNavigateToDashboard={() => setCurrentView('dashboard')}
           onOpenTemplates={() => setIsTemplateModalOpen(true)}
+          onShowToast={showToast}
           theme={theme}
           workspaceName="teste"
         />

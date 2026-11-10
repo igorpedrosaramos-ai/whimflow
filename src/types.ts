@@ -121,6 +121,14 @@ export interface BoardVersionSnapshot {
   boardData: Board;
 }
 
+export interface DocDiscussion {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: string;
+  resolved?: boolean;
+}
+
 export interface Board {
   id: string;
   title: string;
@@ -130,6 +138,7 @@ export interface Board {
   isPrivate?: boolean;
   isStarred?: boolean;
   docContent?: string;
+  discussions?: DocDiscussion[];
   historySnapshots?: BoardVersionSnapshot[];
   mindMapNodes: MindMapNode[];
   shapes: FlowShape[];
