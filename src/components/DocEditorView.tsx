@@ -56,7 +56,7 @@ export const DocEditorView: React.FC<DocEditorViewProps> = ({
   theme = 'light',
   workspaceName = 'teste'
 }) => {
-  const [title, setTitle] = useState(board.title === 'Novo Projeto' || !board.title ? 'untitled' : board.title);
+  const [title, setTitle] = useState(board.title === 'Novo Projeto' || !board.title ? 'Sem título' : board.title);
   const [docContent, setDocContent] = useState(() => {
     if (typeof board.docContent === 'string' && board.docContent.trim()) {
       return board.docContent;
@@ -86,7 +86,7 @@ export const DocEditorView: React.FC<DocEditorViewProps> = ({
     if (typeof board.docContent === 'string') {
       setDocContent(board.docContent);
     }
-    setTitle(board.title === 'Novo Projeto' || !board.title ? 'untitled' : board.title);
+    setTitle(board.title === 'Novo Projeto' || !board.title ? 'Sem título' : board.title);
     setDiscussions(board.discussions || []);
     setIsStarred(Boolean(board.isStarred));
   }, [board.id]);
@@ -446,7 +446,7 @@ Adotaremos renderização condicional dentro do container raiz comum, centraliza
               <line x1="8" y1="14" x2="12" y2="14" />
             </svg>
 
-            <span>{title || 'untitled'}</span>
+            <span>{title || 'Sem título'}</span>
           </div>
 
           <button
@@ -691,7 +691,7 @@ Adotaremos renderização condicional dentro do container raiz comum, centraliza
               setTitle(e.target.value);
               onUpdateTitle(e.target.value);
             }}
-            placeholder="untitled"
+            placeholder="Sem título"
             style={{
               fontSize: '34px',
               fontWeight: 700,
@@ -707,13 +707,13 @@ Adotaremos renderização condicional dentro do container raiz comum, centraliza
           {/* Subtítulo Guia e Link de Templates de Documentos */}
           <div style={{ position: 'relative' }}>
             <p style={{ margin: 0, fontSize: '13.5px', color: '#94a3b8' }}>
-              Press <kbd style={{ padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: isDark ? '#1e2430' : '#f1f5f9', fontSize: '12px' }}>Enter</kbd> to continue with an empty page, or{' '}
+              Pressione <kbd style={{ padding: '2px 6px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: isDark ? '#1e2430' : '#f1f5f9', fontSize: '12px' }}>Enter</kbd> para continuar com uma página em branco, ou{' '}
               <span
                 id="link-choose-template"
                 onClick={() => setIsTemplateMenuOpen(prev => !prev)}
                 style={{ color: '#0284c7', cursor: 'pointer', textDecoration: 'underline', fontWeight: 600 }}
               >
-                choose a template
+                escolha um modelo executivo
               </span>
             </p>
 
@@ -1016,7 +1016,7 @@ Adotaremos renderização condicional dentro do container raiz comum, centraliza
           <input
             id="input-start-discussion"
             type="text"
-            placeholder="Start a discussion... (Digite uma nota e pressione Enter)"
+            placeholder="Iniciar uma discussão executiva ou observação... (Pressione Enter para enviar)"
             value={discussionText}
             onChange={e => setDiscussionText(e.target.value)}
             style={{

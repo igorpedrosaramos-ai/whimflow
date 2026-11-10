@@ -217,7 +217,7 @@ export const App: React.FC = () => {
   }, [openBoardInStorage]);
 
   // Criação de Quadro
-  const handleCreateNewBoard = useCallback((title: string = 'untitled') => {
+  const handleCreateNewBoard = useCallback((title: string = 'Sem título') => {
     createBoardInStorage(title);
     setSelectedNodeId('root');
     setSelectedNodeIds(['root']);
@@ -250,8 +250,8 @@ export const App: React.FC = () => {
   const handleAddSection = useCallback(() => {
     const sectionId = `sec-${Date.now()}`;
     const title = selectedNodeId 
-      ? (activeBoard.mindMapNodes.find(n => n.id === selectedNodeId)?.text || 'untitled') 
-      : `untitled ${(activeBoard.sections?.length || 0) + 1}`;
+      ? (activeBoard.mindMapNodes.find(n => n.id === selectedNodeId)?.text || 'Sem título') 
+      : `Seção ${(activeBoard.sections?.length || 0) + 1}`;
     const newSection: SlideSection = {
       id: sectionId,
       title,
@@ -497,7 +497,7 @@ export const App: React.FC = () => {
   // Criação a partir do Agente IA
   const handleGenerateFromAgent = (prompt: string, title?: string, nodes?: MindMapNode[]) => {
     const newBoardId = `board-agent-${Date.now()}`;
-    const boardTitle = title || (prompt.length > 25 ? prompt.slice(0, 25) + '...' : prompt) || 'untitled';
+    const boardTitle = title || (prompt.length > 25 ? prompt.slice(0, 25) + '...' : prompt) || 'Sem título';
     const newBoard: Board = {
       id: newBoardId,
       title: boardTitle,
@@ -582,7 +582,7 @@ export const App: React.FC = () => {
         <DashboardView
           boards={boards}
           onOpenBoard={handleOpenBoard}
-          onCreateNewBoard={(title) => handleCreateNewBoard(title || 'untitled')}
+          onCreateNewBoard={(title) => handleCreateNewBoard(title || 'Sem título')}
           onOpenDoc={() => setCurrentView('doc')}
           onOpenAskAgent={() => setIsAgentDrawerOpen(true)}
           onOpenTemplates={() => setIsTemplateModalOpen(true)}
@@ -658,7 +658,7 @@ export const App: React.FC = () => {
             boards={boards}
             activeBoardId={activeBoard.id}
             onSelectBoard={handleOpenBoard}
-            onCreateNewBoard={() => handleCreateNewBoard('untitled')}
+            onCreateNewBoard={() => handleCreateNewBoard('Sem título')}
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             onOpenShare={() => setIsShareModalOpen(true)}

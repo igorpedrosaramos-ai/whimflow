@@ -185,7 +185,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
               boxShadow: selectedScope === 'workspace' && !isDark ? '0 1px 3px rgba(0,0,0,0.06)' : 'none'
             }}
           >
-            Workspace
+            Espaço de Trabalho
           </button>
 
           <button
@@ -230,7 +230,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
               padding: '0 12px 10px 12px'
             }}
           >
-            {query.trim() ? `RESULTADOS (${filteredBoards.length})` : 'RECENT'}
+            {query.trim() ? `RESULTADOS (${filteredBoards.length})` : 'RECENTES'}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>

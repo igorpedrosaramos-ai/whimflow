@@ -223,7 +223,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             }}
           >
             <Clock size={16} color={categoryFilter === 'recent' ? '#818cf8' : '#64748b'} />
-            <span>Recent</span>
+            <span>Recentes</span>
           </button>
 
           {/* TEAMS Header com botão toggle de recolher/abrir */}
@@ -477,10 +477,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               flexWrap: 'wrap'
             }}
           >
-            {/* 1. + New Board (Purple #7c3aed) */}
+            {/* 1. + Novo Quadro (Purple #7c3aed) */}
             <button
               id="btn-dashboard-new-board"
-              onClick={() => onCreateNewBoard('untitled')}
+              onClick={() => onCreateNewBoard('Sem título')}
               style={{
                 width: '172px',
                 height: '100px',
@@ -509,14 +509,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <circle cx="12" cy="12" r="1" fill="#ffffff" />
                 <circle cx="16" cy="12" r="1" fill="#ffffff" />
               </svg>
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New Board</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Novo Quadro</span>
             </button>
 
-            {/* 2. + New Doc (Blue #0284c7 - Foto 1 e 2) */}
+            {/* 2. + Novo Documento (Blue #0284c7 - Foto 1 e 2) */}
             <button
               id="btn-dashboard-new-doc"
               onClick={onOpenDoc}
-              title="Text editing with tables and embeds"
+              title="Editor de documentos executivos com tabelas e mapas"
               style={{
                 width: '172px',
                 height: '100px',
@@ -537,13 +537,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
             >
               <FileText size={26} color="#ffffff" />
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New Doc</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Novo Documento</span>
             </button>
 
-            {/* 3. + Ask agent (Teal #0d9488 - Foto 1 e 3) */}
+            {/* 3. + Assistente IA (Teal #0d9488 - Foto 1 e 3) */}
             <button
               id="btn-dashboard-action-agent"
               onClick={onOpenAskAgent}
+              title="Assistente IA multimodal para pensar e desenhar diagramas"
               style={{
                 width: '172px',
                 height: '100px',
@@ -564,13 +565,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
             >
               <Sparkles size={26} color="#ffffff" />
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Ask agent</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Assistente IA</span>
             </button>
 
-            {/* 4. + New from template (Slate #475569 - Foto 1 e 4) */}
+            {/* 4. + Criar de Modelo (Slate #475569 - Foto 1 e 4) */}
             <button
               id="btn-dashboard-action-template"
               onClick={onOpenTemplates}
+              title="Biblioteca de modelos corporativos pré-estruturados"
               style={{
                 width: '172px',
                 height: '100px',
@@ -591,7 +593,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
             >
               <Layout size={26} color="#ffffff" />
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New from template</span>
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Criar de Modelo</span>
             </button>
           </div>
 
@@ -627,10 +629,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 title="Ordenar projetos"
               >
                 <span>
-                  {sortOption === 'created-desc' && 'Date created ↓'}
-                  {sortOption === 'created-asc' && 'Date created ↑'}
-                  {sortOption === 'alpha' && 'Title (A - Z)'}
-                  {sortOption === 'modified' && 'Last modified ↓'}
+                  {sortOption === 'created-desc' && 'Data de criação ↓'}
+                  {sortOption === 'created-asc' && 'Data de criação ↑'}
+                  {sortOption === 'alpha' && 'Título (A - Z)'}
+                  {sortOption === 'modified' && 'Última modificação ↓'}
                 </span>
                 <ChevronDown size={13} color="#94a3b8" />
               </button>
@@ -800,10 +802,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Seção Today com Grid de Boards */}
+          {/* Seção Hoje com Grid de Boards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b' }}>
-              Today
+              Hoje
             </h3>
 
             {displayMode === 'grid' ? (
@@ -905,7 +907,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 textOverflow: 'ellipsis'
                               }}
                             >
-                              {board.title || 'untitled'}
+                              {board.title || 'Sem título'}
                             </span>
                           )}
                         </div>
@@ -1085,7 +1087,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <circle cx="12" cy="8" r="1" fill="#7c3aed" />
                         <circle cx="16" cy="8" r="1" fill="#7c3aed" />
                       </svg>
-                      <span style={{ fontSize: '13.5px', fontWeight: 600 }}>{board.title || 'untitled'}</span>
+                      <span style={{ fontSize: '13.5px', fontWeight: 600 }}>{board.title || 'Sem título'}</span>
                     </div>
                     <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                       {new Date(board.updatedAt || Date.now()).toLocaleDateString('pt-BR')}

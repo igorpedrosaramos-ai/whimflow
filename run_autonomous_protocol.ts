@@ -196,7 +196,7 @@ async function runAutonomousProtocol() {
     let nodeOpsPassed = false;
     if (boardCreated) {
       // Edita o título do quadro no TopNav
-      const titleInput = await page.$('input[value="untitled"]') || await page.$('header input[type="text"]');
+      const titleInput = await page.$('input[value="Sem título"]') || await page.$('input[value="untitled"]') || await page.$('header input[type="text"]');
       if (titleInput) {
         await titleInput.click({ clickCount: 3 });
         await page.keyboard.type('Projeto Automatizado Alpha');
@@ -320,7 +320,7 @@ async function runAutonomousProtocol() {
     if (agentBtn) {
       await agentBtn.click();
       await new Promise(r => setTimeout(r, 600));
-      const hasAgent = (await page.content()).includes('Ask Whimsical agent...') && (await page.content()).includes('Try it out');
+      const hasAgent = (await page.content()).includes('Assistente IA') && ((await page.content()).includes('Sugestões Prontas') || (await page.content()).includes('Try it out'));
       if (hasAgent) {
         agentPassed = true;
         const agentShot = path.join(ARTIFACTS_DIR, 'e2e_10_agent_gemini.png');

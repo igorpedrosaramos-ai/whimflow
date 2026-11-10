@@ -1,19 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   ChevronDown, 
   Star, 
   Search, 
-  Image, 
+  Image as ImageIcon, 
   ArrowUp, 
   Sparkles, 
   GitBranch, 
-  Smartphone, 
+  Layout, 
+  Workflow, 
   Network, 
   StickyNote, 
-  ExternalLink,
-  Users
+  Users,
+  FileText,
+  X,
+  Lightbulb,
+  Copy
 } from 'lucide-react';
-import { Board, MindMapNode } from '../types';
+import { MindMapNode } from '../types';
 import { generateWithGemini } from '../services/geminiService';
 
 interface AgentChatViewProps {
@@ -32,84 +36,98 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
   const [prompt, setPrompt] = useState('');
   const [isHideSuggestions, setIsHideSuggestions] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<{ name: string; size: number; isImage: boolean; dataUrl?: string; textContent?: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const isDark = theme === 'dark';
 
   const suggestions = [
     {
       id: 'seq-pay',
-      label: 'Sequence diagram of payment processing',
+      label: 'Diagrama de sequência: fluxo de pagamentos',
       icon: <GitBranch size={15} color="#8b5cf6" />,
-      title: 'Payment Processing Architecture',
-      generate: () => ([
-        { id: 'root', text: 'Payment Gateway Flow\nStripe & Webhook Orchestrator', x: 0, y: 0, width: 220, height: 48, parentId: null, childrenIds: ['c1', 'c2', 'c3'], color: '#7c3aed', borderStyle: 'fill' as const, lineStyle: 'stepped' as const, side: 'root' as const },
-        { id: 'c1', text: '1. Client Initiates Checkout\n(Tokenized Card Data)', x: -280, y: -60, width: 200, height: 44, parentId: 'root', childrenIds: ['c1-sub'], color: '#3b82f6', borderStyle: 'border' as const, side: 'left' as const },
-        { id: 'c1-sub', text: '3D Secure 2.0 Biometric Verification', x: -490, y: -60, width: 210, height: 40, parentId: 'c1', childrenIds: [], color: '#3b82f6', borderStyle: 'accent' as const, side: 'left' as const },
-        { id: 'c2', text: '2. Acquire Bank Authorization\n(ISO 8583 Protocol)', x: 0, y: 120, width: 205, height: 44, parentId: 'root', childrenIds: ['c2-sub'], color: '#10b981', borderStyle: 'border' as const, side: 'root' as const },
-        { id: 'c2-sub', text: 'Idempotent Ledger Settlement', x: 0, y: 200, width: 190, height: 40, parentId: 'c2', childrenIds: [], color: '#10b981', borderStyle: 'accent' as const, side: 'root' as const },
-        { id: 'c3', text: '3. Webhook Event Dispatcher\n(Signed SHA-256 HMAC)', x: 280, y: -60, width: 205, height: 44, parentId: 'root', childrenIds: ['c3-sub'], color: '#f59e0b', borderStyle: 'border' as const, side: 'right' as const },
-        { id: 'c3-sub', text: 'Auto-provision SaaS Subscription', x: 490, y: -60, width: 200, height: 40, parentId: 'c3', childrenIds: [], color: '#f59e0b', borderStyle: 'accent' as const, side: 'right' as const }
-      ])
+      title: 'Arquitetura de Pagamentos Ponta a Ponta',
+      prompt: 'Diagrama de sequência: fluxo de pagamentos'
     },
     {
       id: 'wf-app',
-      label: 'Wireframe of a budgeting app',
-      icon: <Smartphone size={15} color="#0284c7" />,
-      title: 'Budgeting Mobile App Prototype',
-      generate: () => ([
-        { id: 'root', text: 'Budgeting & Wealth App\niOS Prototype Architecture', x: 0, y: 0, width: 210, height: 48, parentId: null, childrenIds: ['b1', 'b2'], color: '#0284c7', borderStyle: 'fill' as const, side: 'root' as const },
-        { id: 'b1', text: 'Expense Tracking Dashboard\nDaily & Monthly Categories', x: -280, y: 0, width: 200, height: 44, parentId: 'root', childrenIds: [], color: '#0284c7', borderStyle: 'border' as const, side: 'left' as const },
-        { id: 'b2', text: 'Auto-Save Vaults & Investments\nHigh-Yield Savings Engine', x: 280, y: 0, width: 210, height: 44, parentId: 'root', childrenIds: [], color: '#0284c7', borderStyle: 'border' as const, side: 'right' as const }
-      ])
+      label: 'Wireframe: app de controle financeiro',
+      icon: <Layout size={15} color="#0284c7" />,
+      title: 'Protótipo de App Financeiro Mobile',
+      prompt: 'Wireframe: app de controle financeiro'
     },
     {
       id: 'uf-checkout',
-      label: 'User flow of checkout flow',
-      icon: <GitBranch size={15} color="#ec4899" />,
-      title: 'E-commerce Checkout User Flow',
-      generate: () => ([
-        { id: 'root', text: 'High-Converting Checkout Flow\nZero Friction Journey', x: 0, y: 0, width: 220, height: 48, parentId: null, childrenIds: ['u1', 'u2', 'u3'], color: '#ec4899', borderStyle: 'fill' as const, lineStyle: 'stepped' as const, side: 'root' as const },
-        { id: 'u1', text: 'Step 1: 1-Click Apple Pay / Google Pay', x: 270, y: -70, width: 225, height: 42, parentId: 'root', childrenIds: [], color: '#10b981', borderStyle: 'border' as const, side: 'right' as const },
-        { id: 'u2', text: 'Step 2: Dynamic Address Autocomplete', x: 270, y: 0, width: 225, height: 42, parentId: 'root', childrenIds: [], color: '#3b82f6', borderStyle: 'border' as const, side: 'right' as const },
-        { id: 'u3', text: 'Step 3: Instant Order Confirmation & Pix', x: 270, y: 70, width: 235, height: 42, parentId: 'root', childrenIds: [], color: '#f59e0b', borderStyle: 'border' as const, side: 'right' as const }
-      ])
+      label: 'Fluxo de usuário: checkout e conversão',
+      icon: <Workflow size={15} color="#ec4899" />,
+      title: 'Fluxo de Checkout de Alta Conversão',
+      prompt: 'Fluxo de usuário: checkout e conversão'
     },
     {
       id: 'mm-startup',
-      label: 'Mind map of startup building tips',
+      label: 'Mapa mental: passos para criar uma startup',
       icon: <Network size={15} color="#8b5cf6" />,
-      title: 'Startup Execution Playbook',
-      generate: () => ([
-        { id: 'root', text: '0 to 1 Startup Playbook\nFrom Idea to Product-Market Fit', x: 0, y: 0, width: 220, height: 50, parentId: null, childrenIds: ['m1', 'm2', 'm3', 'm4'], color: '#7c3aed', borderStyle: 'fill' as const, lineStyle: 'bezier' as const, side: 'root' as const },
-        { id: 'm1', text: '1. Customer Discovery\nTalk to 50 ICP users before coding', x: -290, y: -60, width: 230, height: 46, parentId: 'root', childrenIds: [], color: '#ec4899', borderStyle: 'border' as const, side: 'left' as const },
-        { id: 'm2', text: '2. Scrappy MVP\nLaunch in 2 weeks with core loop', x: -290, y: 60, width: 220, height: 46, parentId: 'root', childrenIds: [], color: '#8b5cf6', borderStyle: 'border' as const, side: 'left' as const },
-        { id: 'm3', text: '3. Distribution Engine\nOutbound + SEO + Word of mouth', x: 290, y: -60, width: 225, height: 46, parentId: 'root', childrenIds: [], color: '#10b981', borderStyle: 'border' as const, side: 'right' as const },
-        { id: 'm4', text: '4. Unit Economics\nLTV/CAC > 3x & 80%+ Gross Margin', x: 290, y: 60, width: 225, height: 46, parentId: 'root', childrenIds: [], color: '#f59e0b', borderStyle: 'border' as const, side: 'right' as const }
-      ])
+      title: 'Manual Prático de Startups: do 0 ao 1',
+      prompt: 'Mapa mental: passos para criar uma startup'
     },
     {
       id: 'st-marketing',
-      label: 'Sticky note brainstorm for marketing ideas',
+      label: 'Brainstorm em notas: ideias de marketing',
       icon: <StickyNote size={15} color="#eab308" />,
-      title: 'Growth Marketing Ideation Matrix',
-      generate: () => ([
-        { id: 'root', text: 'Growth Marketing Sprint\nHigh Leverage Channels', x: 0, y: 0, width: 210, height: 48, parentId: null, childrenIds: ['g1', 'g2'], color: '#eab308', borderStyle: 'fill' as const, side: 'root' as const },
-        { id: 'g1', text: 'Viral Organic Loops & Referrals', x: -270, y: 0, width: 215, height: 44, parentId: 'root', childrenIds: [], color: '#10b981', borderStyle: 'border' as const, side: 'left' as const },
-        { id: 'g2', text: 'Founder-led Video Content', x: 270, y: 0, width: 200, height: 44, parentId: 'root', childrenIds: [], color: '#3b82f6', borderStyle: 'border' as const, side: 'right' as const }
-      ])
+      title: 'Matriz de Ideação de Marketing de Crescimento',
+      prompt: 'Brainstorm em notas: ideias de marketing'
     }
   ];
 
-  const handleSend = async () => {
-    if (!prompt.trim() || isGenerating) return;
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachedFile({
+          name: file.name,
+          size: file.size,
+          isImage: true,
+          dataUrl: reader.result as string
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachedFile({
+          name: file.name,
+          size: file.size,
+          isImage: false,
+          textContent: typeof reader.result === 'string' ? reader.result : ''
+        });
+      };
+      reader.readAsText(file);
+    }
+    e.target.value = '';
+  };
+
+  const handleSend = async (overridePrompt?: string) => {
+    const textToSend = (overridePrompt || prompt).trim();
+    if ((!textToSend && !attachedFile) || isGenerating) return;
     setIsGenerating(true);
 
+    let finalPrompt = textToSend;
+    if (attachedFile && !attachedFile.isImage && attachedFile.textContent) {
+      finalPrompt = `[Documento Anexado: ${attachedFile.name}]\nConteúdo:\n${attachedFile.textContent}\n\nInstrução: ${textToSend || 'Estruture um mapa mental completo com reflexões estratégicas.'}`;
+    }
+
     try {
-      const result = await generateWithGemini(prompt);
+      const result = await generateWithGemini(
+        finalPrompt || 'Analise a imagem e construa um mapa mental',
+        attachedFile?.isImage ? attachedFile.dataUrl : undefined
+      );
       setIsGenerating(false);
-      onGenerateBoard(prompt, result.title, result.nodes);
+      onGenerateBoard(textToSend || result.title, result.title, result.nodes);
     } catch {
       setIsGenerating(false);
-      onGenerateBoard(prompt, prompt.slice(0, 30));
+      onGenerateBoard(textToSend, textToSend.slice(0, 30));
     }
   };
 
@@ -125,7 +143,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
         fontFamily: 'Dinsical, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
       }}
     >
-      {/* Barra Superior Autêntica Whimsical Ask Agent (Foto 3) */}
+      {/* Barra Superior */}
       <header
         style={{
           height: '48px',
@@ -145,7 +163,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
             onClick={onNavigateToDashboard}
             style={{ color: isDark ? '#94a3b8' : '#64748b', cursor: 'pointer', fontWeight: 500 }}
           >
-            Teams
+            Equipes
           </span>
           <span style={{ color: '#94a3b8' }}>/</span>
           <div
@@ -182,7 +200,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
         </div>
       </header>
 
-      {/* Barra de Aba: New chat (Foto 3) */}
+      {/* Barra de Aba: Assistente IA */}
       <div
         style={{
           borderBottom: isDark ? '1px solid #1e2633' : '1px solid #e2e8f0',
@@ -200,18 +218,18 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
             fontSize: '13px',
             fontWeight: 600,
             color: isDark ? '#f8fafc' : '#0f172a',
-            borderBottom: '2px solid #0d9488',
+            borderBottom: '2.5px solid #0d9488',
             height: '100%',
             display: 'flex',
             alignItems: 'center',
             cursor: 'pointer'
           }}
         >
-          New chat
+          Assistente IA
         </div>
       </div>
 
-      {/* Conteúdo Central do Whimsical Ask Agent (Foto 3) */}
+      {/* Conteúdo Central */}
       <main
         style={{
           flex: 1,
@@ -220,15 +238,15 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           padding: '24px',
-          gap: '24px'
+          gap: '20px'
         }}
       >
-        {/* Card: Try it out (Foto 3) */}
+        {/* Card: Sugestões Prontas */}
         {!isHideSuggestions && (
           <div
             style={{
               width: '100%',
-              maxWidth: '460px',
+              maxWidth: '480px',
               backgroundColor: isDark ? '#181e28' : '#ffffff',
               border: isDark ? '1px solid #2a3446' : '1px solid #e2e8f0',
               borderRadius: '12px',
@@ -240,8 +258,8 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '12.5px', fontWeight: 600, color: isDark ? '#cbd5e1' : '#475569' }}>
-                Try it out
+              <span style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#cbd5e1' : '#475569' }}>
+                Sugestões Prontas
               </span>
               <button
                 onClick={() => setIsHideSuggestions(true)}
@@ -255,16 +273,16 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
                   letterSpacing: '0.05em'
                 }}
               >
-                HIDE
+                OCULTAR
               </button>
             </div>
 
-            {/* Lista dos 5 Prompts Oficiais do Whimsical (Foto 3) */}
+            {/* Lista dos Prompts Traduzidos */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {suggestions.map(item => (
                 <button
                   key={item.id}
-                  onClick={() => onGenerateBoard(item.label, item.title, item.generate())}
+                  onClick={() => handleSend(item.prompt)}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -274,7 +292,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
                     border: 'none',
                     background: 'transparent',
                     color: isDark ? '#f1f5f9' : '#334155',
-                    fontSize: '12.5px',
+                    fontSize: '13px',
                     cursor: 'pointer',
                     textAlign: 'left',
                     transition: 'background-color 0.15s'
@@ -288,16 +306,18 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
               ))}
             </div>
 
-            <div style={{ borderTop: isDark ? '1px solid #242c3b' : '1px solid #f1f5f9', paddingTop: '8px' }}>
-              <span style={{ fontSize: '11px', color: '#94a3b8' }}>
-                Complex prompts use more credits.{' '}
-                <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>Learn more ↗</span>
+            <div style={{ borderTop: isDark ? '1px solid #242c3b' : '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                Gera mapas mentais, analisa arquivos e faz perguntas estratégicas.
+              </span>
+              <span style={{ fontSize: '11.5px', color: '#0d9488', fontWeight: 600 }}>
+                ⚡ Gemini 2.5
               </span>
             </div>
           </div>
         )}
 
-        {/* Input Flutuante Central do Ask Agent (Foto 3) */}
+        {/* Input Flutuante Central com Suporte a Arquivo e Modos */}
         <div
           style={{
             width: '100%',
@@ -309,12 +329,87 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
             boxShadow: isDark ? '0 10px 30px rgba(0,0,0,0.4)' : '0 6px 20px rgba(0, 0, 0, 0.08)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px'
+            gap: '10px'
           }}
         >
+          {/* Pílulas de Modos Rápidos */}
+          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+            <button
+              onClick={() => setPrompt('Analise criticamente minha ideia, aponte pontos cegos e me faça 3 perguntas provocativas: ')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '5px',
+                border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
+                backgroundColor: isDark ? '#141a24' : '#f8fafc',
+                color: isDark ? '#e2e8f0' : '#475569',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Lightbulb size={12} color="#f59e0b" />
+              <span>Ajudar a Pensar</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setPrompt('Copie exatamente os nós e hierarquias da imagem anexada: ');
+                if (!attachedFile) fileInputRef.current?.click();
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 8px',
+                borderRadius: '5px',
+                border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
+                backgroundColor: isDark ? '#141a24' : '#f8fafc',
+                color: isDark ? '#e2e8f0' : '#475569',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              <Copy size={12} color="#0284c7" />
+              <span>Copiar da Imagem</span>
+            </button>
+          </div>
+
+          {/* Anexo selecionado */}
+          {attachedFile && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                backgroundColor: isDark ? '#232d3f' : '#f1f5f9',
+                fontSize: '12px'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {attachedFile.isImage ? <ImageIcon size={14} color="#0284c7" /> : <FileText size={14} color="#0284c7" />}
+                <span style={{ fontWeight: 600 }}>{attachedFile.name}</span>
+                <span style={{ color: '#94a3b8', fontSize: '11px' }}>({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+              </div>
+              <button
+                onClick={() => setAttachedFile(null)}
+                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
           <input
             type="text"
-            placeholder="Ask Whimsical agent..."
+            placeholder="Pergunte ao Assistente IA, envie uma imagem/documento ou peça para estruturar..."
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             onKeyDown={e => {
@@ -330,96 +425,58 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
             }}
           />
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#94a3b8',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                padding: '4px'
-              }}
-              title="Anexar imagem de referência"
-            >
-              <Image size={18} />
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '4px' }}>
+            <div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept="image/*,.txt,.md,.pdf,.json,.csv"
+                style={{ display: 'none' }}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: attachedFile ? '#0d9488' : '#94a3b8',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px',
+                  fontSize: '12px',
+                  fontWeight: 500
+                }}
+                title="Anexar imagem ou documento para análise ou cópia"
+              >
+                <ImageIcon size={17} />
+                <span>Anexar</span>
+              </button>
+            </div>
 
             <button
-              onClick={handleSend}
-              disabled={!prompt.trim() || isGenerating}
+              onClick={() => handleSend()}
+              disabled={(!prompt.trim() && !attachedFile) || isGenerating}
               style={{
                 width: '32px',
                 height: '32px',
                 borderRadius: '50%',
-                backgroundColor: '#0d9488',
+                backgroundColor: (!prompt.trim() && !attachedFile) || isGenerating ? '#cbd5e1' : '#0d9488',
                 border: 'none',
                 color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: prompt.trim() ? 'pointer' : 'default',
-                opacity: prompt.trim() ? 1 : 0.5,
-                boxShadow: '0 2px 8px rgba(13, 148, 136, 0.4)'
+                cursor: (!prompt.trim() && !attachedFile) || isGenerating ? 'not-allowed' : 'pointer'
               }}
-              title="Enviar prompt ao Whimsical Agent"
+              title="Enviar mensagem"
             >
               <ArrowUp size={16} strokeWidth={2.5} />
             </button>
           </div>
         </div>
       </main>
-
-      {/* Rodapé Flutuante: Ação e Ajuda */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          zIndex: 1000
-        }}
-      >
-        <button
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            backgroundColor: isDark ? '#232b38' : '#ffffff',
-            border: isDark ? '1px solid #333f52' : '1px solid #e2e8f0',
-            color: isDark ? '#f1f5f9' : '#475569',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-          }}
-        >
-          ⚡
-        </button>
-        <button
-          style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '6px',
-            backgroundColor: isDark ? '#232b38' : '#ffffff',
-            border: isDark ? '1px solid #333f52' : '1px solid #e2e8f0',
-            color: isDark ? '#f1f5f9' : '#475569',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
-          }}
-        >
-          ?
-        </button>
-      </div>
     </div>
   );
 };

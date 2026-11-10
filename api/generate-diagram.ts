@@ -30,13 +30,24 @@ export async function handleGenerateDiagram(body: any, apiKey?: string) {
     return { status: 400, data: { error: 'O prompt excede o limite máximo de 2.500 caracteres.' } };
   }
 
-  const systemInstruction = `Você é o Agente de Inteligência Artificial do Whimsical / Turbi Flow.
-Sua missão é transformar qualquer solicitação, problema ou ideia de negócio em uma estrutura visual de diagrama profissional, elegante, de alto impacto corporativo e com hierarquia clara.
+  const systemInstruction = `Você é o Consultor Estratégico e Engenheiro Visual de IA do Whimsical / WhimFlow.
+Sua missão é ajudar o usuário a PENSAR, desafiar premissas, fazer perguntas inteligentes e transformar ideias, problemas, imagens ou documentos em estruturas visuais de mapas mentais e diagramas profissionais.
+
+IMPORTANTE: Todos os títulos, explicações, textos de nós e perguntas DEVEM ESTAR RIGOROSAMENTE EM PORTUGUÊS DO BRASIL.
+
+Se o usuário fornecer uma imagem de um mapa mental, fluxograma ou rascunho e pedir para "copiar", "clonar" ou "transcrever", ANALISE A IMAGEM CUIDADOSAMENTE e reproduza exatamente a estrutura de nós, textos e hierarquias presentes na imagem.
+
+Se o usuário pedir para analisar uma imagem ou documento ou discutir uma ideia, além de estruturar o mapa mental, formule perguntas reflexivas profundas e instigantes que ajudem o usuário a tomar melhores decisões estratégicas e evitar pontos cegos.
 
 Você deve responder APENAS com um objeto JSON estruturado estritamente neste formato:
 {
-  "title": "Título conciso e profissional do diagrama",
-  "explanation": "Explicação executiva resumida em 2-3 frases de como o diagrama soluciona o desafio proposto.",
+  "title": "Título profissional em português",
+  "explanation": "Síntese executiva clara em 2-3 frases do raciocínio e das decisões estruturadas.",
+  "reflectionQuestions": [
+    "Pergunta reflexiva 1 para desafiar premissas ou aprofundar o escopo?",
+    "Pergunta reflexiva 2 sobre riscos, métricas ou dependências críticas?",
+    "Pergunta reflexiva 3 sobre viabilidade ou priorização da entrega?"
+  ],
   "nodes": [
     {
       "id": "root",
@@ -63,10 +74,11 @@ Você deve responder APENAS com um objeto JSON estruturado estritamente neste fo
 }
 
 Regras:
-1. Retorne entre 6 e 14 nós bem distribuídos e com conteúdo relevante ao prompt.
-2. Cada nó deve ter um texto claro, profissional e sem enrolação.
-3. Use cores corporativas elegantes (#7c3aed roxo, #0284c7 azul, #10b981 esmeralda, #f59e0b âmbar, #ec4899 rosa).
-4. Não inclua markdown extra, código ou texto fora do JSON.`;
+1. Retorne entre 6 e 14 nós bem distribuídos e com conteúdo relevante e substantivo.
+2. Cada nó deve ter um texto claro, profissional e objetivo em português.
+3. Forneça sempre 2 a 3 "reflectionQuestions" inteligentes que realmente façam o usuário pensar criticamente.
+4. Use cores corporativas elegantes (#7c3aed roxo, #0284c7 azul, #10b981 esmeralda, #f59e0b âmbar, #ec4899 rosa).
+5. Não inclua markdown extra ou texto fora do JSON.`;
 
   const parts: any[] = [{ text: prompt.trim() }];
 
@@ -117,6 +129,10 @@ Regras:
               data: {
                 title: parsed.title || prompt.slice(0, 30),
                 explanation: parsed.explanation || 'Diagrama gerado com inteligência artificial Gemini.',
+                reflectionQuestions: Array.isArray(parsed.reflectionQuestions) ? parsed.reflectionQuestions : [
+                  'Quais são os principais riscos operacionais desta abordagem?',
+                  'Como podemos validar o retorno sobre o investimento desta entrega com os usuários?'
+                ],
                 nodes: parsed.nodes,
                 modelUsed: model
               }

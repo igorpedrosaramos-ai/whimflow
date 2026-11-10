@@ -125,7 +125,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           onMouseEnter={e => (e.currentTarget.style.color = '#818cf8')}
           onMouseLeave={e => (e.currentTarget.style.color = isDark ? '#94a3b8' : '#64748b')}
         >
-          <span>Teams</span>
+          <span>Equipes</span>
           <span style={{ color: '#94a3b8' }}>/</span>
           <Users size={14} color="#818cf8" />
           <span>Everyone at {workspaceName}</span>
@@ -202,7 +202,7 @@ export const TopNav: React.FC<TopNavProps> = ({
               <option value="" disabled>Alternar Quadro...</option>
               {boards.map(b => (
                 <option key={b.id} value={b.id}>
-                  {b.title || 'untitled'}
+                  {b.title || 'Sem título'}
                 </option>
               ))}
               <option value="NEW">+ Novo Quadro em Branco...</option>

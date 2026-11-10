@@ -170,7 +170,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Itens do Menu Whimsical */}
       <div style={{ display: 'flex', flexDirection: 'column', padding: '4px 8px', gap: '2px', flex: 1, overflowY: 'auto' }}>
-        {/* Recent */}
+        {/* Recentes */}
         <button
           onClick={onNavigateToDashboard}
           style={{
@@ -188,10 +188,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }}
         >
           <Clock size={15} color="#64748b" />
-          <span>Recent</span>
+          <span>Recentes</span>
         </button>
 
-        {/* TEAMS */}
+        {/* EQUIPES */}
         <button
           type="button"
           onClick={() => setIsTeamsOpen(prev => !prev)}
@@ -214,14 +214,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           }}
           onMouseEnter={e => (e.currentTarget.style.color = '#94a3b8')}
           onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
-          title={isTeamsOpen ? 'Recolher TEAMS' : 'Expandir TEAMS'}
+          title={isTeamsOpen ? 'Recolher EQUIPES' : 'Expandir EQUIPES'}
         >
           {isTeamsOpen ? (
             <ChevronDown size={12} color="#64748b" />
           ) : (
             <ChevronRight size={12} color="#64748b" />
           )}
-          <span>TEAMS</span>
+          <span>EQUIPES</span>
         </button>
 
         {/* Everyone at workspace (recolhível) */}
@@ -315,7 +315,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           flex: 1
                         }}
                       >
-                        {board.title || 'untitled'}
+                        {board.title || 'Sem título'}
                       </span>
                     )}
                   </div>
