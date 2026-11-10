@@ -85,9 +85,8 @@ export const App: React.FC = () => {
     saveActiveBoardId(activeBoardId);
   }, [activeBoardId]);
 
-  // Pilha de Histórico para Desfazer / Refazer
-  const [history, setHistory] = useState<Board[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  // Pilha de Histórico Particionada por Quadro (Desfazer / Refazer 100% isolado)
+  const [boardHistories, setBoardHistories] = useState<Record<string, { past: Board[]; future: Board[] }>>({});
 
   // Edição imediata de novos nós
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
@@ -278,7 +277,7 @@ export const App: React.FC = () => {
     setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   };
 
-  // Atualizar quadro ativo de forma robusta e com gravação de histórico
+  // Atualizar quadro ativo de forma robusta e com gravação de histórico particionado
   const updateActiveBoard = useCallback((updater: (board: Board) => Board, pushHistory: boolean = true) => {
     setBoards(prevBoards => {
       const current = prevBoards.find(b => b.id === activeBoardId) || prevBoards[0];
@@ -286,32 +285,73 @@ export const App: React.FC = () => {
 
       if (pushHistory) {
         const snapshot = JSON.parse(JSON.stringify(current));
-        setHistory(prev => [...prev.slice(0, historyIndex + 1), snapshot].slice(-40));
-        setHistoryIndex(prev => Math.min(prev + 1, 39));
+        setBoardHistories(prev => {
+          const currentHist = prev[activeBoardId] || { past: [], future: [] };
+          return {
+            ...prev,
+            [activeBoardId]: {
+              past: [...currentHist.past, snapshot].slice(-40),
+              future: []
+            }
+          };
+        });
       }
 
       const updated = updater(current);
       return prevBoards.map(b => b.id === current.id ? { ...updated, updatedAt: new Date().toISOString() } : b);
     });
-  }, [activeBoardId, historyIndex]);
+  }, [activeBoardId]);
 
-  // Desfazer / Refazer
+  // Desfazer / Refazer particionado por quadro
   const handleUndo = useCallback(() => {
-    if (historyIndex >= 0) {
-      const previousState = history[historyIndex];
-      setBoards(prev => prev.map(b => b.id === previousState.id ? previousState : b));
-      setHistoryIndex(prev => prev - 1);
-    }
-  }, [history, historyIndex]);
+    setBoardHistories(prev => {
+      const currentHist = prev[activeBoardId];
+      if (!currentHist || currentHist.past.length === 0) return prev;
+
+      const previousState = currentHist.past[currentHist.past.length - 1];
+      const newPast = currentHist.past.slice(0, -1);
+
+      setBoards(prevBoards => {
+        const current = prevBoards.find(b => b.id === activeBoardId);
+        if (!current) return prevBoards;
+        return prevBoards.map(b => b.id === activeBoardId ? { ...previousState, updatedAt: new Date().toISOString() } : b);
+      });
+
+      const currentBoard = boards.find(b => b.id === activeBoardId) || previousState;
+      return {
+        ...prev,
+        [activeBoardId]: {
+          past: newPast,
+          future: [JSON.parse(JSON.stringify(currentBoard)), ...currentHist.future].slice(0, 40)
+        }
+      };
+    });
+  }, [activeBoardId, boards]);
 
   const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const nextIndex = historyIndex + 1;
-      const nextState = history[nextIndex];
-      setBoards(prev => prev.map(b => b.id === nextState.id ? nextState : b));
-      setHistoryIndex(nextIndex);
-    }
-  }, [history, historyIndex]);
+    setBoardHistories(prev => {
+      const currentHist = prev[activeBoardId];
+      if (!currentHist || currentHist.future.length === 0) return prev;
+
+      const nextState = currentHist.future[0];
+      const newFuture = currentHist.future.slice(1);
+
+      setBoards(prevBoards => {
+        const current = prevBoards.find(b => b.id === activeBoardId);
+        if (!current) return prevBoards;
+        return prevBoards.map(b => b.id === activeBoardId ? { ...nextState, updatedAt: new Date().toISOString() } : b);
+      });
+
+      const currentBoard = boards.find(b => b.id === activeBoardId) || nextState;
+      return {
+        ...prev,
+        [activeBoardId]: {
+          past: [...currentHist.past, JSON.parse(JSON.stringify(currentBoard))].slice(-40),
+          future: newFuture
+        }
+      };
+    });
+  }, [activeBoardId, boards]);
 
   // Atalhos Globais de Teclado (Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z)
   useEffect(() => {
@@ -1241,21 +1281,6 @@ export const App: React.FC = () => {
       const target = e.target as HTMLElement;
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
 
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-        e.preventDefault();
-        if (e.shiftKey) {
-          handleRedo();
-        } else {
-          handleUndo();
-        }
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
-        e.preventDefault();
-        handleRedo();
-        return;
-      }
-
       if (e.code === 'Space' && !isInput && !isSpacePressed.current) {
         isSpacePressed.current = true;
         document.body.style.cursor = 'grab';
@@ -1440,7 +1465,7 @@ export const App: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('paste', handleGlobalPaste);
     };
-  }, [selectedNodeId, selectedNodeIds, selectedStickyId, historyIndex, history]);
+  }, [selectedNodeId, selectedNodeIds, selectedStickyId]);
 
   // Scroll do Mouse direto para ZOOM IN / ZOOM OUT centrado no cursor
   const handleWheel = (e: React.WheelEvent) => {
@@ -1837,8 +1862,8 @@ export const App: React.FC = () => {
         theme={theme}
         onToggleTheme={toggleTheme}
         totalObjects={totalObjects}
-        canUndo={historyIndex >= 0}
-        canRedo={historyIndex < history.length - 1}
+        canUndo={(boardHistories[activeBoard.id]?.past?.length || 0) > 0}
+        canRedo={(boardHistories[activeBoard.id]?.future?.length || 0) > 0}
         onUndo={handleUndo}
         onRedo={handleRedo}
         onNavigateToDashboard={() => setCurrentView('dashboard')}
@@ -2117,8 +2142,8 @@ export const App: React.FC = () => {
           onZoomIn={() => setZoom(prev => Math.min(prev + 0.1, 2.5))}
           onZoomOut={() => setZoom(prev => Math.max(prev - 0.1, 0.2))}
           onResetZoom={() => fitView()}
-          canUndo={historyIndex >= 0}
-          canRedo={historyIndex < history.length - 1}
+          canUndo={(boardHistories[activeBoard.id]?.past?.length || 0) > 0}
+          canRedo={(boardHistories[activeBoard.id]?.future?.length || 0) > 0}
           onUndo={handleUndo}
           onRedo={handleRedo}
           onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
