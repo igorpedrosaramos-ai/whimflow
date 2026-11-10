@@ -591,32 +591,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <Layout size={26} color="#ffffff" />
               <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New from template</span>
             </button>
-
-            {/* 5. + New folder (Gray #64748b - Foto 1) */}
-            <button
-              onClick={() => onCreateNewBoard('Nova Pasta')}
-              style={{
-                width: '172px',
-                height: '100px',
-                borderRadius: '8px',
-                backgroundColor: '#64748b',
-                border: 'none',
-                color: '#ffffff',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(100, 116, 139, 0.28)',
-                transition: 'transform 0.15s, box-shadow 0.15s'
-              }}
-              onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
-              onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
-            >
-              <Folder size={26} color="#ffffff" />
-              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ New folder</span>
-            </button>
           </div>
 
           {/* Barra de Filtros & Modo de Visualização */}
