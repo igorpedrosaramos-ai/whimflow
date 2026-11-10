@@ -65,16 +65,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'recent' | 'private'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'recent'>('all');
+  const [isTeamsOpen, setIsTeamsOpen] = useState(true);
   const [sortOption, setSortOption] = useState<'created-desc' | 'created-asc' | 'alpha' | 'modified'>('created-desc');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
   let displayBoards = boards.filter(b => {
     if (searchFilter.trim() && !b.title.toLowerCase().includes(searchFilter.toLowerCase())) {
       return false;
-    }
-    if (categoryFilter === 'private') {
-      return !!b.isPrivate;
     }
     return true;
   });
@@ -226,67 +224,71 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span>Recent</span>
           </button>
 
-          {/* PRIVATE */}
-          <div
-            onClick={() => setCategoryFilter(categoryFilter === 'private' ? 'all' : 'private')}
+          {/* TEAMS Header com botão toggle de recolher/abrir */}
+          <button
+            id="btn-dashboard-toggle-teams"
+            type="button"
+            onClick={() => setIsTeamsOpen(prev => !prev)}
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              padding: '10px 12px 4px 12px',
-              fontSize: '11px',
-              fontWeight: 700,
-              color: categoryFilter === 'private' ? '#818cf8' : '#64748b',
-              letterSpacing: '0.05em',
-              cursor: 'pointer',
-              borderRadius: '4px'
-            }}
-            title="Filtrar quadros privados"
-          >
-            <ChevronRight size={13} color={categoryFilter === 'private' ? '#818cf8' : '#64748b'} />
-            <span>PRIVATE</span>
-          </div>
-
-          {/* TEAMS */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 12px 4px 12px',
+              padding: '10px 12px 6px 12px',
               fontSize: '11px',
               fontWeight: 700,
               color: '#64748b',
               letterSpacing: '0.05em',
-              cursor: 'pointer'
-            }}
-          >
-            <ChevronDown size={13} color="#64748b" />
-            <span>TEAMS</span>
-          </div>
-
-          {/* Everyone at workspace (ITEM ATIVO SELECIONADO) */}
-          <button
-            onClick={() => setCategoryFilter('all')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '7px 12px 7px 24px',
-              borderRadius: '6px',
-              border: 'none',
-              background: categoryFilter === 'all' ? '#232b38' : 'transparent',
-              color: categoryFilter === 'all' ? '#f8fafc' : '#94a3b8',
-              fontSize: '13px',
-              fontWeight: categoryFilter === 'all' ? 600 : 500,
               cursor: 'pointer',
+              background: 'transparent',
+              border: 'none',
+              borderRadius: '4px',
               textAlign: 'left',
-              transition: 'all 0.15s ease'
+              width: '100%',
+              transition: 'color 0.15s ease, background 0.15s ease'
             }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = '#94a3b8';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = '#64748b';
+              e.currentTarget.style.background = 'transparent';
+            }}
+            title={isTeamsOpen ? 'Recolher TEAMS' : 'Expandir TEAMS'}
           >
-            <Users size={15} color={categoryFilter === 'all' ? '#818cf8' : '#64748b'} />
-            <span>Everyone at {workspaceName}</span>
+            {isTeamsOpen ? (
+              <ChevronDown size={13} color="#64748b" />
+            ) : (
+              <ChevronRight size={13} color="#64748b" />
+            )}
+            <span>TEAMS</span>
           </button>
+
+          {/* Everyone at workspace (ITEM ATIVO SELECIONADO - RECOLHÍVEL) */}
+          {isTeamsOpen && (
+            <button
+              id="btn-sidebar-everyone"
+              onClick={() => setCategoryFilter('all')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '7px 12px 7px 24px',
+                borderRadius: '6px',
+                border: 'none',
+                background: categoryFilter === 'all' ? '#232b38' : 'transparent',
+                color: categoryFilter === 'all' ? '#f8fafc' : '#94a3b8',
+                fontSize: '13px',
+                fontWeight: categoryFilter === 'all' ? 600 : 500,
+                cursor: 'pointer',
+                textAlign: 'left',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Users size={15} color={categoryFilter === 'all' ? '#818cf8' : '#64748b'} />
+              <span>Everyone at {workspaceName}</span>
+            </button>
+          )}
         </div>
 
         {/* Rodapé da Barra Lateral */}

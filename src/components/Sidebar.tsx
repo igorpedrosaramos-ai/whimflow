@@ -50,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [isTeamsOpen, setIsTeamsOpen] = useState(true);
 
   if (!isOpen) return null;
 
@@ -190,25 +191,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>Recent</span>
         </button>
 
-        {/* PRIVATE */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '8px 10px 4px 10px',
-            fontSize: '11px',
-            fontWeight: 700,
-            color: '#64748b',
-            letterSpacing: '0.05em'
-          }}
-        >
-          <ChevronRight size={12} color="#64748b" />
-          <span>PRIVATE</span>
-        </div>
-
         {/* TEAMS */}
-        <div
+        <button
+          type="button"
+          onClick={() => setIsTeamsOpen(prev => !prev)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -217,35 +203,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
             fontSize: '11px',
             fontWeight: 700,
             color: '#64748b',
-            letterSpacing: '0.05em'
-          }}
-        >
-          <ChevronDown size={12} color="#64748b" />
-          <span>TEAMS</span>
-        </div>
-
-        {/* Everyone at workspace */}
-        <button
-          onClick={onNavigateToDashboard}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 10px 6px 14px',
-            borderRadius: '5px',
+            letterSpacing: '0.05em',
+            background: 'transparent',
             border: 'none',
-            background: '#232b38',
-            color: '#f8fafc',
-            fontSize: '12.5px',
-            fontWeight: 600,
+            borderRadius: '4px',
             cursor: 'pointer',
-            textAlign: 'left'
+            textAlign: 'left',
+            width: '100%',
+            transition: 'color 0.15s ease'
           }}
-          title="Ver todos os quadros no Dashboard"
+          onMouseEnter={e => (e.currentTarget.style.color = '#94a3b8')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
+          title={isTeamsOpen ? 'Recolher TEAMS' : 'Expandir TEAMS'}
         >
-          <Users size={14} color="#818cf8" />
-          <span>Everyone at {workspaceName}</span>
+          {isTeamsOpen ? (
+            <ChevronDown size={12} color="#64748b" />
+          ) : (
+            <ChevronRight size={12} color="#64748b" />
+          )}
+          <span>TEAMS</span>
         </button>
+
+        {/* Everyone at workspace (recolhível) */}
+        {isTeamsOpen && (
+          <button
+            id="btn-editor-sidebar-everyone"
+            onClick={onNavigateToDashboard}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 10px 6px 14px',
+              borderRadius: '5px',
+              border: 'none',
+              background: '#232b38',
+              color: '#f8fafc',
+              fontSize: '12.5px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              textAlign: 'left'
+            }}
+            title="Ver todos os quadros no Dashboard"
+          >
+            <Users size={14} color="#818cf8" />
+            <span>Everyone at {workspaceName}</span>
+          </button>
+        )}
 
         {/* Lista limpa de quadros (apenas se houver busca ou quadros existentes) */}
         {search.trim() && (
