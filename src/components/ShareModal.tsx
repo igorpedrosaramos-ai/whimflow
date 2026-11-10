@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Share2, 
   Copy, 
@@ -42,6 +42,16 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [pngScale, setPngScale] = useState<number>(2);
   const [pngTransparent, setPngTransparent] = useState<boolean>(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -180,6 +190,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           </div>
 
           <button
+            id="btn-close-share"
             onClick={onClose}
             style={{
               background: 'transparent',

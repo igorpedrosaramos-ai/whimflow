@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Trash2, RotateCcw, X, AlertCircle } from 'lucide-react';
 import { Board } from '../types';
 
@@ -22,6 +22,16 @@ export const TrashModal: React.FC<TrashModalProps> = ({
   theme = 'light'
 }) => {
   const isDark = theme === 'dark';
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -71,6 +81,7 @@ export const TrashModal: React.FC<TrashModalProps> = ({
             </h3>
           </div>
           <button
+            id="btn-close-trash"
             onClick={onClose}
             style={{
               background: 'transparent',

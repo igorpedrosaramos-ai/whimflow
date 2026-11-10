@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Search, 
@@ -38,6 +38,20 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
   // Estado para Visualização Detalhada / Preview Individual do Template (FOTO 4 DO WHIMSICAL)
   const [selectedPreviewTemplate, setSelectedPreviewTemplate] = useState<TemplateItem | null>(null);
   const [previewZoom, setPreviewZoom] = useState(1.0);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        if (selectedPreviewTemplate) {
+          setSelectedPreviewTemplate(null);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, selectedPreviewTemplate]);
 
   if (!isOpen) return null;
 
@@ -533,6 +547,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
               </button>
 
               <button
+                id="btn-close-templates"
                 onClick={onClose}
                 style={{
                   background: 'transparent',
@@ -699,6 +714,7 @@ export const TemplateModal: React.FC<TemplateModalProps> = ({
                  activeCategory === 'all' ? 'All templates' : 'Templates'}
               </h2>
               <button
+                id="btn-close-templates"
                 onClick={onClose}
                 style={{
                   background: 'transparent',

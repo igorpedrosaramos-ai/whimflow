@@ -572,10 +572,10 @@ export const App: React.FC = () => {
 
   const currentBoardSnapshots = activeBoard.historySnapshots || [];
 
-  // 1. Visão de Dashboard
-  if (currentView === 'dashboard') {
-    return (
-      <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc' }}>
+  return (
+    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      {/* 1. Visão de Dashboard */}
+      {currentView === 'dashboard' && (
         <DashboardView
           boards={boards}
           onOpenBoard={handleOpenBoard}
@@ -601,33 +601,10 @@ export const App: React.FC = () => {
           theme={theme}
           workspaceName="teste"
         />
+      )}
 
-        <TemplateModal
-          isOpen={isTemplateModalOpen}
-          onClose={() => setIsTemplateModalOpen(false)}
-          onSelectTemplate={handleCreateFromTemplate}
-          workspaceName="teste"
-        />
-
-        <TrashModal
-          isOpen={isTrashModalOpen}
-          onClose={() => setIsTrashModalOpen(false)}
-          trashBoards={trashBoards}
-          onRestoreBoard={handleRestoreBoard}
-          onPermanentlyDeleteBoard={handlePermanentlyDeleteBoard}
-          onEmptyTrash={() => setTrashBoards([])}
-          theme={theme}
-        />
-
-        <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
-      </div>
-    );
-  }
-
-  // 2. Visão de Documentos (Doc Editor)
-  if (currentView === 'doc') {
-    return (
-      <div style={{ width: '100vw', height: '100vh', display: 'flex', position: 'relative' }}>
+      {/* 2. Visão de Documentos (Doc Editor) */}
+      {currentView === 'doc' && (
         <DocEditorView
           board={activeBoard}
           onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
@@ -637,89 +614,63 @@ export const App: React.FC = () => {
           theme={theme}
           workspaceName="teste"
         />
+      )}
 
-        <TemplateModal
-          isOpen={isTemplateModalOpen}
-          onClose={() => setIsTemplateModalOpen(false)}
-          onSelectTemplate={handleCreateFromTemplate}
-          workspaceName="teste"
-        />
-
-        <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
-      </div>
-    );
-  }
-
-  // 3. Visão do Agente IA em Tela Cheia
-  if (currentView === 'agent') {
-    return (
-      <div style={{ width: '100vw', height: '100vh', display: 'flex', position: 'relative' }}>
+      {/* 3. Visão do Agente IA em Tela Cheia */}
+      {currentView === 'agent' && (
         <AgentChatView
           onGenerateBoard={handleGenerateFromAgent}
           onNavigateToDashboard={() => setCurrentView('dashboard')}
           theme={theme}
           workspaceName="teste"
         />
+      )}
 
-        <TemplateModal
-          isOpen={isTemplateModalOpen}
-          onClose={() => setIsTemplateModalOpen(false)}
-          onSelectTemplate={handleCreateFromTemplate}
-          workspaceName="teste"
+      {/* 4. Modo de Apresentação */}
+      {isPresentationOpen && (
+        <PresentationView
+          board={activeBoard}
+          initialSelectedNodeId={selectedNodeId}
+          onClose={() => setIsPresentationOpen(false)}
         />
+      )}
 
-        <ToastContainer toasts={toasts} onDismiss={handleDismissToast} />
-      </div>
-    );
-  }
+      {/* 5. Visão Principal de Editor Canvas */}
+      {currentView === 'editor' && !isPresentationOpen && (
+        <>
+          <TopNav
+            boardTitle={activeBoard.title}
+            onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
+            boards={boards}
+            activeBoardId={activeBoard.id}
+            onSelectBoard={handleOpenBoard}
+            onCreateNewBoard={() => handleCreateNewBoard('untitled')}
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            onOpenShare={() => setIsShareModalOpen(true)}
+            onStartPresentation={() => setIsPresentationOpen(true)}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            totalObjects={totalObjects}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onNavigateToDashboard={() => setCurrentView('dashboard')}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            onOpenAgent={() => setIsAgentDrawerOpen(true)}
+            onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
+            onOpenBoardStats={() => setIsBoardStatsOpen(true)}
+            isStarred={!!activeBoard.isStarred}
+            onToggleFavorite={() => {
+              const nextVal = !activeBoard.isStarred;
+              updateActiveBoard(b => ({ ...b, isStarred: nextVal }));
+              showToast(nextVal ? 'Quadro adicionado aos favoritos!' : 'Quadro removido dos favoritos.', 'info');
+            }}
+            workspaceName="teste"
+          />
 
-  // 4. Modo de Apresentação
-  if (isPresentationOpen) {
-    return (
-      <PresentationView
-        board={activeBoard}
-        initialSelectedNodeId={selectedNodeId}
-        onClose={() => setIsPresentationOpen(false)}
-      />
-    );
-  }
-
-  // 5. Visão Principal de Editor Canvas
-  return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <TopNav
-        boardTitle={activeBoard.title}
-        onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
-        boards={boards}
-        activeBoardId={activeBoard.id}
-        onSelectBoard={handleOpenBoard}
-        onCreateNewBoard={() => handleCreateNewBoard('untitled')}
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        onOpenShare={() => setIsShareModalOpen(true)}
-        onStartPresentation={() => setIsPresentationOpen(true)}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-        totalObjects={totalObjects}
-        canUndo={canUndo}
-        canRedo={canRedo}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onNavigateToDashboard={() => setCurrentView('dashboard')}
-        onOpenSearch={() => setIsSearchModalOpen(true)}
-        onOpenAgent={() => setIsAgentDrawerOpen(true)}
-        onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
-        onOpenBoardStats={() => setIsBoardStatsOpen(true)}
-        isStarred={!!activeBoard.isStarred}
-        onToggleFavorite={() => {
-          const nextVal = !activeBoard.isStarred;
-          updateActiveBoard(b => ({ ...b, isStarred: nextVal }));
-          showToast(nextVal ? 'Quadro adicionado aos favoritos!' : 'Quadro removido dos favoritos.', 'info');
-        }}
-        workspaceName="teste"
-      />
-
-      <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
         <Sidebar
           isOpen={sidebarOpen}
           boards={boards}
@@ -967,24 +918,25 @@ export const App: React.FC = () => {
           theme={theme}
         />
 
-        {/* Controles de Zoom e Atalhos */}
-        <ZoomControls
-          zoom={zoom}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onResetZoom={handleResetZoom}
-          canUndo={canUndo}
-          canRedo={canRedo}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
-          onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
-          onOpenSearch={() => setIsSearchModalOpen(true)}
-          theme={theme}
-        />
-      </div>
+          <ZoomControls
+            zoom={zoom}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onResetZoom={handleResetZoom}
+            canUndo={canUndo}
+            canRedo={canRedo}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
+            onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
+            onOpenSearch={() => setIsSearchModalOpen(true)}
+            theme={theme}
+          />
+        </div>
+      </>
+    )}
 
-      {/* Drawer do Agente IA Turbi */}
+  {/* Drawer do Agente IA Turbi */}
       <AgentDrawer
         isOpen={isAgentDrawerOpen}
         onClose={() => setIsAgentDrawerOpen(false)}

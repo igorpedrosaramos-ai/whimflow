@@ -720,8 +720,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             zIndex: 10000,
             maxWidth: '190px',
             backgroundColor: ghostBg,
-            border: ghostBorder,
-            borderLeft: ghostBorderLeft,
+            borderTop: ghostBorder,
+            borderRight: ghostBorder,
+            borderBottom: ghostBorder,
+            borderLeft: ghostBorderLeft || ghostBorder,
             borderRadius: '6px',
             padding: '5px 11px',
             fontWeight: 500,
@@ -869,8 +871,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               minWidth: `${pos.width}px`,
               minHeight: `${pos.height}px`,
               backgroundColor: bg,
-              border: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
-              borderLeft: isMultiSelected ? undefined : borderLeft,
+              borderTop: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
+              borderRight: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
+              borderBottom: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
+              borderLeft: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : (borderLeft || border),
               outline: isDropTarget && dropPosition === 'inside'
                 ? `2px solid ${nodeColor}`
                 : isMultiSelected

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Clock, 
   RotateCcw, 
@@ -44,6 +44,16 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
   const [newMilestoneName, setNewMilestoneName] = useState('');
   const [isCreatingMilestone, setIsCreatingMilestone] = useState(false);
   const [confirmRestoreId, setConfirmRestoreId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 

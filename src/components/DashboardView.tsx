@@ -293,6 +293,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div style={{ padding: '12px 14px', borderTop: '1px solid #202633', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {/* Templates & color themes */}
           <button
+            id="btn-dashboard-templates"
             onClick={onOpenTemplates}
             style={{
               display: 'flex',
@@ -314,6 +315,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           {/* Trash */}
           <button
+            id="btn-dashboard-trash"
             onClick={onOpenTrash}
             style={{
               display: 'flex',
@@ -422,6 +424,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* Busca */}
             <button
+              id="btn-dashboard-search"
               onClick={onOpenSearch}
               style={{
                 background: 'transparent',
@@ -472,6 +475,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           >
             {/* 1. + New Board (Purple #7c3aed) */}
             <button
+              id="btn-dashboard-new-board"
               onClick={() => onCreateNewBoard('untitled')}
               style={{
                 width: '172px',
@@ -506,6 +510,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* 2. + New Doc (Blue #0284c7 - Foto 1 e 2) */}
             <button
+              id="btn-dashboard-new-doc"
               onClick={onOpenDoc}
               title="Text editing with tables and embeds"
               style={{
@@ -533,6 +538,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* 3. + Ask agent (Teal #0d9488 - Foto 1 e 3) */}
             <button
+              id="btn-dashboard-action-agent"
               onClick={onOpenAskAgent}
               style={{
                 width: '172px',
@@ -559,6 +565,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             {/* 4. + New from template (Slate #475569 - Foto 1 e 4) */}
             <button
+              id="btn-dashboard-action-template"
               onClick={onOpenTemplates}
               style={{
                 width: '172px',
@@ -836,6 +843,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   return (
                     <div
                       key={board.id}
+                      className="board-card"
+                      data-board-id={board.id}
                       onClick={() => onOpenBoard(board.id)}
                       style={{
                         height: '190px',
@@ -1079,6 +1088,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {displayBoards.map(board => (
                   <div
                     key={board.id}
+                    className="board-card"
+                    data-board-id={board.id}
                     onClick={() => onOpenBoard(board.id)}
                     style={{
                       display: 'flex',

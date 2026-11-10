@@ -62,6 +62,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
     >
       {/* 1. Criar Nó Conectado */}
       <button
+        id="btn-toolbar-add-node"
         onClick={onAddConnectedNode}
         style={{
           width: '32px',
@@ -83,6 +84,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 2. Modo Mapa Mental */}
       <button
+        id="btn-toolbar-mindmap"
         onClick={() => onSelectTool('mindmap')}
         style={{
           width: '32px',
@@ -106,6 +108,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 3. Ferramenta de Seleção / Cursor */}
       <button
+        id="btn-toolbar-select"
         onClick={() => onSelectTool('select')}
         style={{
           width: '32px',
@@ -126,6 +129,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 4. Mão / Panorâmica */}
       <button
+        id="btn-toolbar-hand"
         onClick={() => onSelectTool('hand')}
         style={{
           width: '32px',
@@ -146,6 +150,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 5. Forma Geométrica */}
       <button
+        id="btn-toolbar-shape"
         onClick={onAddShape}
         style={{
           width: '32px',
@@ -166,6 +171,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 6. Sticky Note */}
       <button
+        id="btn-toolbar-sticky"
         onClick={() => {
           onSelectTool('sticky');
           onAddSticky();
@@ -189,6 +195,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 7. Wireframe */}
       <button
+        id="btn-toolbar-wireframe"
         onClick={() => {
           onSelectTool('wireframe');
           onAddWireframe();
@@ -212,6 +219,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 8. Texto Livre */}
       <button
+        id="btn-toolbar-text"
         onClick={onAddText}
         style={{
           width: '32px',
@@ -232,6 +240,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 9. Caneta / Desenho Livre */}
       <button
+        id="btn-toolbar-draw"
         onClick={() => onSelectTool(currentTool === 'draw' ? 'mindmap' : 'draw')}
         style={{
           width: '32px',
@@ -252,6 +261,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 10. Seção / Apresentação */}
       <button
+        id="btn-toolbar-present-panel"
         onClick={onTogglePresentPanel}
         style={{
           width: '32px',
@@ -275,6 +285,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* 11. Assistente IA Turbi */}
       <button
+        id="btn-toolbar-ai"
         onClick={onOpenAI}
         style={{
           width: '32px',

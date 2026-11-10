@@ -91,6 +91,7 @@ export const TopNav: React.FC<TopNavProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: '1 1 auto', overflow: 'hidden' }}>
         {/* Toggle da Barra Lateral */}
         <button
+          id="btn-toggle-sidebar"
           onClick={onToggleSidebar}
           style={{
             background: 'transparent',
@@ -158,6 +159,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 
           {/* Campo Editável de Título */}
           <input
+            id="input-board-title"
             type="text"
             value={boardTitle}
             onChange={e => onUpdateTitle(e.target.value)}
@@ -211,6 +213,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 
         {/* Estrela de Favorito */}
         <button
+          id="btn-favorite-star"
           onClick={onToggleFavorite}
           style={{
             background: 'transparent',
@@ -234,6 +237,7 @@ export const TopNav: React.FC<TopNavProps> = ({
         {/* Contador de Objetos Ilimitados Pro / Estatísticas do Quadro */}
         {onOpenBoardStats && (
           <button
+            id="btn-topnav-stats"
             onClick={onOpenBoardStats}
             style={{
               display: 'flex',
@@ -258,6 +262,7 @@ export const TopNav: React.FC<TopNavProps> = ({
         {/* Histórico de Versões Ilimitado (Time Machine / Milestones) */}
         {onOpenVersionHistory && (
           <button
+            id="btn-topnav-history"
             onClick={onOpenVersionHistory}
             style={{
               display: 'flex',
@@ -335,6 +340,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 
         {/* Botão Compartilhar */}
         <button
+          id="btn-topnav-share"
           onClick={onOpenShare}
           style={{
             display: 'flex',
@@ -358,6 +364,7 @@ export const TopNav: React.FC<TopNavProps> = ({
 
         {/* Botão ▷ Present */}
         <button
+          id="btn-topnav-present"
           onClick={onStartPresentation}
           style={{
             display: 'flex',

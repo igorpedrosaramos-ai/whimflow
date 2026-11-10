@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   BarChart2, 
   X, 
@@ -27,6 +27,16 @@ export const BoardStatsModal: React.FC<BoardStatsModalProps> = ({
   board,
   theme = 'light'
 }) => {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const isDark = theme === 'dark';
@@ -132,6 +142,7 @@ export const BoardStatsModal: React.FC<BoardStatsModalProps> = ({
           </div>
 
           <button
+            id="btn-close-stats"
             onClick={onClose}
             style={{
               background: 'transparent',
