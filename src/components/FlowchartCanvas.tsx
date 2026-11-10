@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { FlowShape, WireframeItem } from '../types';
+import { FlowShape, WireframeItem, TextItem } from '../types';
 
 interface FlowchartCanvasProps {
   shapes: FlowShape[];
   wireframes: WireframeItem[];
+  texts?: TextItem[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onUpdateShapeText: (id: string, text: string) => void;
@@ -12,24 +13,31 @@ interface FlowchartCanvasProps {
   onDeleteShape: (id: string) => void;
   onMoveWireframe: (id: string, dx: number, dy: number) => void;
   onDeleteWireframe: (id: string) => void;
+  onUpdateText?: (id: string, text: string) => void;
+  onMoveText?: (id: string, dx: number, dy: number) => void;
+  onDeleteText?: (id: string) => void;
 }
 
 export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
   shapes,
   wireframes,
+  texts = [],
   selectedId,
   onSelect,
   onUpdateShapeText,
   onMoveShape,
   onDeleteShape,
   onMoveWireframe,
-  onDeleteWireframe
+  onDeleteWireframe,
+  onUpdateText,
+  onMoveText,
+  onDeleteText
 }) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragType, setDragType] = useState<'shape' | 'wireframe' | null>(null);
+  const [dragType, setDragType] = useState<'shape' | 'wireframe' | 'text' | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
 
-  const handleMouseDown = (id: string, type: 'shape' | 'wireframe', e: React.MouseEvent) => {
+  const handleMouseDown = (id: string, type: 'shape' | 'wireframe' | 'text', e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.stopPropagation();
     onSelect(id);
@@ -45,8 +53,10 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       const dy = e.clientY - dragStart.current.y;
       if (dragType === 'shape') {
         onMoveShape(draggingId, dx, dy);
-      } else {
+      } else if (dragType === 'wireframe') {
         onMoveWireframe(draggingId, dx, dy);
+      } else if (dragType === 'text' && onMoveText) {
+        onMoveText(draggingId, dx, dy);
       }
       dragStart.current = { x: e.clientX, y: e.clientY };
     };
@@ -65,7 +75,7 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [draggingId, dragType, onMoveShape, onMoveWireframe]);
+  }, [draggingId, dragType, onMoveShape, onMoveWireframe, onMoveText]);
 
   return (
     <>
@@ -215,6 +225,74 @@ export const FlowchartCanvas: React.FC<FlowchartCanvasProps> = ({
                 <div style={{ fontWeight: 700, fontSize: '15px', marginBottom: '8px' }}>{wf.label || 'Container Card'}</div>
                 <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>Bloco de conteúdo de alta fidelidade para prototipagem rápida.</div>
               </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Free Text Items */}
+      {texts.map(txt => {
+        const isSelected = selectedId === txt.id;
+        return (
+          <div
+            key={txt.id}
+            style={{
+              position: 'absolute',
+              left: `${txt.x}px`,
+              top: `${txt.y}px`,
+              minWidth: `${txt.width || 120}px`,
+              cursor: 'move',
+              zIndex: isSelected ? 25 : 15,
+              outline: isSelected ? '1.5px dashed var(--accent-purple, #6366f1)' : 'none',
+              outlineOffset: '4px',
+              borderRadius: '4px'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(txt.id);
+            }}
+            onMouseDown={(e) => handleMouseDown(txt.id, 'text', e)}
+          >
+            <input
+              type="text"
+              value={txt.text}
+              onChange={(e) => onUpdateText?.(txt.id, e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: txt.color || 'var(--text-primary)',
+                fontSize: `${txt.fontSize || 16}px`,
+                fontWeight: 500,
+                padding: '2px 4px'
+              }}
+            />
+            {isSelected && onDeleteText && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteText(txt.id);
+                }}
+                style={{
+                  position: 'absolute',
+                  top: '-10px',
+                  right: '-10px',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={11} />
+              </button>
             )}
           </div>
         );

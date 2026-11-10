@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { INITIAL_BOARDS, BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD } from './constants/initialData';
-import { Board, ToolType, MindMapNode, StickyNote, WireframeItem, DrawingStroke, SlideSection } from './types';
+import { Board, ToolType, MindMapNode, StickyNote, WireframeItem, DrawingStroke, SlideSection, FlowShape, ShapeType, TextItem } from './types';
 import { TopNav } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
 import { Toolbar } from './components/Toolbar';
 import { MindMapCanvas } from './components/MindMapCanvas';
 import { StickyNotesCanvas } from './components/StickyNotesCanvas';
 import { FreehandCanvas } from './components/FreehandCanvas';
+import { FlowchartCanvas } from './components/FlowchartCanvas';
 import { ZoomControls } from './components/ZoomControls';
 import { AIModal } from './components/AIModal';
 import { ShareModal } from './components/ShareModal';
@@ -116,6 +117,7 @@ export const App: React.FC = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>('root');
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(['root']);
   const [selectedStickyId, setSelectedStickyId] = useState<string | null>(null);
+  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
 
   // Seleção por Retângulo (Marquee / Lasso) no Canvas
   const [marqueeRect, setMarqueeRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
@@ -1168,32 +1170,69 @@ export const App: React.FC = () => {
     }));
   };
 
-  // Notas Adesivas
-  const handleAddSticky = () => {
+  // Ferramentas do Canvas (Notas, Formas, Wireframes, Texto)
+  const handleAddSticky = (customX?: number, customY?: number) => {
     const newSticky: StickyNote = {
       id: `sticky-${Date.now()}`,
-      x: -pan.x / zoom + window.innerWidth / (2 * zoom) - 90,
-      y: -pan.y / zoom + window.innerHeight / (2 * zoom) - 70,
+      x: customX !== undefined ? customX : -pan.x / zoom + window.innerWidth / (2 * zoom) - 90,
+      y: customY !== undefined ? customY : -pan.y / zoom + window.innerHeight / (2 * zoom) - 70,
       width: 180,
       height: 140,
       text: 'Nota de apoio...',
       color: '#fef08a'
     };
-    updateActiveBoard(board => ({ ...board, stickies: [...board.stickies, newSticky] }));
+    updateActiveBoard(board => ({ ...board, stickies: [...(board.stickies || []), newSticky] }));
     setSelectedStickyId(newSticky.id);
+    showToast('Nota adesiva adicionada');
   };
 
-  const handleAddWireframe = () => {
+  const handleAddShape = (type: ShapeType = 'rounded', customX?: number, customY?: number) => {
+    const newShape: FlowShape = {
+      id: `shape-${Date.now()}`,
+      type,
+      x: customX !== undefined ? customX : -pan.x / zoom + window.innerWidth / (2 * zoom) - 80,
+      y: customY !== undefined ? customY : -pan.y / zoom + window.innerHeight / (2 * zoom) - 35,
+      width: 160,
+      height: 70,
+      text: 'Novo Bloco',
+      color: theme === 'dark' ? '#1e293b' : '#f8fafc',
+      borderColor: '#6366f1',
+      textColor: theme === 'dark' ? '#f8fafc' : '#0f172a'
+    };
+    updateActiveBoard(board => ({ ...board, shapes: [...(board.shapes || []), newShape] }));
+    setSelectedShapeId(newShape.id);
+    showToast('Forma criada');
+  };
+
+  const handleAddWireframe = (type: any = 'card', customX?: number, customY?: number) => {
     const newWf: WireframeItem = {
       id: `wf-${Date.now()}`,
-      type: 'card',
-      x: -pan.x / zoom + window.innerWidth / (2 * zoom) - 120,
-      y: -pan.y / zoom + window.innerHeight / (2 * zoom) - 60,
+      type,
+      x: customX !== undefined ? customX : -pan.x / zoom + window.innerWidth / (2 * zoom) - 120,
+      y: customY !== undefined ? customY : -pan.y / zoom + window.innerHeight / (2 * zoom) - 60,
       width: 240,
       height: 120,
       label: 'Bloco de Interface'
     };
-    updateActiveBoard(board => ({ ...board, wireframes: [...board.wireframes, newWf] }));
+    updateActiveBoard(board => ({ ...board, wireframes: [...(board.wireframes || []), newWf] }));
+    setSelectedShapeId(newWf.id);
+    showToast('Wireframe adicionado');
+  };
+
+  const handleAddText = (customX?: number, customY?: number) => {
+    const newText: TextItem = {
+      id: `text-${Date.now()}`,
+      x: customX !== undefined ? customX : -pan.x / zoom + window.innerWidth / (2 * zoom) - 60,
+      y: customY !== undefined ? customY : -pan.y / zoom + window.innerHeight / (2 * zoom) - 15,
+      width: 140,
+      height: 32,
+      text: 'Texto livre...',
+      fontSize: 16,
+      color: theme === 'dark' ? '#f1f5f9' : '#1e293b'
+    };
+    updateActiveBoard(board => ({ ...board, texts: [...(board.texts || []), newText] }));
+    setSelectedShapeId(newText.id);
+    showToast('Caixa de texto criada');
   };
 
   // Atalhos de Teclado (Tab, Enter, Delete, Ctrl+Z, Ctrl+Y, Espaço)
@@ -1515,6 +1554,16 @@ export const App: React.FC = () => {
         color: '#f43f5e',
         strokeWidth: 3
       };
+    } else if (currentTool === 'sticky' && isCanvasBg) {
+      const canvasX = (e.clientX - pan.x) / zoom;
+      const canvasY = (e.clientY - pan.y) / zoom;
+      handleAddSticky(canvasX - 90, canvasY - 70);
+      setCurrentTool('select');
+    } else if (currentTool === 'wireframe' && isCanvasBg) {
+      const canvasX = (e.clientX - pan.x) / zoom;
+      const canvasY = (e.clientY - pan.y) / zoom;
+      handleAddWireframe('card', canvasX - 120, canvasY - 60);
+      setCurrentTool('select');
     } else if (e.button === 0 && isCanvasBg) {
       // Arrastar sobre fundo vazio inicia retângulo de seleção múltipla (Lasso)
       isMarqueeActiveRef.current = true;
@@ -1840,11 +1889,12 @@ export const App: React.FC = () => {
             currentTool={currentTool}
             onSelectTool={setCurrentTool}
             onAddConnectedNode={handleAddConnectedNode}
-            onAddSticky={handleAddSticky}
-            onAddWireframe={handleAddWireframe}
-            onAddText={() => handleAddSticky()}
+            onAddShape={() => handleAddShape()}
+            onAddSticky={() => handleAddSticky()}
+            onAddWireframe={() => handleAddWireframe()}
+            onAddText={() => handleAddText()}
             onStartPresentation={() => setIsPresentationOpen(true)}
-            onOpenAI={() => setIsAIModalOpen(true)}
+            onOpenAI={() => setIsAgentDrawerOpen(true)}
             onTogglePresentPanel={() => setIsPresentSidePanelOpen(prev => !prev)}
           />
 
@@ -1912,6 +1962,47 @@ export const App: React.FC = () => {
               onDelete={(id) => updateActiveBoard(b => ({
                 ...b,
                 stickies: b.stickies.filter(s => s.id !== id)
+              }))}
+            />
+
+            {/* Formas Geométricas, Wireframes e Textos Livres */}
+            <FlowchartCanvas
+              shapes={activeBoard.shapes || []}
+              wireframes={activeBoard.wireframes || []}
+              texts={activeBoard.texts || []}
+              selectedId={selectedShapeId}
+              onSelect={setSelectedShapeId}
+              onUpdateShapeText={(id, text) => updateActiveBoard(b => ({
+                ...b,
+                shapes: (b.shapes || []).map(s => s.id === id ? { ...s, text } : s)
+              }))}
+              onMoveShape={(id, dx, dy) => updateActiveBoard(b => ({
+                ...b,
+                shapes: (b.shapes || []).map(s => s.id === id ? { ...s, x: s.x + dx / zoom, y: s.y + dy / zoom } : s)
+              }))}
+              onDeleteShape={(id) => updateActiveBoard(b => ({
+                ...b,
+                shapes: (b.shapes || []).filter(s => s.id !== id)
+              }))}
+              onMoveWireframe={(id, dx, dy) => updateActiveBoard(b => ({
+                ...b,
+                wireframes: (b.wireframes || []).map(w => w.id === id ? { ...w, x: w.x + dx / zoom, y: w.y + dy / zoom } : w)
+              }))}
+              onDeleteWireframe={(id) => updateActiveBoard(b => ({
+                ...b,
+                wireframes: (b.wireframes || []).filter(w => w.id !== id)
+              }))}
+              onUpdateText={(id, text) => updateActiveBoard(b => ({
+                ...b,
+                texts: (b.texts || []).map(t => t.id === id ? { ...t, text } : t)
+              }))}
+              onMoveText={(id, dx, dy) => updateActiveBoard(b => ({
+                ...b,
+                texts: (b.texts || []).map(t => t.id === id ? { ...t, x: t.x + dx / zoom, y: t.y + dy / zoom } : t)
+              }))}
+              onDeleteText={(id) => updateActiveBoard(b => ({
+                ...b,
+                texts: (b.texts || []).filter(t => t.id !== id)
               }))}
             />
           </div>

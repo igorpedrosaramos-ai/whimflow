@@ -8,15 +8,9 @@ import {
   Layout, 
   Type, 
   Pencil, 
-  Play,
   GitBranch,
   Sparkles,
-  ArrowUpRight,
-  Smile,
-  Link,
-  Frame,
-  Table,
-  Plus
+  Frame
 } from 'lucide-react';
 import { ToolType } from '../types';
 
@@ -24,6 +18,7 @@ interface ToolbarProps {
   currentTool: ToolType;
   onSelectTool: (tool: ToolType) => void;
   onAddConnectedNode: () => void;
+  onAddShape: () => void;
   onAddSticky: () => void;
   onAddWireframe: () => void;
   onAddText: () => void;
@@ -36,6 +31,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   currentTool,
   onSelectTool,
   onAddConnectedNode,
+  onAddShape,
   onAddSticky,
   onAddWireframe,
   onAddText,
@@ -64,7 +60,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       onMouseDown={e => e.stopPropagation()}
       onClick={e => e.stopPropagation()}
     >
-      {/* Grupo Superior de Modos de Diagrama */}
+      {/* 1. Criar Nó Conectado */}
       <button
         onClick={onAddConnectedNode}
         style={{
@@ -80,34 +76,35 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           cursor: 'pointer',
           boxShadow: '0 2px 8px rgba(124, 58, 237, 0.4)'
         }}
-        title="Criar Quadrado com Linha Conectada (Tab: Filho | Enter: Irmão)"
+        title="Criar Nó Conectado (Tab: Filho | Enter: Irmão)"
       >
         <Network size={16} />
       </button>
 
+      {/* 2. Modo Mapa Mental */}
       <button
-        onClick={() => onSelectTool('wireframe')}
+        onClick={() => onSelectTool('mindmap')}
         style={{
           width: '32px',
           height: '32px',
           borderRadius: '7px',
           border: 'none',
-          backgroundColor: currentTool === 'wireframe' ? '#2e394d' : 'transparent',
-          color: currentTool === 'wireframe' ? '#ffffff' : '#94a3b8',
+          backgroundColor: currentTool === 'mindmap' ? '#2e394d' : 'transparent',
+          color: currentTool === 'mindmap' ? '#a78bfa' : '#94a3b8',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Modo Wireframe / Componentes"
+        title="Modo Mapa Mental (M)"
       >
-        <Layout size={16} />
+        <GitBranch size={16} />
       </button>
 
       {/* Divisor */}
       <div style={{ width: '22px', height: '1px', backgroundColor: '#2d3748', margin: '2px 0' }} />
 
-      {/* Ferramenta de Seleção / Cursor */}
+      {/* 3. Ferramenta de Seleção / Cursor */}
       <button
         onClick={() => onSelectTool('select')}
         style={{
@@ -122,12 +119,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Selecionar / Mover Nós (V)"
+        title="Selecionar e Mover (V)"
       >
         <MousePointer size={16} />
       </button>
 
-      {/* Mão / Pan */}
+      {/* 4. Mão / Panorâmica */}
       <button
         onClick={() => onSelectTool('hand')}
         style={{
@@ -142,14 +139,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Panorâmica / Mover Canvas (H ou segurar Espaço)"
+        title="Panorâmica / Mover Tela (H ou segurar Espaço)"
       >
         <Hand size={16} />
       </button>
 
-      {/* Formas Geométricas */}
+      {/* 5. Forma Geométrica */}
       <button
-        onClick={onAddConnectedNode}
+        onClick={onAddShape}
         style={{
           width: '32px',
           height: '32px',
@@ -162,12 +159,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Formas Geométricas"
+        title="Inserir Forma Geométrica / Card"
       >
         <Square size={16} />
       </button>
 
-      {/* Sticky Note */}
+      {/* 6. Sticky Note */}
       <button
         onClick={() => {
           onSelectTool('sticky');
@@ -185,52 +182,35 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Nota Adesiva / Post-it (S)"
+        title="Inserir Nota Adesiva / Post-it (S)"
       >
         <StickyIcon size={16} />
       </button>
 
-      {/* Mind Map Mode */}
+      {/* 7. Wireframe */}
       <button
-        onClick={() => onSelectTool('mindmap')}
+        onClick={() => {
+          onSelectTool('wireframe');
+          onAddWireframe();
+        }}
         style={{
           width: '32px',
           height: '32px',
           borderRadius: '7px',
           border: 'none',
-          backgroundColor: currentTool === 'mindmap' ? '#7c3aed' : 'transparent',
-          color: '#ffffff',
+          backgroundColor: currentTool === 'wireframe' ? '#2e394d' : 'transparent',
+          color: currentTool === 'wireframe' ? '#38bdf8' : '#94a3b8',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Mapa Mental (M)"
+        title="Inserir Componente de Wireframe"
       >
-        <GitBranch size={16} />
+        <Layout size={16} />
       </button>
 
-      {/* Conector */}
-      <button
-        onClick={onAddConnectedNode}
-        style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '7px',
-          border: 'none',
-          backgroundColor: 'transparent',
-          color: '#94a3b8',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer'
-        }}
-        title="Conector / Linha (C)"
-      >
-        <ArrowUpRight size={16} />
-      </button>
-
-      {/* Texto */}
+      {/* 8. Texto Livre */}
       <button
         onClick={onAddText}
         style={{
@@ -245,52 +225,12 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Texto Livre (T)"
+        title="Inserir Caixa de Texto (T)"
       >
         <Type size={16} />
       </button>
 
-      {/* Ícone / Emoji */}
-      <button
-        onClick={onAddConnectedNode}
-        style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '7px',
-          border: 'none',
-          backgroundColor: 'transparent',
-          color: '#94a3b8',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer'
-        }}
-        title="Ícones e Emojis"
-      >
-        <Smile size={16} />
-      </button>
-
-      {/* Link */}
-      <button
-        onClick={onAddConnectedNode}
-        style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '7px',
-          border: 'none',
-          backgroundColor: 'transparent',
-          color: '#94a3b8',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer'
-        }}
-        title="Link Externo (K)"
-      >
-        <Link size={16} />
-      </button>
-
-      {/* Desenho Livre / Caneta */}
+      {/* 9. Caneta / Desenho Livre */}
       <button
         onClick={() => onSelectTool(currentTool === 'draw' ? 'mindmap' : 'draw')}
         style={{
@@ -299,18 +239,18 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           borderRadius: '7px',
           border: 'none',
           backgroundColor: currentTool === 'draw' ? '#2e394d' : 'transparent',
-          color: currentTool === 'draw' ? '#ffffff' : '#94a3b8',
+          color: currentTool === 'draw' ? '#f43f5e' : '#94a3b8',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Caneta / Desenho Livre (D)"
+        title="Caneta / Traço Livre (D)"
       >
         <Pencil size={16} />
       </button>
 
-      {/* Moldura / Seção de Apresentação */}
+      {/* 10. Seção / Apresentação */}
       <button
         onClick={onTogglePresentPanel}
         style={{
@@ -325,35 +265,15 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Seção / Painel de Apresentação (F)"
+        title="Painel de Seções e Apresentação (F)"
       >
         <Frame size={16} />
-      </button>
-
-      {/* Tabela */}
-      <button
-        onClick={onAddConnectedNode}
-        style={{
-          width: '32px',
-          height: '32px',
-          borderRadius: '7px',
-          border: 'none',
-          backgroundColor: 'transparent',
-          color: '#94a3b8',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer'
-        }}
-        title="Tabela"
-      >
-        <Table size={16} />
       </button>
 
       {/* Divisor */}
       <div style={{ width: '22px', height: '1px', backgroundColor: '#2d3748', margin: '2px 0' }} />
 
-      {/* Assistente IA */}
+      {/* 11. Assistente IA Turbi */}
       <button
         onClick={onOpenAI}
         style={{
@@ -368,7 +288,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Assistente IA (Gerar ramos e estruturas)"
+        title="Assistente IA (Gerar diagramas e ramificações)"
       >
         <Sparkles size={16} />
       </button>
