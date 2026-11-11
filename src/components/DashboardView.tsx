@@ -27,6 +27,7 @@ import {
 import { Board, BoardCategory } from '../types';
 import { CategoryModal } from './CategoryModal';
 import { MoveCategoryModal } from './MoveCategoryModal';
+import { BoardThumbnailPreview } from './BoardThumbnailPreview';
 
 interface DashboardViewProps {
   boards: Board[];
@@ -1206,8 +1207,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         onOpenBoard(board.id);
                       }}
                       style={{
-                        height: '190px',
-                        borderRadius: '8px',
+                        height: '205px',
+                        borderRadius: '10px',
                         border: isDark ? '1px solid #232c3d' : '1px solid #e2e8f0',
                         backgroundColor: isDark ? '#19202c' : '#ffffff',
                         overflow: 'hidden',
@@ -1216,14 +1217,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         flexDirection: 'column',
                         textDecoration: 'none',
                         color: 'inherit',
-                        transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
+                        transition: 'transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.15s',
                         position: 'relative'
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.transform = 'translateY(-3px)';
                         e.currentTarget.style.boxShadow = isDark
-                          ? '0 8px 24px rgba(0, 0, 0, 0.4)'
-                          : '0 8px 20px rgba(0, 0, 0, 0.08)';
+                          ? '0 12px 28px rgba(0, 0, 0, 0.45)'
+                          : '0 12px 26px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0,0,0,0.03)';
                         e.currentTarget.style.borderColor = '#818cf8';
                       }}
                       onMouseLeave={e => {
@@ -1232,93 +1233,99 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         e.currentTarget.style.borderColor = isDark ? '#232c3d' : '#e2e8f0';
                       }}
                     >
-                      {/* Cabeçalho do Card com Ícone Roxo e Título */}
+                      {/* Cabeçalho do Card com Ícone Roxo, Título e Categoria */}
                       <div
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'space-between',
-                          padding: '12px 14px',
+                          padding: '11px 14px 10px 14px',
                           borderBottom: isDark ? '1px solid #202735' : '1px solid #f1f5f9',
-                          backgroundColor: isDark ? '#1b2331' : '#fafafa'
+                          backgroundColor: isDark ? '#1b2331' : '#fafafa',
+                          gap: '8px'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
-                          {/* Ícone de Board Roxo */}
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                            <rect x="3" y="3" width="18" height="18" rx="3" />
-                            <circle cx="8" cy="8" r="1" fill="#7c3aed" />
-                            <circle cx="12" cy="8" r="1" fill="#7c3aed" />
-                            <circle cx="16" cy="8" r="1" fill="#7c3aed" />
-                          </svg>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                            {/* Ícone de Board Roxo */}
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                              <rect x="3" y="3" width="18" height="18" rx="3" />
+                              <circle cx="8" cy="8" r="1" fill="#7c3aed" />
+                              <circle cx="12" cy="8" r="1" fill="#7c3aed" />
+                              <circle cx="16" cy="8" r="1" fill="#7c3aed" />
+                            </svg>
 
-                          {isEditing ? (
-                            <input
-                              autoFocus
-                              value={editTitle}
-                              onClick={e => e.stopPropagation()}
-                              onChange={e => setEditTitle(e.target.value)}
-                              onBlur={() => {
-                                if (editTitle.trim()) onRenameBoard(board.id, editTitle.trim());
-                                setEditingBoardId(null);
-                              }}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
+                            {isEditing ? (
+                              <input
+                                autoFocus
+                                value={editTitle}
+                                onClick={e => e.stopPropagation()}
+                                onChange={e => setEditTitle(e.target.value)}
+                                onBlur={() => {
                                   if (editTitle.trim()) onRenameBoard(board.id, editTitle.trim());
                                   setEditingBoardId(null);
-                                }
-                              }}
-                              style={{
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                border: '1px solid #6366f1',
-                                outline: 'none'
-                              }}
-                            />
-                          ) : (
-                            <span
-                              style={{
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                color: isDark ? '#f8fafc' : '#1e293b',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis'
-                              }}
-                            >
-                              {board.title || 'Sem título'}
-                            </span>
-                          )}
+                                }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    if (editTitle.trim()) onRenameBoard(board.id, editTitle.trim());
+                                    setEditingBoardId(null);
+                                  }
+                                }}
+                                style={{
+                                  fontSize: '13px',
+                                  fontWeight: 600,
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #6366f1',
+                                  outline: 'none',
+                                  width: '100%'
+                                }}
+                              />
+                            ) : (
+                              <span
+                                style={{
+                                  fontSize: '13.5px',
+                                  fontWeight: 600,
+                                  color: isDark ? '#f8fafc' : '#0f172a',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}
+                                title={board.title}
+                              >
+                                {board.title || 'Sem título'}
+                              </span>
+                            )}
+                          </div>
 
-                          {/* Tag de Categoria no Cabeçalho do Card */}
+                          {/* Linha de Categoria e Metadados abaixo do título */}
                           {(() => {
                             const boardCat = categories.find(c => c.id === board.categoryId);
                             if (!boardCat) return null;
                             return (
-                              <span
-                                onClick={e => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setBoardToMove(board);
-                                }}
-                                style={{
-                                  fontSize: '11px',
-                                  fontWeight: 600,
-                                  padding: '1px 6px',
-                                  borderRadius: '4px',
-                                  backgroundColor: isDark ? '#232c3f' : '#f1f5f9',
-                                  color: boardCat.color || '#818cf8',
-                                  border: `1px solid ${boardCat.color ? boardCat.color + '44' : '#818cf844'}`,
-                                  whiteSpace: 'nowrap',
-                                  flexShrink: 0,
-                                  cursor: 'pointer'
-                                }}
-                                title="Clique para mudar a categoria"
-                              >
-                                {boardCat.name}
-                              </span>
+                              <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '23px' }}>
+                                <span
+                                  onClick={e => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setBoardToMove(board);
+                                  }}
+                                  style={{
+                                    fontSize: '10.5px',
+                                    fontWeight: 600,
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    backgroundColor: isDark ? '#232c3f' : '#f1f5f9',
+                                    color: boardCat.color || '#818cf8',
+                                    border: `1px solid ${boardCat.color ? boardCat.color + '44' : '#818cf844'}`,
+                                    whiteSpace: 'nowrap',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Clique para mudar a categoria"
+                                >
+                                  {boardCat.name}
+                                </span>
+                              </div>
                             );
                           })()}
                         </div>
@@ -1467,32 +1474,63 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </div>
                       </div>
 
-                      {/* Prévia Visual do Conteúdo do Board */}
-                      <div
-                        style={{
-                          flex: 1,
-                          backgroundColor: isDark ? '#141a24' : '#ffffff',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          padding: '14px',
-                          position: 'relative'
-                        }}
-                      >
-                        {/* Ilustração sutil dos nós */}
-                        <svg viewBox="0 0 200 100" style={{ width: '100%', height: '100%' }}>
-                          <line x1="40" y1="50" x2="100" y2="30" stroke="#818cf8" strokeWidth="1.5" />
-                          <line x1="40" y1="50" x2="100" y2="70" stroke="#818cf8" strokeWidth="1.5" />
-                          <line x1="100" y1="30" x2="160" y2="20" stroke="#c084fc" strokeWidth="1.5" />
-                          <line x1="100" y1="30" x2="160" y2="45" stroke="#c084fc" strokeWidth="1.5" />
+                    {/* Prévia Visual Dinâmica e Real do Conteúdo do Board */}
+                    {(() => {
+                      const isStickies = (board.stickies?.length || 0) > 0 && (board.mindMapNodes?.length || 0) <= 1;
+                      const isWireframe = (board.wireframes?.length || 0) > 0 && (board.mindMapNodes?.length || 0) <= 1;
+                      const isDoc = ((board.texts?.length || 0) > 0 || board.title?.toLowerCase().includes('doc')) && (board.mindMapNodes?.length || 0) <= 1 && (board.stickies?.length || 0) === 0;
 
-                          <rect x="15" y="40" width="50" height="20" rx="4" fill="#7c3aed" />
-                          <rect x="85" y="20" width="45" height="18" rx="3" fill={isDark ? '#263143' : '#f1f5f9'} stroke="#818cf8" strokeWidth="1" />
-                          <rect x="85" y="60" width="45" height="18" rx="3" fill={isDark ? '#263143' : '#f1f5f9'} stroke="#818cf8" strokeWidth="1" />
-                          <rect x="145" y="12" width="40" height="16" rx="3" fill={isDark ? '#263143' : '#f1f5f9'} stroke="#c084fc" strokeWidth="1" />
-                          <rect x="145" y="38" width="40" height="16" rx="3" fill={isDark ? '#263143' : '#f1f5f9'} stroke="#c084fc" strokeWidth="1" />
-                        </svg>
-                      </div>
+                      let badgeText = '';
+                      if (isStickies) {
+                        badgeText = `${board.stickies.length} ${board.stickies.length === 1 ? 'nota' : 'notas'}`;
+                      } else if (isWireframe) {
+                        badgeText = `${board.wireframes.length} componentes`;
+                      } else if (isDoc) {
+                        badgeText = 'Documento';
+                      } else if ((board.mindMapNodes?.length || 0) > 1) {
+                        badgeText = `${board.mindMapNodes.length} tópicos`;
+                      }
+
+                      return (
+                        <div
+                          style={{
+                            flex: 1,
+                            backgroundColor: isDark ? '#141a24' : '#ffffff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '8px 12px',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          <BoardThumbnailPreview board={board} isDark={isDark} />
+
+                          {badgeText && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: '8px',
+                                right: '10px',
+                                padding: '2px 7px',
+                                borderRadius: '4px',
+                                backgroundColor: isDark ? 'rgba(20, 26, 36, 0.88)' : 'rgba(255, 255, 255, 0.94)',
+                                backdropFilter: 'blur(4px)',
+                                border: isDark ? '1px solid #283344' : '1px solid #e2e8f0',
+                                color: isDark ? '#94a3b8' : '#64748b',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                letterSpacing: '-0.01em',
+                                pointerEvents: 'none',
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.06)'
+                              }}
+                            >
+                              {badgeText}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                     </a>
                   );
                 })}
