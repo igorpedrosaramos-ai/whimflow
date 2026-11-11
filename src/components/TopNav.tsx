@@ -282,37 +282,6 @@ export const TopNav: React.FC<TopNavProps> = ({
           </button>
         )}
 
-        {/* Avatar do Usuário */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-            padding: '2px 8px 2px 4px',
-            borderRadius: '14px',
-            backgroundColor: isDark ? '#232b38' : '#f1f5f9',
-            fontSize: '12px',
-            fontWeight: 600
-          }}
-        >
-          <div
-            style={{
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
-              backgroundColor: '#10b981',
-              color: '#ffffff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '10px'
-            }}
-          >
-            I
-          </div>
-          <span style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>1</span>
-        </div>
-
         {/* Botão de Navegar para o Dashboard */}
         {onNavigateToDashboard && (
           <button
