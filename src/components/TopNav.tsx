@@ -17,12 +17,13 @@ import {
   BarChart2,
   Sparkles
 } from 'lucide-react';
-import { Board } from '../types';
+import { Board, BoardCategory } from '../types';
 
 interface TopNavProps {
   boardTitle: string;
   onUpdateTitle: (title: string) => void;
   boards: Board[];
+  categories?: BoardCategory[];
   activeBoardId: string;
   onSelectBoard: (id: string) => void;
   onCreateNewBoard: () => void;
@@ -42,6 +43,7 @@ interface TopNavProps {
   onOpenAgent?: () => void;
   onOpenVersionHistory?: () => void;
   onOpenBoardStats?: () => void;
+  onMoveCategory?: (categoryId?: string) => void;
   workspaceName?: string;
   isStarred?: boolean;
   onToggleFavorite?: () => void;
@@ -51,6 +53,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   boardTitle,
   onUpdateTitle,
   boards,
+  categories = [],
   activeBoardId,
   onSelectBoard,
   onCreateNewBoard,
@@ -65,6 +68,7 @@ export const TopNav: React.FC<TopNavProps> = ({
   onOpenAgent,
   onOpenVersionHistory,
   onOpenBoardStats,
+  onMoveCategory,
   totalObjects = 0,
   workspaceName = 'teste',
   isStarred = false,
@@ -210,6 +214,76 @@ export const TopNav: React.FC<TopNavProps> = ({
             <ChevronDown size={12} color="#94a3b8" />
           </div>
         </div>
+
+        {/* Badge e Seletor Rápido de Categoria no TopNav */}
+        {(() => {
+          const currentBoard = boards.find(b => b.id === activeBoardId);
+          const cat = categories.find(c => c.id === currentBoard?.categoryId);
+          return (
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  padding: '3px 8px',
+                  borderRadius: '5px',
+                  border: cat
+                    ? `1px solid ${cat.color ? cat.color + '44' : '#818cf844'}`
+                    : isDark ? '1px solid #2a3446' : '1px solid #e2e8f0',
+                  backgroundColor: cat
+                    ? (isDark ? '#232c3f' : '#f1f5f9')
+                    : 'transparent',
+                  color: cat ? (cat.color || '#818cf8') : (isDark ? '#94a3b8' : '#64748b'),
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+                title="Mudar categoria do projeto atual"
+              >
+                {cat && (
+                  <span
+                    style={{
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      backgroundColor: cat.color || '#818cf8'
+                    }}
+                  />
+                )}
+                <span>{cat ? cat.name : '+ Categoria'}</span>
+                <ChevronDown size={11} color={cat ? (cat.color || '#818cf8') : '#94a3b8'} />
+              </button>
+
+              {/* Select nativo para trocar categoria com zero atrito */}
+              <select
+                value={currentBoard?.categoryId || ''}
+                onChange={e => {
+                  const newCatId = e.target.value ? e.target.value : undefined;
+                  onMoveCategory?.(newCatId);
+                }}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  opacity: 0,
+                  cursor: 'pointer',
+                  width: '100%',
+                  height: '100%',
+                  zIndex: 3
+                }}
+                title="Selecionar categoria para este quadro"
+              >
+                <option value="">Sem Categoria (Geral)</option>
+                {categories.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          );
+        })()}
 
         {/* Estrela de Favorito */}
         <button

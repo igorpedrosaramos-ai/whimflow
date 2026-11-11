@@ -11,6 +11,7 @@ export const BLANK_BOARD: Board = {
   id: 'board-novo',
   title: 'Meu Novo Projeto',
   workspaceId: 'ws-default',
+  categoryId: 'cat-produto',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   mindMapNodes: [

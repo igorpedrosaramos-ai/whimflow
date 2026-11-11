@@ -1,10 +1,40 @@
-import { Board, MindMapNode } from '../types';
+import { Board, MindMapNode, BoardCategory } from '../types';
 
 export const STORAGE_KEY = 'whimflow_boards_v6';
 export const LEGACY_STORAGE_KEY = 'whimflow_boards_v5';
 export const ACTIVE_BOARD_KEY = 'whimflow_active_board_id';
 export const CURRENT_VIEW_KEY = 'whimflow_current_view';
 export const THEME_KEY = 'whimflow_theme';
+export const CATEGORIES_KEY = 'whimflow_board_categories_v1';
+
+export const DEFAULT_CATEGORIES: BoardCategory[] = [
+  { id: 'cat-marketing', name: 'Marketing & Vendas', color: '#f97316' },
+  { id: 'cat-produto', name: 'Design & Produto', color: '#8b5cf6' },
+  { id: 'cat-operacoes', name: 'Estratégia & Operações', color: '#10b981' }
+];
+
+export function loadCategories(): BoardCategory[] {
+  if (typeof window === 'undefined') return DEFAULT_CATEGORIES;
+  try {
+    const raw = localStorage.getItem(CATEGORIES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Erro ao carregar categorias:', e);
+  }
+  return DEFAULT_CATEGORIES;
+}
+
+export function saveCategories(categories: BoardCategory[]): void {
+  if (typeof window === 'undefined' || !Array.isArray(categories)) return;
+  try {
+    localStorage.setItem(CATEGORIES_KEY, JSON.stringify(categories));
+  } catch (e) {
+    console.warn('Erro ao salvar categorias:', e);
+  }
+}
 
 const DB_NAME = 'whimflow_indexeddb';
 const DB_VERSION = 1;

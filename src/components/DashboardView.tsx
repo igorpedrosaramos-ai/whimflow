@@ -21,14 +21,18 @@ import {
   Folder,
   Copy,
   Trash,
-  Pencil
+  Pencil,
+  Tag
 } from 'lucide-react';
-import { Board } from '../types';
+import { Board, BoardCategory } from '../types';
+import { CategoryModal } from './CategoryModal';
+import { MoveCategoryModal } from './MoveCategoryModal';
 
 interface DashboardViewProps {
   boards: Board[];
+  categories?: BoardCategory[];
   onOpenBoard: (boardId: string) => void;
-  onCreateNewBoard: (title?: string) => void;
+  onCreateNewBoard: (title?: string, categoryId?: string) => void;
   onOpenDoc: () => void;
   onOpenAskAgent: () => void;
   onOpenTemplates: () => void;
@@ -39,15 +43,20 @@ interface DashboardViewProps {
   onOpenSearch?: () => void;
   onOpenShortcuts?: () => void;
   onOpenQuickSpark?: () => void;
-  initialCategoryFilter?: 'all' | 'recent';
+  initialCategoryFilter?: string;
   onSelectRecent?: () => void;
   onSelectAll?: () => void;
+  onSelectCategory?: (categoryId: string) => void;
+  onSaveCategory?: (category: { id?: string; name: string; color: string }) => void;
+  onDeleteCategory?: (categoryId: string) => void;
+  onMoveBoardCategory?: (boardId: string, categoryId?: string) => void;
   workspaceName?: string;
   theme?: 'dark' | 'light';
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   boards,
+  categories = [],
   onOpenBoard,
   onCreateNewBoard,
   onOpenDoc,
@@ -63,6 +72,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   initialCategoryFilter = 'all',
   onSelectRecent,
   onSelectAll,
+  onSelectCategory,
+  onSaveCategory,
+  onDeleteCategory,
+  onMoveBoardCategory,
   workspaceName = 'teste',
   theme = 'light'
 }) => {
@@ -73,8 +86,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'recent'>(initialCategoryFilter);
+  const [categoryFilter, setCategoryFilter] = useState<string>(initialCategoryFilter);
   const [isTeamsOpen, setIsTeamsOpen] = useState(true);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(true);
+  const [activeCategoryMenuId, setActiveCategoryMenuId] = useState<string | null>(null);
+  const [categoryToEdit, setCategoryToEdit] = useState<BoardCategory | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [boardToMove, setBoardToMove] = useState<Board | null>(null);
   const [sortOption, setSortOption] = useState<'created-desc' | 'created-asc' | 'alpha' | 'modified'>('created-desc');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
@@ -88,7 +106,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     if (searchFilter.trim() && !b.title.toLowerCase().includes(searchFilter.toLowerCase())) {
       return false;
     }
-    return true;
+    if (categoryFilter === 'all' || categoryFilter === 'recent') {
+      return true;
+    }
+    return b.categoryId === categoryFilter;
   });
 
   if (categoryFilter === 'recent') {
@@ -310,11 +331,284 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span>Everyone at {workspaceName}</span>
             </button>
           )}
+
+          {/* =========================================================================
+              SEÇÃO DE CATEGORIAS (Whimsical Authentic Categories)
+              ========================================================================= */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 12px 6px 12px',
+              marginTop: '4px'
+            }}
+          >
+            <button
+              id="btn-dashboard-toggle-categories"
+              type="button"
+              onClick={() => setIsCategoriesOpen(prev => !prev)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px',
+                fontWeight: 700,
+                color: '#64748b',
+                letterSpacing: '0.05em',
+                cursor: 'pointer',
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                textAlign: 'left',
+                transition: 'color 0.15s ease'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#94a3b8')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
+              title={isCategoriesOpen ? 'Recolher CATEGORIAS' : 'Expandir CATEGORIAS'}
+            >
+              {isCategoriesOpen ? (
+                <ChevronDown size={13} color="#64748b" />
+              ) : (
+                <ChevronRight size={13} color="#64748b" />
+              )}
+              <span>CATEGORIAS</span>
+            </button>
+
+            {/* Botão rápido + para adicionar categoria */}
+            <button
+              id="btn-add-category"
+              type="button"
+              onClick={() => {
+                setCategoryToEdit(null);
+                setIsCategoryModalOpen(true);
+              }}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#64748b',
+                cursor: 'pointer',
+                padding: '2px 4px',
+                borderRadius: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                transition: 'color 0.15s ease'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#f8fafc')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
+              title="Nova Categoria"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {/* Lista de Categorias Cadastradas */}
+          {isCategoriesOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {categories.map(cat => {
+                const count = boards.filter(b => b.categoryId === cat.id).length;
+                const isSelected = categoryFilter === cat.id;
+                const isCatMenuOpen = activeCategoryMenuId === cat.id;
+
+                return (
+                  <div
+                    key={cat.id}
+                    style={{ position: 'relative' }}
+                  >
+                    <button
+                      id={`btn-cat-${cat.id}`}
+                      onClick={() => {
+                        setCategoryFilter(cat.id);
+                        onSelectCategory?.(cat.id);
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 10px 6px 20px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        background: isSelected ? '#232b38' : 'transparent',
+                        color: isSelected ? '#f8fafc' : '#94a3b8',
+                        fontSize: '13px',
+                        fontWeight: isSelected ? 600 : 500,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={e => {
+                        if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                      }}
+                      onMouseLeave={e => {
+                        if (!isSelected) e.currentTarget.style.background = 'transparent';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '9px', minWidth: 0, flex: 1 }}>
+                        <span
+                          style={{
+                            width: '9px',
+                            height: '9px',
+                            borderRadius: '50%',
+                            backgroundColor: cat.color || '#818cf8',
+                            flexShrink: 0
+                          }}
+                        />
+                        <span
+                          style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          {cat.name}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {count > 0 && (
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              padding: '1px 5px',
+                              borderRadius: '10px',
+                              backgroundColor: isSelected ? '#334155' : '#232b38',
+                              color: isSelected ? '#f8fafc' : '#64748b',
+                              fontWeight: 600
+                            }}
+                          >
+                            {count}
+                          </span>
+                        )}
+
+                        <span
+                          onClick={e => {
+                            e.stopPropagation();
+                            setActiveCategoryMenuId(isCatMenuOpen ? null : cat.id);
+                          }}
+                          style={{
+                            padding: '2px 4px',
+                            borderRadius: '4px',
+                            color: '#64748b',
+                            display: 'flex',
+                            alignItems: 'center',
+                            cursor: 'pointer'
+                          }}
+                          title="Opções da categoria"
+                        >
+                          <MoreHorizontal size={13} />
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Menu Popover da Categoria (Editar / Excluir) */}
+                    {isCatMenuOpen && (
+                      <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                          position: 'absolute',
+                          right: '8px',
+                          top: '28px',
+                          backgroundColor: '#1e2634',
+                          border: '1px solid #333e50',
+                          borderRadius: '6px',
+                          boxShadow: '0 8px 20px rgba(0,0,0,0.3)',
+                          zIndex: 100,
+                          minWidth: '130px',
+                          padding: '4px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '2px'
+                        }}
+                      >
+                        <button
+                          onClick={() => {
+                            setCategoryToEdit(cat);
+                            setIsCategoryModalOpen(true);
+                            setActiveCategoryMenuId(null);
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 8px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#f8fafc',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Pencil size={12} color="#94a3b8" />
+                          <span>Editar</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm(`Deseja excluir a categoria "${cat.name}"? Os quadros não serão apagados, apenas desvinculados.`)) {
+                              onDeleteCategory?.(cat.id);
+                              if (categoryFilter === cat.id) setCategoryFilter('all');
+                              setActiveCategoryMenuId(null);
+                            }
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '6px 8px',
+                            borderRadius: '4px',
+                            border: 'none',
+                            background: 'transparent',
+                            color: '#f87171',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Trash size={12} color="#f87171" />
+                          <span>Excluir</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Botão + Nova Categoria */}
+              <button
+                id="btn-sidebar-new-category"
+                onClick={() => {
+                  setCategoryToEdit(null);
+                  setIsCategoryModalOpen(true);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 12px 6px 20px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#64748b',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  marginTop: '2px',
+                  transition: 'color 0.15s ease'
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#818cf8')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
+              >
+                <Plus size={13} />
+                <span>+ Nova Categoria</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Rodapé da Barra Lateral */}
         <div style={{ padding: '12px 14px', borderTop: '1px solid #202633', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {/* Templates & color themes */}
+          {/* Templates e Temas */}
           <button
             id="btn-dashboard-templates"
             onClick={onOpenTemplates}
@@ -333,10 +627,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             }}
           >
             <Layout size={15} color="#64748b" />
-            <span>Templates & color themes</span>
+            <span>Templates e Temas</span>
           </button>
 
-          {/* Trash */}
+          {/* Lixeira */}
           <button
             id="btn-dashboard-trash"
             onClick={onOpenTrash}
@@ -355,7 +649,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             }}
           >
             <Trash2 size={15} color="#64748b" />
-            <span>Trash</span>
+            <span>Lixeira</span>
           </button>
         </div>
       </aside>
@@ -789,13 +1083,106 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Seção Hoje com Grid de Boards */}
+          {/* Seção Hoje ou Categoria com Grid de Boards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b' }}>
-              Hoje
-            </h3>
+            {(() => {
+              const selectedCat = categories.find(c => c.id === categoryFilter);
+              if (selectedCat) {
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: selectedCat.color || '#818cf8' }} />
+                      <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: isDark ? '#f8fafc' : '#0f172a' }}>
+                        Categoria: {selectedCat.name}
+                      </h3>
+                      <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        ({displayBoards.length} {displayBoards.length === 1 ? 'quadro' : 'quadros'})
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCategoryFilter('all');
+                        onSelectAll?.();
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#818cf8',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      ← Ver todos os quadros
+                    </button>
+                  </div>
+                );
+              }
+              if (categoryFilter === 'recent') {
+                return (
+                  <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b' }}>
+                    Recentes ({displayBoards.length})
+                  </h3>
+                );
+              }
+              return (
+                <h3 style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: isDark ? '#94a3b8' : '#64748b' }}>
+                  Hoje ({displayBoards.length})
+                </h3>
+              );
+            })()}
 
-            {displayMode === 'grid' ? (
+            {/* Estado Vazio de Categoria */}
+            {displayBoards.length === 0 && (
+              <div
+                style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  borderRadius: '8px',
+                  border: isDark ? '1px dashed #2d3848' : '1px dashed #cbd5e1',
+                  backgroundColor: isDark ? '#161d28' : '#fafafa',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}
+              >
+                <Folder size={32} color="#64748b" />
+                <div>
+                  <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: isDark ? '#f8fafc' : '#1e293b' }}>
+                    Nenhum quadro encontrado
+                  </p>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: '#94a3b8' }}>
+                    {categoryFilter !== 'all' && categoryFilter !== 'recent'
+                      ? 'Nenhum projeto associado a esta categoria ainda. Mova um quadro existente ou crie um novo.'
+                      : 'Nenhum quadro corresponde à sua pesquisa.'}
+                  </p>
+                </div>
+                {categoryFilter !== 'all' && categoryFilter !== 'recent' && (
+                  <button
+                    onClick={() => onCreateNewBoard('Sem título', categoryFilter)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      backgroundColor: '#818cf8',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Plus size={15} />
+                    <span>+ Criar quadro nesta categoria</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {displayBoards.length > 0 && displayMode === 'grid' ? (
               <div
                 style={{
                   display: 'grid',
@@ -856,7 +1243,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           backgroundColor: isDark ? '#1b2331' : '#fafafa'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
                           {/* Ícone de Board Roxo */}
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                             <rect x="3" y="3" width="18" height="18" rx="3" />
@@ -904,12 +1291,44 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               {board.title || 'Sem título'}
                             </span>
                           )}
+
+                          {/* Tag de Categoria no Cabeçalho do Card */}
+                          {(() => {
+                            const boardCat = categories.find(c => c.id === board.categoryId);
+                            if (!boardCat) return null;
+                            return (
+                              <span
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setBoardToMove(board);
+                                }}
+                                style={{
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  backgroundColor: isDark ? '#232c3f' : '#f1f5f9',
+                                  color: boardCat.color || '#818cf8',
+                                  border: `1px solid ${boardCat.color ? boardCat.color + '44' : '#818cf844'}`,
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0,
+                                  cursor: 'pointer'
+                                }}
+                                title="Clique para mudar a categoria"
+                              >
+                                {boardCat.name}
+                              </span>
+                            );
+                          })()}
                         </div>
 
                         {/* Menu de Ações (3 Pontinhos) */}
                         <div style={{ position: 'relative' }}>
                           <button
+                            id={`btn-board-menu-${board.id}`}
                             onClick={e => {
+                              e.preventDefault();
                               e.stopPropagation();
                               setActiveBoardMenuId(isMenuOpen ? null : board.id);
                             }}
@@ -945,7 +1364,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               }}
                             >
                               <button
-                                onClick={() => {
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   setEditingBoardId(board.id);
                                   setEditTitle(board.title);
                                   setActiveBoardMenuId(null);
@@ -968,7 +1389,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 <span>Renomear</span>
                               </button>
                               <button
-                                onClick={() => {
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   onDuplicateBoard(board.id);
                                   setActiveBoardMenuId(null);
                                 }}
@@ -989,9 +1412,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                 <Copy size={13} color="#94a3b8" />
                                 <span>Duplicar</span>
                               </button>
+                              <button
+                                id={`btn-move-board-${board.id}`}
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setBoardToMove(board);
+                                  setActiveBoardMenuId(null);
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  padding: '6px 10px',
+                                  borderRadius: '4px',
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: isDark ? '#f1f5f9' : '#1e293b',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  textAlign: 'left'
+                                }}
+                              >
+                                <Folder size={13} color="#94a3b8" />
+                                <span>Mover Categoria</span>
+                              </button>
                               <div style={{ height: '1px', backgroundColor: isDark ? '#2d3748' : '#e2e8f0', margin: '2px 0' }} />
                               <button
-                                onClick={() => {
+                                onClick={e => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   onDeleteBoard(board.id);
                                   setActiveBoardMenuId(null);
                                 }}
@@ -1047,7 +1497,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   );
                 })}
               </div>
-            ) : (
+            ) : displayBoards.length > 0 ? (
               /* Modo Lista */
               <div
                 style={{
@@ -1059,44 +1509,106 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   overflow: 'hidden'
                 }}
               >
-                {displayBoards.map(board => (
-                  <a
-                    key={board.id}
-                    href={`/board/${encodeURIComponent(board.id)}`}
-                    className="board-card board-list-item"
-                    data-board-id={board.id}
-                    onClick={e => {
-                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-                      e.preventDefault();
-                      onOpenBoard(board.id);
-                    }}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 18px',
-                      borderBottom: isDark ? '1px solid #202735' : '1px solid #f1f5f9',
-                      cursor: 'pointer',
-                      textDecoration: 'none',
-                      color: 'inherit'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="3" />
-                        <circle cx="8" cy="8" r="1" fill="#7c3aed" />
-                        <circle cx="12" cy="8" r="1" fill="#7c3aed" />
-                        <circle cx="16" cy="8" r="1" fill="#7c3aed" />
-                      </svg>
-                      <span style={{ fontSize: '13.5px', fontWeight: 600 }}>{board.title || 'Sem título'}</span>
+                {displayBoards.map(board => {
+                  const boardCat = categories.find(c => c.id === board.categoryId);
+                  return (
+                    <div
+                      key={board.id}
+                      className="board-card board-list-item"
+                      data-board-id={board.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 18px',
+                        borderBottom: isDark ? '1px solid #202735' : '1px solid #f1f5f9',
+                        transition: 'background-color 0.12s'
+                      }}
+                    >
+                      <a
+                        href={`/board/${encodeURIComponent(board.id)}`}
+                        onClick={e => {
+                          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                          e.preventDefault();
+                          onOpenBoard(board.id);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          textDecoration: 'none',
+                          color: 'inherit',
+                          flex: 1,
+                          minWidth: 0,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                          <rect x="3" y="3" width="18" height="18" rx="3" />
+                          <circle cx="8" cy="8" r="1" fill="#7c3aed" />
+                          <circle cx="12" cy="8" r="1" fill="#7c3aed" />
+                          <circle cx="16" cy="8" r="1" fill="#7c3aed" />
+                        </svg>
+                        <span style={{ fontSize: '13.5px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {board.title || 'Sem título'}
+                        </span>
+                      </a>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Badge de Categoria Clicável */}
+                        <button
+                          type="button"
+                          onClick={() => setBoardToMove(board)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '3px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: boardCat
+                              ? (isDark ? '#232c3f' : '#f1f5f9')
+                              : 'transparent',
+                            color: boardCat ? (boardCat.color || '#818cf8') : '#64748b',
+                            border: boardCat
+                              ? `1px solid ${boardCat.color ? boardCat.color + '44' : '#818cf844'}`
+                              : '1px dashed #64748b44',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                          title="Mudar categoria"
+                        >
+                          <Tag size={12} />
+                          <span>{boardCat ? boardCat.name : 'Sem Categoria'}</span>
+                        </button>
+
+                        <span style={{ fontSize: '12px', color: '#94a3b8', minWidth: '75px', textAlign: 'right' }}>
+                          {new Date(board.updatedAt || Date.now()).toLocaleDateString('pt-BR')}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => setBoardToMove(board)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#94a3b8',
+                            cursor: 'pointer',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center'
+                          }}
+                          title="Mover para categoria"
+                        >
+                          <Folder size={15} />
+                        </button>
+                      </div>
                     </div>
-                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                      {new Date(board.updatedAt || Date.now()).toLocaleDateString('pt-BR')}
-                    </span>
-                  </a>
-                ))}
+                  );
+                })}
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -1164,6 +1676,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ?
           </button>
         </div>
+
+        {/* Modal de Criação / Edição de Categorias */}
+        <CategoryModal
+          isOpen={isCategoryModalOpen}
+          onClose={() => {
+            setIsCategoryModalOpen(false);
+            setCategoryToEdit(null);
+          }}
+          categoryToEdit={categoryToEdit}
+          onSave={cat => {
+            onSaveCategory?.(cat);
+            setIsCategoryModalOpen(false);
+            setCategoryToEdit(null);
+          }}
+          onDelete={catId => {
+            onDeleteCategory?.(catId);
+            setIsCategoryModalOpen(false);
+            setCategoryToEdit(null);
+          }}
+          theme={theme}
+        />
+
+        {/* Modal de Mover Projeto para Categoria */}
+        <MoveCategoryModal
+          isOpen={boardToMove !== null}
+          onClose={() => setBoardToMove(null)}
+          board={boardToMove}
+          categories={categories}
+          onSelectCategory={(boardId, catId) => {
+            onMoveBoardCategory?.(boardId, catId);
+            setBoardToMove(null);
+          }}
+          onCreateNewCategory={() => {
+            setBoardToMove(null);
+            setCategoryToEdit(null);
+            setIsCategoryModalOpen(true);
+          }}
+          theme={theme}
+        />
       </main>
     </div>
   );

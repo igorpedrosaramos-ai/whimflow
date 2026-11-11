@@ -9,7 +9,8 @@ import {
   Trash2 
 } from 'lucide-react';
 import { 
-  Board, 
+  Board,
+  BoardCategory,
   ToolType, 
   MindMapNode, 
   StickyNote, 
@@ -50,7 +51,7 @@ import { useCanvasNavigation } from './hooks/useCanvasNavigation';
 import { useBoardStorage } from './hooks/useBoardStorage';
 import { useBoardOperations } from './hooks/useBoardOperations';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { THEME_KEY } from './services/storageService';
+import { THEME_KEY, loadCategories, saveCategories } from './services/storageService';
 import { useRouter } from './router';
 
 export const App: React.FC = () => {
@@ -142,6 +143,47 @@ export const App: React.FC = () => {
     setTimeout(() => fitView(target.mindMapNodes), 80);
   });
 
+  // Categorias de Quadros e Projetos
+  const [categories, setCategories] = useState<BoardCategory[]>(() => loadCategories());
+
+  useEffect(() => {
+    saveCategories(categories);
+  }, [categories]);
+
+  const handleSaveCategory = useCallback((cat: { id?: string; name: string; color: string }) => {
+    if (cat.id) {
+      setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, name: cat.name, color: cat.color } : c));
+      showToast(`Categoria "${cat.name}" atualizada!`, 'success');
+    } else {
+      const newCat: BoardCategory = {
+        id: `cat-${Date.now()}`,
+        name: cat.name,
+        color: cat.color,
+        createdAt: new Date().toISOString()
+      };
+      setCategories(prev => [...prev, newCat]);
+      showToast(`Categoria "${cat.name}" criada com sucesso!`, 'success');
+    }
+  }, [showToast]);
+
+  const handleDeleteCategory = useCallback((categoryId: string) => {
+    const cat = categories.find(c => c.id === categoryId);
+    setCategories(prev => prev.filter(c => c.id !== categoryId));
+    setBoards(prev => prev.map(b => b.categoryId === categoryId ? { ...b, categoryId: undefined, updatedAt: new Date().toISOString() } : b));
+    showToast(`Categoria "${cat?.name || ''}" excluída.`, 'info');
+  }, [categories, setBoards, showToast]);
+
+  const handleMoveBoardCategory = useCallback((boardId: string, categoryId?: string) => {
+    const targetBoard = boards.find(b => b.id === boardId);
+    const targetCategory = categories.find(c => c.id === categoryId);
+    setBoards(prev => prev.map(b => b.id === boardId ? { ...b, categoryId, updatedAt: new Date().toISOString() } : b));
+    if (targetCategory) {
+      showToast(`Projeto "${targetBoard?.title || 'Quadro'}" movido para "${targetCategory.name}".`, 'success');
+    } else {
+      showToast(`Projeto "${targetBoard?.title || 'Quadro'}" sem categoria definida.`, 'info');
+    }
+  }, [boards, categories, setBoards, showToast]);
+
   // Sincroniza o boardId ativo quando o usuário acessa ou navega para /board/:id, /doc/:id ou /present/:id
   useEffect(() => {
     if (route.boardId && route.boardId !== activeBoardId) {
@@ -168,10 +210,13 @@ export const App: React.FC = () => {
       document.title = `Apresentação: ${activeBoard.title || 'Quadro'} | WhimFlow`;
     } else if (route.type === 'recent') {
       document.title = 'Recentes | WhimFlow';
+    } else if (route.type === 'category' && route.categoryId) {
+      const cat = categories.find(c => c.id === route.categoryId);
+      document.title = `${cat?.name || 'Categoria'} | WhimFlow`;
     } else {
       document.title = 'Dashboard | WhimFlow';
     }
-  }, [route.type, activeBoard.title]);
+  }, [route.type, route.categoryId, categories, activeBoard.title]);
 
   // 2. Hook de Navegação Espacial no Canvas (Pan, Zoom, Fit)
   const {
@@ -259,14 +304,17 @@ export const App: React.FC = () => {
   }, [openBoardInStorage, routerNavigate]);
 
   // Criação de Quadro com Roteamento Real
-  const handleCreateNewBoard = useCallback((title: string = 'Sem título') => {
+  const handleCreateNewBoard = useCallback((title: string = 'Sem título', categoryId?: string) => {
     const created = createBoardInStorage(title);
+    if (categoryId) {
+      setBoards(prev => prev.map(b => b.id === created.id ? { ...b, categoryId } : b));
+    }
     setSelectedNodeId('root');
     setSelectedNodeIds(['root']);
     setPan({ x: 300, y: 350 });
     setZoom(1.0);
     routerNavigate(`/board/${encodeURIComponent(created.id)}`);
-  }, [createBoardInStorage, setPan, setZoom, routerNavigate]);
+  }, [createBoardInStorage, setBoards, setPan, setZoom, routerNavigate]);
 
   // Criação a partir de Template com Roteamento Real
   const handleCreateFromTemplate = useCallback((template: TemplateItem) => {
@@ -826,8 +874,9 @@ export const App: React.FC = () => {
       {currentView === 'dashboard' && (
         <DashboardView
           boards={boards}
+          categories={categories}
           onOpenBoard={handleOpenBoard}
-          onCreateNewBoard={(title) => handleCreateNewBoard(title || 'Sem título')}
+          onCreateNewBoard={(title, catId) => handleCreateNewBoard(title || 'Sem título', catId)}
           onOpenDoc={() => routerNavigate(`/doc/${encodeURIComponent(activeBoard.id)}`)}
           onOpenAskAgent={() => routerNavigate('/ia')}
           onOpenTemplates={() => routerNavigate('/templates')}
@@ -847,9 +896,13 @@ export const App: React.FC = () => {
           onOpenSearch={() => setIsSearchModalOpen(true)}
           onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
           onOpenQuickSpark={() => setIsQuickSparkOpen(true)}
-          initialCategoryFilter={route.type === 'recent' ? 'recent' : 'all'}
+          initialCategoryFilter={route.type === 'category' && route.categoryId ? route.categoryId : (route.type === 'recent' ? 'recent' : 'all')}
           onSelectRecent={() => routerNavigate('/recentes')}
           onSelectAll={() => routerNavigate('/')}
+          onSelectCategory={(catId) => routerNavigate(`/categoria/${encodeURIComponent(catId)}`)}
+          onSaveCategory={handleSaveCategory}
+          onDeleteCategory={handleDeleteCategory}
+          onMoveBoardCategory={handleMoveBoardCategory}
           theme={theme}
           workspaceName="teste"
         />
@@ -904,6 +957,8 @@ export const App: React.FC = () => {
             boardTitle={activeBoard.title}
             onUpdateTitle={(title) => updateActiveBoard(b => ({ ...b, title }))}
             boards={boards}
+            categories={categories}
+            onMoveCategory={(catId) => handleMoveBoardCategory(activeBoard.id, catId)}
             activeBoardId={activeBoard.id}
             onSelectBoard={handleOpenBoard}
             onCreateNewBoard={() => handleCreateNewBoard('Sem título')}
@@ -936,9 +991,10 @@ export const App: React.FC = () => {
         <Sidebar
           isOpen={sidebarOpen}
           boards={boards}
+          categories={categories}
           activeBoardId={activeBoard.id}
           onSelectBoard={handleOpenBoard}
-          onCreateBoard={handleCreateNewBoard}
+          onCreateBoard={(title, catId) => handleCreateNewBoard(title, catId)}
           onDuplicateBoard={handleDuplicateBoard}
           onDeleteBoard={(id) => {
             const boardToTrash = boards.find(b => b.id === id);
@@ -954,7 +1010,12 @@ export const App: React.FC = () => {
           onNavigateToDashboard={() => routerNavigate('/')}
           onOpenTemplates={() => routerNavigate('/templates')}
           onOpenTrash={() => routerNavigate('/lixeira')}
+          onSelectCategory={(catId) => routerNavigate(`/categoria/${encodeURIComponent(catId)}`)}
+          onSaveCategory={handleSaveCategory}
+          onDeleteCategory={handleDeleteCategory}
+          onMoveBoardCategory={handleMoveBoardCategory}
           workspaceName="teste"
+          theme={theme}
         />
 
         {/* Canvas Principal com Toolbar Flutuante Embutida */}

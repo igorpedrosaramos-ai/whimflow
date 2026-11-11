@@ -131,10 +131,19 @@ export interface DocDiscussion {
   resolved?: boolean;
 }
 
+export interface BoardCategory {
+  id: string;
+  name: string;
+  color?: string;
+  icon?: string;
+  createdAt?: string;
+}
+
 export interface Board {
   id: string;
   title: string;
   workspaceId: string;
+  categoryId?: string;
   createdAt: string;
   updatedAt: string;
   isPrivate?: boolean;

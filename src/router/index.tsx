@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 export type RouteType =
   | 'dashboard'
   | 'recent'
+  | 'category'
   | 'board'
   | 'doc'
   | 'agent'
@@ -14,6 +15,7 @@ export interface RouteState {
   type: RouteType;
   path: string;
   boardId?: string;
+  categoryId?: string;
   query: Record<string, string>;
 }
 
@@ -36,6 +38,17 @@ export function parseRoute(pathname: string = window.location.pathname, search: 
   // 2. Filtro de Recentes (/recentes ou /recent)
   if (cleanPath === '/recentes' || cleanPath === '/recent') {
     return { type: 'recent', path: cleanPath, query };
+  }
+
+  // 3. Filtro por Categoria (/categoria/:id ou /category/:id)
+  const categoryMatch = cleanPath.match(/^\/(?:categoria|category)\/([^/?#]+)$/i);
+  if (categoryMatch) {
+    return {
+      type: 'category',
+      path: cleanPath,
+      categoryId: decodeURIComponent(categoryMatch[1]),
+      query
+    };
   }
 
   // 3. Central de Templates (/templates)
@@ -139,6 +152,7 @@ export function useRouter() {
     navigate: navigateTo,
     path: route.path,
     boardId: route.boardId,
+    categoryId: route.categoryId,
     type: route.type,
     query: route.query
   };

@@ -4,6 +4,7 @@ export const ONEGAI_BOARD: Board = {
   id: 'board-onegai',
   title: 'Cardápio Onegai',
   workspaceId: 'ws-default',
+  categoryId: 'cat-marketing',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   mindMapNodes: [

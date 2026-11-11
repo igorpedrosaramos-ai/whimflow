@@ -4,6 +4,7 @@ export const ORION_SUSHI_BOARD: Board = {
   id: 'board-orion-sushi',
   title: 'Orion Sushi — Cardápio Geral',
   workspaceId: 'ws-default',
+  categoryId: 'cat-operacoes',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   mindMapNodes: [
