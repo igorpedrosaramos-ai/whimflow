@@ -18,7 +18,8 @@ import {
   SlideSection, 
   FlowShape, 
   ShapeType, 
-  TextItem 
+  TextItem,
+  Connector 
 } from './types';
 import { TopNav } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
@@ -85,7 +86,8 @@ export const App: React.FC = () => {
 
   // Ferramentas e Interface
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [currentTool, setCurrentTool] = useState<ToolType>('mindmap');
+  const [currentTool, setCurrentTool] = useState<ToolType>('select');
+  const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
 
   // Seleções
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>('root');
@@ -201,6 +203,8 @@ export const App: React.FC = () => {
     setSelectedNodeIds,
     selectedStickyId,
     setSelectedStickyId,
+    selectedShapeId,
+    setSelectedShapeId,
     isSpacePressed,
     setIsPanning,
     handleUndo,
@@ -295,12 +299,110 @@ export const App: React.FC = () => {
     showToast('Quadro excluído permanentemente.');
   }, [showToast]);
 
-  // Inserção de Ferramentas no Canvas
+  // ─── FERRAMENTAS DO MAPA MENTAL E CANVAS ─────────────────────────────────────
+  // 1. Conexão Transversal entre Ramos (Cross-Link)
+  const handleConnectNode = useCallback((nodeId: string) => {
+    if (!connectingSourceId) {
+      setConnectingSourceId(nodeId);
+      showToast('Tópico de origem selecionado. Clique no tópico de destino para ligar.', 'info');
+    } else if (connectingSourceId === nodeId) {
+      setConnectingSourceId(null);
+      showToast('Conexão cancelada.', 'info');
+    } else {
+      const sourceId = connectingSourceId;
+      const targetId = nodeId;
+      const newConnector: Connector = {
+        id: `conn-${Date.now()}`,
+        fromId: sourceId,
+        toId: targetId,
+        label: 'relação',
+        color: '#6366f1',
+        style: 'curve'
+      };
+      updateActiveBoard(b => ({
+        ...b,
+        connectors: [...(b.connectors || []), newConnector]
+      }));
+      setConnectingSourceId(null);
+      setCurrentTool('select');
+      showToast('Conexão transversal criada entre os tópicos!', 'success');
+    }
+  }, [connectingSourceId, updateActiveBoard, showToast]);
+
+  const handleDeleteConnector = useCallback((id: string) => {
+    updateActiveBoard(b => ({
+      ...b,
+      connectors: (b.connectors || []).filter(c => c.id !== id)
+    }));
+    showToast('Conexão excluída.');
+  }, [updateActiveBoard, showToast]);
+
+  const handleUpdateConnectorLabel = useCallback((id: string, label: string) => {
+    updateActiveBoard(b => ({
+      ...b,
+      connectors: (b.connectors || []).map(c => c.id === id ? { ...c, label } : c)
+    }));
+  }, [updateActiveBoard]);
+
+  // 2. Novo Tópico Independente no Mapa Mental (Substitui o antigo 'Novo Bloco' desconectado)
+  const handleAddFloatingTopic = useCallback((customX?: number, customY?: number) => {
+    let targetX = customX;
+    let targetY = customY;
+
+    if (targetX === undefined || targetY === undefined) {
+      let maxX = 0;
+      activeBoard.mindMapNodes.forEach(n => {
+        if ((n.x || 0) > maxX) maxX = n.x || 0;
+      });
+      targetX = maxX > 0 ? maxX + 280 : 350;
+      targetY = 0;
+    }
+
+    const newId = `topic-${Date.now()}`;
+    const newFloatingNode: MindMapNode = {
+      id: newId,
+      text: 'Novo Tópico',
+      x: targetX,
+      y: targetY,
+      offsetX: 0,
+      offsetY: 0,
+      parentId: null,
+      childrenIds: [],
+      collapsed: false,
+      color: '#7c3aed',
+      borderStyle: 'fill',
+      lineStyle: 'bezier',
+      side: 'root'
+    };
+
+    updateActiveBoard(board => ({
+      ...board,
+      mindMapNodes: [...board.mindMapNodes, newFloatingNode]
+    }));
+    setSelectedNodeId(newId);
+    setSelectedNodeIds([newId]);
+    setEditingNodeId(newId);
+    showToast('Novo tópico independente criado com sucesso.');
+  }, [activeBoard.mindMapNodes, updateActiveBoard, setSelectedNodeId, setSelectedNodeIds, setEditingNodeId, showToast]);
+
+  // 3. Nota Adesiva (Post-it) com Posicionamento Inteligente sem Sobreposição
   const handleAddSticky = useCallback((customX?: number, customY?: number) => {
+    let targetX = customX;
+    let targetY = customY;
+
+    if (targetX === undefined || targetY === undefined) {
+      let maxX = 50;
+      activeBoard.mindMapNodes.forEach(n => {
+        if ((n.x || 0) > maxX) maxX = n.x || 0;
+      });
+      targetX = maxX > 100 ? maxX + 260 : 300;
+      targetY = 120;
+    }
+
     const newSticky: StickyNote = {
       id: `sticky-${Date.now()}`,
-      x: customX !== undefined ? customX : -pan.x / zoom + window.innerWidth / (2 * zoom) - 90,
-      y: customY !== undefined ? customY : -pan.y / zoom + window.innerHeight / (2 * zoom) - 70,
+      x: targetX,
+      y: targetY,
       width: 180,
       height: 140,
       text: 'Nota de apoio...',
@@ -308,33 +410,49 @@ export const App: React.FC = () => {
     };
     updateActiveBoard(board => ({ ...board, stickies: [...(board.stickies || []), newSticky] }));
     setSelectedStickyId(newSticky.id);
-    showToast('Nota adesiva adicionada');
-  }, [pan, zoom, updateActiveBoard, showToast]);
+    showToast('Nota adesiva posicionada.');
+  }, [activeBoard.mindMapNodes, updateActiveBoard, showToast]);
 
-  const handleAddShape = useCallback((type: ShapeType = 'rounded', customX?: number, customY?: number) => {
-    const newShape: FlowShape = {
-      id: `shape-${Date.now()}`,
-      type,
-      x: customX !== undefined ? customX : -pan.x / zoom + window.innerWidth / (2 * zoom) - 80,
-      y: customY !== undefined ? customY : -pan.y / zoom + window.innerHeight / (2 * zoom) - 35,
+  // 4. Caixa de Texto Livre com Posicionamento Inteligente
+  const handleAddText = useCallback((customX?: number, customY?: number) => {
+    let targetX = customX;
+    let targetY = customY;
+
+    if (targetX === undefined || targetY === undefined) {
+      let maxX = 50;
+      activeBoard.mindMapNodes.forEach(n => {
+        if ((n.x || 0) > maxX) maxX = n.x || 0;
+      });
+      targetX = maxX > 100 ? maxX + 260 : 300;
+      targetY = 40;
+    }
+
+    const newText: TextItem = {
+      id: `text-${Date.now()}`,
+      x: targetX,
+      y: targetY,
       width: 160,
-      height: 70,
-      text: 'Novo Bloco',
-      color: theme === 'dark' ? '#1e293b' : '#f8fafc',
-      borderColor: '#6366f1',
-      textColor: theme === 'dark' ? '#f8fafc' : '#0f172a'
+      height: 36,
+      text: 'Texto livre...',
+      fontSize: 16,
+      color: theme === 'dark' ? '#f1f5f9' : '#1e293b'
     };
-    updateActiveBoard(board => ({ ...board, shapes: [...(board.shapes || []), newShape] }));
-    setSelectedShapeId(newShape.id);
-    showToast('Forma criada');
-  }, [pan, zoom, theme, updateActiveBoard, showToast]);
+    updateActiveBoard(board => ({ ...board, texts: [...(board.texts || []), newText] }));
+    setSelectedShapeId(newText.id);
+    showToast('Caixa de texto criada.');
+  }, [activeBoard.mindMapNodes, theme, updateActiveBoard, showToast]);
+
+  // Compatibilidade legada para testes e fluxogramas
+  const handleAddShape = useCallback((type: ShapeType = 'rounded', customX?: number, customY?: number) => {
+    handleAddFloatingTopic(customX, customY);
+  }, [handleAddFloatingTopic]);
 
   const handleAddWireframe = useCallback((type: any = 'card', customX?: number, customY?: number) => {
     const newWf: WireframeItem = {
       id: `wf-${Date.now()}`,
       type,
-      x: customX !== undefined ? customX : -pan.x / zoom + window.innerWidth / (2 * zoom) - 120,
-      y: customY !== undefined ? customY : -pan.y / zoom + window.innerHeight / (2 * zoom) - 60,
+      x: customX !== undefined ? customX : 300,
+      y: customY !== undefined ? customY : 180,
       width: 240,
       height: 120,
       label: 'Bloco de Interface'
@@ -342,23 +460,7 @@ export const App: React.FC = () => {
     updateActiveBoard(board => ({ ...board, wireframes: [...(board.wireframes || []), newWf] }));
     setSelectedShapeId(newWf.id);
     showToast('Wireframe adicionado');
-  }, [pan, zoom, updateActiveBoard, showToast]);
-
-  const handleAddText = useCallback((customX?: number, customY?: number) => {
-    const newText: TextItem = {
-      id: `text-${Date.now()}`,
-      x: customX !== undefined ? customX : -pan.x / zoom + window.innerWidth / (2 * zoom) - 60,
-      y: customY !== undefined ? customY : -pan.y / zoom + window.innerHeight / (2 * zoom) - 15,
-      width: 140,
-      height: 32,
-      text: 'Texto livre...',
-      fontSize: 16,
-      color: theme === 'dark' ? '#f1f5f9' : '#1e293b'
-    };
-    updateActiveBoard(board => ({ ...board, texts: [...(board.texts || []), newText] }));
-    setSelectedShapeId(newText.id);
-    showToast('Caixa de texto criada');
-  }, [pan, zoom, theme, updateActiveBoard, showToast]);
+  }, [updateActiveBoard, showToast]);
 
   // Caneta / Desenho Livre
   const [isDrawing, setIsDrawing] = useState(false);
@@ -475,6 +577,16 @@ export const App: React.FC = () => {
       const canvasY = (e.clientY - pan.y) / zoom;
       handleAddSticky(canvasX - 90, canvasY - 70);
       setCurrentTool('select');
+    } else if (currentTool === 'text' && isCanvasBg) {
+      const canvasX = (e.clientX - pan.x) / zoom;
+      const canvasY = (e.clientY - pan.y) / zoom;
+      handleAddText(canvasX - 60, canvasY - 15);
+      setCurrentTool('select');
+    } else if (currentTool === 'connect' && isCanvasBg) {
+      if (connectingSourceId) {
+        setConnectingSourceId(null);
+        showToast('Conexão cancelada.', 'info');
+      }
     } else if (currentTool === 'wireframe' && isCanvasBg) {
       const canvasX = (e.clientX - pan.x) / zoom;
       const canvasY = (e.clientY - pan.y) / zoom;
@@ -818,7 +930,7 @@ export const App: React.FC = () => {
         <div
           id="main-canvas-area"
           style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
-          className={`canvas-container ${isPanning || currentTool === 'hand' ? 'panning' : currentTool === 'draw' ? 'drawing' : ''}`}
+          className={`canvas-container ${isPanning || currentTool === 'hand' ? 'panning' : currentTool === 'draw' ? 'drawing' : currentTool === 'connect' ? 'connecting' : currentTool === 'sticky' ? 'sticky-mode' : currentTool === 'text' ? 'text-mode' : ''}`}
           onWheel={handleWheel}
           onMouseDown={handleMouseDownCanvas}
           onMouseMove={handleMouseMoveCanvas}
@@ -828,13 +940,14 @@ export const App: React.FC = () => {
             currentTool={currentTool}
             onSelectTool={setCurrentTool}
             onAddConnectedNode={handleAddConnectedNode}
-            onAddShape={() => handleAddShape()}
+            onAddFloatingTopic={() => handleAddFloatingTopic()}
             onAddSticky={() => handleAddSticky()}
             onAddWireframe={() => handleAddWireframe()}
             onAddText={() => handleAddText()}
             onStartPresentation={() => setIsPresentationOpen(true)}
             onOpenAI={() => setIsAgentDrawerOpen(true)}
             onTogglePresentPanel={() => setIsPresentSidePanelOpen(prev => !prev)}
+            onAddShape={() => handleAddFloatingTopic()}
           />
 
           <div className="canvas-background" />
@@ -852,6 +965,12 @@ export const App: React.FC = () => {
 
             <MindMapCanvas
               nodes={activeBoard.mindMapNodes}
+              connectors={activeBoard.connectors || []}
+              currentTool={currentTool}
+              connectingSourceId={connectingSourceId}
+              onConnectNode={handleConnectNode}
+              onDeleteConnector={handleDeleteConnector}
+              onUpdateConnectorLabel={handleUpdateConnectorLabel}
               selectedNodeId={selectedNodeId}
               selectedNodeIds={selectedNodeIds}
               editingNodeId={editingNodeId}

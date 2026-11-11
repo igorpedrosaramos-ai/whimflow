@@ -1,12 +1,18 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, ExternalLink } from 'lucide-react';
-import { MindMapNode } from '../types';
+import { MindMapNode, Connector, ToolType } from '../types';
 import { calculateMindMapLayout, getBezierPath, cleanAndNormalizeMindMap } from '../utils/treeLayout';
 import { NodeContextMenu } from './NodeContextMenu';
 
 interface MindMapCanvasProps {
   nodes: MindMapNode[];
+  connectors?: Connector[];
+  currentTool?: ToolType;
+  connectingSourceId?: string | null;
+  onConnectNode?: (nodeId: string) => void;
+  onDeleteConnector?: (id: string) => void;
+  onUpdateConnectorLabel?: (id: string, label: string) => void;
   selectedNodeId: string | null;
   selectedNodeIds?: string[];
   editingNodeId?: string | null;
@@ -35,6 +41,12 @@ interface MindMapCanvasProps {
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   nodes,
+  connectors = [],
+  currentTool = 'select',
+  connectingSourceId = null,
+  onConnectNode,
+  onDeleteConnector,
+  onUpdateConnectorLabel,
   selectedNodeId,
   selectedNodeIds = [],
   editingNodeId,
@@ -592,6 +604,100 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       });
     });
 
+    // ─── CONEXÕES TRANSVERSAIS ENTRE RAMOS (CROSS-LINKS) ──────────────────────
+    const crossLinkPaths = (connectors || []).map(conn => {
+      const fromNode = nodeMap.get(conn.fromId);
+      const toNode = nodeMap.get(conn.toId);
+      if (!fromNode || !toNode || !isNodeVisible(fromNode) || !isNodeVisible(toNode)) return null;
+
+      const p1 = getNodePos(fromNode);
+      const p2 = getNodePos(toNode);
+
+      const c1x = p1.x + p1.width / 2;
+      const c1y = p1.y + p1.height / 2;
+      const c2x = p2.x + p2.width / 2;
+      const c2y = p2.y + p2.height / 2;
+
+      // Determina borda mais próxima
+      const startX = c1x < c2x ? p1.x + p1.width : p1.x;
+      const startY = c1y;
+      const endX = c1x < c2x ? p2.x : p2.x + p2.width;
+      const endY = c2y;
+
+      const dx = endX - startX;
+      const dy = endY - startY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const curvature = Math.min(80, Math.max(30, dist * 0.22));
+
+      const cp1x = startX + (c1x < c2x ? curvature : -curvature);
+      const cp1y = startY - curvature * 0.6;
+      const cp2x = endX - (c1x < c2x ? curvature : -curvature);
+      const cp2y = endY - curvature * 0.6;
+
+      const pathD = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
+      const midX = (startX + endX) / 2;
+      const midY = (startY + endY) / 2 - curvature * 0.45;
+
+      const color = conn.color || '#6366f1';
+
+      return (
+        <g key={conn.id} className="crosslink-group">
+          <path
+            d={pathD}
+            fill="none"
+            stroke={color}
+            strokeWidth="2.2"
+            strokeDasharray="5 4"
+            markerEnd="url(#crosslink-arrow)"
+            style={{ pointerEvents: 'stroke', cursor: 'pointer' }}
+          />
+          <foreignObject
+            x={midX - 55}
+            y={midY - 14}
+            width="110"
+            height="28"
+            style={{ pointerEvents: 'auto', overflow: 'visible' }}
+          >
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: '#1e293b',
+                border: `1px solid ${color}`,
+                borderRadius: '12px',
+                padding: '2px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#f8fafc',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                const newLabel = prompt('Nome da relação:', conn.label || 'relação');
+                if (newLabel !== null) onUpdateConnectorLabel?.(conn.id, newLabel.trim());
+              }}
+              title="Clique para renomear. Clique no × para excluir."
+            >
+              <span>{conn.label || 'relação'}</span>
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteConnector?.(conn.id);
+                }}
+                style={{ marginLeft: '6px', opacity: 0.65, fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                title="Excluir conexão"
+              >
+                ×
+              </span>
+            </div>
+          </foreignObject>
+        </g>
+      );
+    });
+
     return (
       <svg
         width="10000"
@@ -608,7 +714,21 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           zIndex: 5
         }}
       >
+        <defs>
+          <marker
+            id="crosslink-arrow"
+            viewBox="0 0 10 10"
+            refX="6"
+            refY="5"
+            markerWidth="6"
+            markerHeight="6"
+            orient="auto"
+          >
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="#6366f1" />
+          </marker>
+        </defs>
         {paths}
+        {crossLinkPaths}
       </svg>
     );
   };
@@ -960,11 +1080,13 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const fontSizePx = node.fontSize === 'small' ? '12px' : node.fontSize === 'large' ? '16px' : (isRoot ? '16px' : '13.5px');
         const textColor = borderStyle === 'fill' ? '#ffffff' : (borderStyle === 'text' ? nodeColor : 'var(--text-primary)');
 
+        const isConnectingSource = connectingSourceId === node.id;
+
         return (
           <div
             key={node.id}
             id={`node-${node.id}`}
-            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''}`}
+            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isConnectingSource ? 'connecting-source' : ''}`}
             style={{
               left: `${pos.x}px`,
               top: `${pos.y}px`,
@@ -976,27 +1098,35 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               borderRight: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
               borderBottom: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
               borderLeft: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : (borderLeft || border),
-              outline: isDropTarget && dropPosition === 'inside'
+              outline: isConnectingSource
+                ? '3px solid #3b82f6'
+                : (isDropTarget && dropPosition === 'inside'
                 ? `2px solid ${nodeColor}`
                 : isMultiSelected
                 ? '2px solid var(--accent-purple, #6366f1)'
-                : (isSelected ? `2px solid ${nodeColor}` : undefined),
+                : (isSelected ? `2px solid ${nodeColor}` : undefined)),
               outlineOffset: '2px',
-              boxShadow: isDropTarget && dropPosition === 'inside'
+              boxShadow: isConnectingSource
+                ? '0 0 0 4px rgba(59, 130, 246, 0.4), 0 8px 24px rgba(59, 130, 246, 0.3)'
+                : (isDropTarget && dropPosition === 'inside'
                 ? `0 0 0 3px ${nodeColor}33, 0 6px 20px ${nodeColor}25`
-                : (isSelected ? `0 0 12px ${nodeColor}55` : '0 2px 8px rgba(0, 0, 0, 0.2)'),
-              zIndex: isDropTarget ? 45 : (isSelected ? 35 : 20),
+                : (isSelected ? `0 0 12px ${nodeColor}55` : '0 2px 8px rgba(0, 0, 0, 0.2)')),
+              zIndex: isConnectingSource ? 50 : (isDropTarget ? 45 : (isSelected ? 35 : 20)),
               padding: isRoot ? '12px 24px' : '8px 14px',
               whiteSpace: 'nowrap',
               // Nó-fonte durante drag: semi-transparente + desfocado (como o Whimsical)
               opacity: isDraggingThis ? 0.35 : 1,
               filter: isDraggingThis ? 'grayscale(0.4) blur(0.5px)' : undefined,
               transition: isDraggingThis ? 'none' : 'opacity 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease',
-              cursor: isRoot ? 'default' : (isDraggingThis ? 'grabbing' : 'grab'),
+              cursor: currentTool === 'connect' ? 'crosshair' : (isRoot ? 'default' : (isDraggingThis ? 'grabbing' : 'grab')),
               pointerEvents: isDraggingThis ? 'none' : undefined
             }}
             onClick={(e) => {
               e.stopPropagation();
+              if (currentTool === 'connect') {
+                onConnectNode?.(node.id);
+                return;
+              }
               if (e.ctrlKey || e.metaKey || e.shiftKey) {
                 const current = selectedNodeIdsRef.current || [];
                 const next = current.includes(node.id)

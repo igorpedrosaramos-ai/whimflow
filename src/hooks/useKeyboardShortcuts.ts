@@ -10,6 +10,8 @@ interface UseKeyboardShortcutsProps {
   setSelectedNodeIds: (ids: string[]) => void;
   selectedStickyId: string | null;
   setSelectedStickyId: (id: string | null) => void;
+  selectedShapeId?: string | null;
+  setSelectedShapeId?: (id: string | null) => void;
   isSpacePressed: React.MutableRefObject<boolean>;
   setIsPanning: (panning: boolean) => void;
   handleUndo: () => void;
@@ -37,6 +39,8 @@ export function useKeyboardShortcuts({
   setSelectedNodeIds,
   selectedStickyId,
   setSelectedStickyId,
+  selectedShapeId,
+  setSelectedShapeId,
   isSpacePressed,
   setIsPanning,
   handleUndo,
@@ -229,11 +233,20 @@ export function useKeyboardShortcuts({
         } else if (selectedStickyId) {
           updateActiveBoard(b => ({ ...b, stickies: (b.stickies || []).filter(s => s.id !== selectedStickyId) }));
           setSelectedStickyId(null);
+        } else if (selectedShapeId) {
+          updateActiveBoard(b => ({
+            ...b,
+            shapes: (b.shapes || []).filter(s => s.id !== selectedShapeId),
+            wireframes: (b.wireframes || []).filter(w => w.id !== selectedShapeId),
+            texts: (b.texts || []).filter(t => t.id !== selectedShapeId)
+          }));
+          setSelectedShapeId?.(null);
         }
       } else if (e.key === 'Escape') {
         setSelectedNodeId(null);
         setSelectedNodeIds([]);
         setSelectedStickyId(null);
+        setSelectedShapeId?.(null);
       }
     };
 

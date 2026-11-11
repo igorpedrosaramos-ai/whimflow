@@ -523,3 +523,40 @@ html, body, #root {
   background-color: #334155;
   margin: 0 2px;
 }
+
+/* Estado de Conexão Transversal (Cross-Link) */
+.connecting-source {
+  animation: pulse-connect-ring 1.5s infinite;
+}
+
+@keyframes pulse-connect-ring {
+  0% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4), 0 4px 14px rgba(59, 130, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.65), 0 8px 24px rgba(59, 130, 246, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4), 0 4px 14px rgba(59, 130, 246, 0.2);
+  }
+}
+
+.canvas-container.connecting {
+  cursor: crosshair !important;
+}
+
+.canvas-container.sticky-mode {
+  cursor: cell !important;
+}
+
+.canvas-container.text-mode {
+  cursor: text !important;
+}
+
+.canvas-vertical-toolbar button {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.canvas-vertical-toolbar button:hover {
+  filter: brightness(1.15);
+}

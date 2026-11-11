@@ -1,8 +1,10 @@
 export type ToolType = 
   | 'select' 
   | 'hand' 
+  | 'connect'
   | 'mindmap' 
   | 'sticky' 
+  | 'text'
   | 'wireframe' 
   | 'draw' 
   | 'present';
