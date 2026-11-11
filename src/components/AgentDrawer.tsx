@@ -20,13 +20,15 @@ import {
   Paperclip
 } from 'lucide-react';
 import { MindMapNode } from '../types';
-import { generateWithGemini } from '../services/geminiService';
+import { generateWithGemini, GeminiDiagramResult } from '../services/geminiService';
+import { MindMapAiPreview } from './MindMapAiPreview';
 
 interface AttachedFile {
   name: string;
   size: number;
   type: string;
   isImage: boolean;
+  isPdf?: boolean;
   dataUrl?: string;
   textContent?: string;
 }
@@ -36,13 +38,7 @@ interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   attachedFile?: AttachedFile;
-  generatedDiagram?: {
-    title: string;
-    explanation: string;
-    reflectionQuestions?: string[];
-    nodes: MindMapNode[];
-    modelUsed?: string;
-  };
+  generatedDiagram?: GeminiDiagramResult;
 }
 
 interface AgentDrawerProps {
@@ -140,15 +136,15 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
     try {
       // Monta o prompt completo integrando o conteúdo textual se houver arquivo de texto
       let promptWithContext = trimmed;
-      if (currentAttachment && !currentAttachment.isImage && currentAttachment.textContent) {
+      if (currentAttachment && !currentAttachment.isImage && !currentAttachment.isPdf && currentAttachment.textContent) {
         promptWithContext = `[Arquivo Anexado: ${currentAttachment.name}]\nConteúdo:\n${currentAttachment.textContent}\n\nInstrução: ${trimmed || 'Analise este documento, extraia os pilares e estruture um mapa mental completo com perguntas reflexivas.'}`;
-      } else if (!trimmed && currentAttachment?.isImage) {
-        promptWithContext = 'Analise a imagem anexada, identifique a hierarquia e recrie o mapa mental ou fluxo visual com fidelidade máxima.';
+      } else if (!trimmed && (currentAttachment?.isImage || currentAttachment?.isPdf)) {
+        promptWithContext = 'Analise a imagem/documento anexado, identifique minuciosamente a hierarquia e recrie o mapa mental visual com fidelidade máxima.';
       }
 
       const result = await generateWithGemini(
         promptWithContext,
-        currentAttachment?.isImage ? currentAttachment.dataUrl : undefined
+        (currentAttachment?.isImage || currentAttachment?.isPdf) ? currentAttachment.dataUrl : undefined
       );
 
       const assistantMsg: ChatMessage = {
@@ -178,15 +174,17 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
     if (!file) return;
 
     const isImg = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
 
-    if (isImg) {
+    if (isImg || isPdf) {
       const reader = new FileReader();
       reader.onload = () => {
         setAttachedFile({
           name: file.name,
           size: file.size,
-          type: file.type,
-          isImage: true,
+          type: file.type || (isPdf ? 'application/pdf' : 'image/jpeg'),
+          isImage: isImg,
+          isPdf: isPdf,
           dataUrl: reader.result as string
         });
       };
@@ -200,6 +198,7 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
           size: file.size,
           type: file.type || 'text/plain',
           isImage: false,
+          isPdf: false,
           textContent: typeof reader.result === 'string' ? reader.result : ''
         });
       };
@@ -392,7 +391,7 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
                 >
                   <span>Analisa imagens, arquivos e faz perguntas reflexivas</span>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '2px', color: '#0d9488', fontWeight: 600 }}>
-                    ⚡ Gemini 2.5
+                    ⚡ Gemini 3.1 Flash
                   </span>
                 </div>
               </div>
@@ -472,148 +471,24 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
 
                   <div>{msg.text}</div>
 
-                  {/* Card do Diagrama Gerado com Ações Diretas */}
+                  {/* Prévia Rica, Raciocínio e Ações com MindMapAiPreview */}
                   {msg.generatedDiagram && (
-                    <div
-                      style={{
-                        padding: '10px',
-                        borderRadius: '8px',
-                        backgroundColor: isDark ? '#141922' : '#f8fafc',
-                        border: isDark ? '1px solid #222b3a' : '1px solid #e2e8f0',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px'
+                    <MindMapAiPreview
+                      diagram={msg.generatedDiagram}
+                      isDark={isDark}
+                      onInsertToCanvas={(nodes, title) => {
+                        onInsertNodesToCurrentBoard(nodes, title);
+                        setInsertedIds(prev => ({ ...prev, [msg.id]: true }));
                       }}
-                    >
-                      <div style={{ fontWeight: 600, fontSize: '12.5px', color: '#7c3aed' }}>
-                        ✦ {msg.generatedDiagram.title}
-                      </div>
-                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>
-                        {msg.generatedDiagram.nodes.length} nós estruturados e conectados
-                      </div>
-
-                      <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
-                        <button
-                          id="btn-insert-to-canvas"
-                          data-testid="btn-insert-to-canvas"
-                          onClick={() => {
-                            if (msg.generatedDiagram) {
-                              onInsertNodesToCurrentBoard(msg.generatedDiagram.nodes, msg.generatedDiagram.title);
-                              setInsertedIds(prev => ({ ...prev, [msg.id]: true }));
-                            }
-                          }}
-                          style={{
-                            flex: 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            padding: '6px 8px',
-                            borderRadius: '6px',
-                            backgroundColor: insertedIds[msg.id] ? '#10b981' : '#7c3aed',
-                            border: 'none',
-                            color: '#ffffff',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {insertedIds[msg.id] ? <Check size={12} /> : <Layers size={12} />}
-                          <span>{insertedIds[msg.id] ? 'Inserido!' : 'Inserir no Canvas'}</span>
-                        </button>
-
-                        <button
-                          id="btn-create-new-board-ai"
-                          data-testid="btn-create-new-board-ai"
-                          onClick={() => {
-                            if (msg.generatedDiagram) {
-                              onCreateNewBoardWithNodes(msg.generatedDiagram.title, msg.generatedDiagram.nodes);
-                              onClose();
-                            }
-                          }}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '4px',
-                            padding: '6px 8px',
-                            borderRadius: '6px',
-                            backgroundColor: isDark ? '#232d3f' : '#e2e8f0',
-                            border: 'none',
-                            color: isDark ? '#f1f5f9' : '#334155',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            cursor: 'pointer'
-                          }}
-                          title="Abrir em um novo quadro separado"
-                        >
-                          <Plus size={12} />
-                          <span>Novo Quadro</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bloco de Reflexão: Perguntas Estratégicas para o Usuário Pensar */}
-                  {msg.generatedDiagram?.reflectionQuestions && msg.generatedDiagram.reflectionQuestions.length > 0 && (
-                    <div
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: '8px',
-                        backgroundColor: isDark ? '#16222f' : '#f0fdfa',
-                        border: isDark ? '1px solid #1e3a47' : '1px solid #ccfbf1',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px'
+                      onCreateNewBoard={(title, nodes) => {
+                        onCreateNewBoardWithNodes(title, nodes);
+                        onClose();
                       }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', fontWeight: 700, color: '#0d9488' }}>
-                        <HelpCircle size={14} />
-                        <span>Perguntas para Aprofundar seu Raciocínio:</span>
-                      </div>
-
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {msg.generatedDiagram.reflectionQuestions.map((question, qIdx) => (
-                          <div
-                            key={qIdx}
-                            style={{
-                              padding: '6px 8px',
-                              borderRadius: '6px',
-                              backgroundColor: isDark ? '#141c27' : '#ffffff',
-                              border: isDark ? '1px solid #243445' : '1px solid #e6f4f2',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '4px'
-                            }}
-                          >
-                            <span style={{ fontSize: '12px', color: isDark ? '#e2e8f0' : '#334155', lineHeight: '1.4' }}>
-                              • {question}
-                            </span>
-                            <button
-                              onClick={() => {
-                                setPrompt(`Sobre "${question}": `);
-                                inputRef.current?.focus();
-                              }}
-                              style={{
-                                alignSelf: 'flex-start',
-                                background: 'transparent',
-                                border: 'none',
-                                color: '#0d9488',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                padding: 0,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}
-                            >
-                              <span>Responder e desdobrar no mapa →</span>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                      onAskReflectionQuestion={(question) => {
+                        setPrompt(`Sobre "${question}": `);
+                        inputRef.current?.focus();
+                      }}
+                    />
                   )}
                 </div>
               )}

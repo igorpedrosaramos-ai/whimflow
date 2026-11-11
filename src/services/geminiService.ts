@@ -6,6 +6,9 @@ export interface GeminiDiagramResult {
   nodes: MindMapNode[];
   reflectionQuestions?: string[];
   modelUsed?: string;
+  thinking?: string;
+  diagramType?: 'mindmap' | 'orgchart' | 'process' | 'menu' | 'strategic' | 'brainstorm';
+  detectedDomain?: string;
 }
 
 // Presets de alta fidelidade 100% em Português com perguntas reflexivas
@@ -264,6 +267,9 @@ export function generateDynamicFallback(prompt: string): GeminiDiagramResult {
 
     return {
       title: 'Salgados Viana: Estratégia de Cardápio & Vendas no iFood',
+      thinking: 'Diagnóstico do Pedido: Cardápio comercial focado em delivery iFood para a loja Salgados Viana, exigindo kits festa (100, 50, 20 unidades), combos com refrigerante e upsell avulso. Decisão Visual: Formato de Cardápio Estratégico Bi-direcional, dividindo produtos em pacotes de volume de um lado e combos/bebidas de alta margem do outro. Lógica de Ramos: Ancoragem de valor no kit 100, conveniência no combo familiar e bebidas avulsas para elevar o ticket médio.',
+      diagramType: 'menu',
+      detectedDomain: 'Gastronomia & Delivery iFood',
       explanation: 'Estrutura estratégica e comercial focada em conversão no iFood para Salgados Viana: kits festa (100, 50 e 20 unidades), combos com Coca-Cola e bebidas avulsas de alta margem.',
       reflectionQuestions: [
         'Qual a margem de contribuição líquida dos combos de 50 e 100 salgados considerando a taxa cobrada pelo iFood?',
@@ -306,6 +312,9 @@ export function generateDynamicFallback(prompt: string): GeminiDiagramResult {
 
   return {
     title: capitalizedTopic.slice(0, 40),
+    thinking: `Diagnóstico do Pedido: Construção de mapa mental estruturado para ${capitalizedTopic.slice(0, 40)}. Decisão Visual: Arquitetura bi-direcional balanceada conectando objetivos, plano de ação e métricas. Lógica de Ramos: Ramos distribuídos estrategicamente para visualização 360 do plano.`,
+    diagramType: 'strategic',
+    detectedDomain: capitalizedTopic.slice(0, 35),
     explanation: `Mapa mental estruturado para ${capitalizedTopic.slice(0, 40)}, organizando pilares de execução, entregas e validação contínua.`,
     reflectionQuestions: [
       `Quais são as principais premissas que precisam ser validadas antes de avançar nesta iniciativa?`,
@@ -347,10 +356,10 @@ export async function generateWithGemini(
     return { ...p, modelUsed: 'preset-instant' };
   }
 
-  // Chama o backend seguro em /api/generate-diagram com timeout de 10s
+  // Chama o backend seguro em /api/generate-diagram com timeout ampliado de 25s
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     const response = await fetch('/api/generate-diagram', {
       method: 'POST',
@@ -371,6 +380,9 @@ export async function generateWithGemini(
         const formattedNodes = layoutNodesTree(data.nodes);
         return {
           title: data.title || (prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt),
+          thinking: data.thinking || 'Diagnóstico e arquitetura estrutural gerados pelo motor analítico Gemini.',
+          diagramType: data.diagramType || 'mindmap',
+          detectedDomain: data.detectedDomain || 'Mapa Mental Estratégico',
           explanation: data.explanation || 'Estrutura conceitual e mapa de raciocínio gerado pelo Gemini.',
           reflectionQuestions: Array.isArray(data.reflectionQuestions) && data.reflectionQuestions.length > 0
             ? data.reflectionQuestions

@@ -184,7 +184,7 @@ export const QuickSparkModal: React.FC<QuickSparkModalProps> = ({
 
     try {
       const result = await generateWithGemini(
-        `Gere um mapa mental corporativo executivo, rigoroso e hierarquizado sobre o seguinte conteúdo:\n\n${finalPrompt}`
+        `Gere um mapa mental estruturado, rigoroso e fiel ao tema e domínio solicitado sobre o seguinte conteúdo:\n\n${finalPrompt}`
       );
       if (result.nodes && result.nodes.length > 0) {
         onCreateBoardWithNodes(result.title || finalPrompt.slice(0, 30), result.nodes);
