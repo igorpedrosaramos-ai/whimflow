@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Board, BoardVersionSnapshot } from '../types';
 import { INITIAL_BOARDS, BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD } from '../constants/initialData';
+import { parseRoute } from '../router';
 import {
   loadBoards,
   loadBoardsSync,
@@ -38,6 +39,12 @@ export function useBoardStorage(onBoardOpened?: (board: Board) => void) {
   }, []);
 
   const [activeBoardId, setActiveBoardId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const initRoute = parseRoute(window.location.pathname, window.location.search);
+      if (initRoute.boardId) {
+        return initRoute.boardId;
+      }
+    }
     const savedActiveId = loadActiveBoardId();
     if (savedActiveId && boards.some(b => b.id === savedActiveId)) {
       return savedActiveId;

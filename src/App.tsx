@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   AlignLeft, 
   AlignCenter, 
@@ -50,25 +50,23 @@ import { useCanvasNavigation } from './hooks/useCanvasNavigation';
 import { useBoardStorage } from './hooks/useBoardStorage';
 import { useBoardOperations } from './hooks/useBoardOperations';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { saveCurrentView, loadCurrentView, THEME_KEY } from './services/storageService';
+import { THEME_KEY } from './services/storageService';
+import { useRouter } from './router';
 
 export const App: React.FC = () => {
-  useEffect(() => {
-    document.title = 'Mapa Mental Turbine';
-  }, []);
+  // 0. Sistema de Roteamento Real com URLs Independentes
+  const { route, navigate: routerNavigate } = useRouter();
 
-  // Roteamento de Visualização: 'dashboard' | 'editor' | 'doc' | 'agent'
-  const [currentView, setCurrentView] = useState<'dashboard' | 'editor' | 'doc' | 'agent'>(() => {
-    const saved = loadCurrentView();
-    if (saved === 'dashboard' || saved === 'editor' || saved === 'doc' || saved === 'agent') {
-      return saved as 'dashboard' | 'editor' | 'doc' | 'agent';
-    }
+  // O tipo de visualização é derivado 100% da rota atual da URL no navegador
+  // Sem restauração forçada de localStorage na raiz
+  const currentView: 'dashboard' | 'editor' | 'doc' | 'agent' = useMemo(() => {
+    if (route.type === 'doc') return 'doc';
+    if (route.type === 'agent') return 'agent';
+    if (route.type === 'board') return 'editor';
     return 'dashboard';
-  });
+  }, [route.type]);
 
-  useEffect(() => {
-    saveCurrentView(currentView);
-  }, [currentView]);
+  const isPresentationOpen = route.type === 'presentation';
 
   // Tema
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -108,7 +106,6 @@ export const App: React.FC = () => {
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isQuickSparkOpen, setIsQuickSparkOpen] = useState(false);
-  const [isPresentationOpen, setIsPresentationOpen] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -141,9 +138,40 @@ export const App: React.FC = () => {
     handleCreateMilestone,
     handleDeleteSnapshot
   } = useBoardStorage((target) => {
-    setCurrentView('editor');
+    routerNavigate(`/board/${encodeURIComponent(target.id)}`);
     setTimeout(() => fitView(target.mindMapNodes), 80);
   });
+
+  // Sincroniza o boardId ativo quando o usuário acessa ou navega para /board/:id, /doc/:id ou /present/:id
+  useEffect(() => {
+    if (route.boardId && route.boardId !== activeBoardId) {
+      const exists = boards.some(b => b.id === route.boardId);
+      if (exists) {
+        setActiveBoardId(route.boardId);
+      }
+    }
+  }, [route.boardId, activeBoardId, boards, setActiveBoardId]);
+
+  // Atualização dinâmica do título da página no navegador de acordo com a rota e o quadro
+  useEffect(() => {
+    if (route.type === 'board') {
+      document.title = `${activeBoard.title || 'Quadro'} | WhimFlow`;
+    } else if (route.type === 'doc') {
+      document.title = `${activeBoard.title || 'Documento'} (Doc) | WhimFlow`;
+    } else if (route.type === 'agent') {
+      document.title = 'Assistente IA | WhimFlow';
+    } else if (route.type === 'templates') {
+      document.title = 'Templates & Temas | WhimFlow';
+    } else if (route.type === 'trash') {
+      document.title = 'Lixeira | WhimFlow';
+    } else if (route.type === 'presentation') {
+      document.title = `Apresentação: ${activeBoard.title || 'Quadro'} | WhimFlow`;
+    } else if (route.type === 'recent') {
+      document.title = 'Recentes | WhimFlow';
+    } else {
+      document.title = 'Dashboard | WhimFlow';
+    }
+  }, [route.type, activeBoard.title]);
 
   // 2. Hook de Navegação Espacial no Canvas (Pan, Zoom, Fit)
   const {
@@ -224,23 +252,23 @@ export const App: React.FC = () => {
     onToggleQuickSpark: () => setIsQuickSparkOpen(prev => !prev)
   });
 
-  // Abertura de Quadro
+  // Abertura de Quadro com Roteamento Real
   const handleOpenBoard = useCallback((boardId: string) => {
     openBoardInStorage(boardId);
-    setCurrentView('editor');
-  }, [openBoardInStorage]);
+    routerNavigate(`/board/${encodeURIComponent(boardId)}`);
+  }, [openBoardInStorage, routerNavigate]);
 
-  // Criação de Quadro
+  // Criação de Quadro com Roteamento Real
   const handleCreateNewBoard = useCallback((title: string = 'Sem título') => {
-    createBoardInStorage(title);
+    const created = createBoardInStorage(title);
     setSelectedNodeId('root');
     setSelectedNodeIds(['root']);
     setPan({ x: 300, y: 350 });
     setZoom(1.0);
-    setCurrentView('editor');
-  }, [createBoardInStorage, setPan, setZoom]);
+    routerNavigate(`/board/${encodeURIComponent(created.id)}`);
+  }, [createBoardInStorage, setPan, setZoom, routerNavigate]);
 
-  // Criação a partir de Template
+  // Criação a partir de Template com Roteamento Real
   const handleCreateFromTemplate = useCallback((template: TemplateItem) => {
     const newId = `board-${Date.now()}`;
     const newBoard: Board = {
@@ -253,12 +281,12 @@ export const App: React.FC = () => {
     setActiveBoardId(newId);
     setIsTemplateModalOpen(false);
     if (template.previewType === 'doc') {
-      setCurrentView('doc');
+      routerNavigate(`/doc/${encodeURIComponent(newId)}`);
     } else {
-      setCurrentView('editor');
+      routerNavigate(`/board/${encodeURIComponent(newId)}`);
     }
     setTimeout(() => fitView(newBoard.mindMapNodes), 100);
-  }, [fitView, setBoards, setActiveBoardId]);
+  }, [fitView, setBoards, setActiveBoardId, routerNavigate]);
 
   // Gestão de Seções de Apresentação
   const handleAddSection = useCallback(() => {
@@ -652,7 +680,7 @@ export const App: React.FC = () => {
 
     setBoards(prev => [newBoard, ...prev]);
     setActiveBoardId(newBoardId);
-    setCurrentView('editor');
+    routerNavigate(`/board/${encodeURIComponent(newBoardId)}`);
     setTimeout(() => fitView(newBoard.mindMapNodes), 100);
   };
 
@@ -800,9 +828,9 @@ export const App: React.FC = () => {
           boards={boards}
           onOpenBoard={handleOpenBoard}
           onCreateNewBoard={(title) => handleCreateNewBoard(title || 'Sem título')}
-          onOpenDoc={() => setCurrentView('doc')}
-          onOpenAskAgent={() => setIsAgentDrawerOpen(true)}
-          onOpenTemplates={() => setIsTemplateModalOpen(true)}
+          onOpenDoc={() => routerNavigate(`/doc/${encodeURIComponent(activeBoard.id)}`)}
+          onOpenAskAgent={() => routerNavigate('/ia')}
+          onOpenTemplates={() => routerNavigate('/templates')}
           onDuplicateBoard={handleDuplicateBoard}
           onDeleteBoard={(id) => {
             const boardToTrash = boards.find(b => b.id === id);
@@ -815,10 +843,13 @@ export const App: React.FC = () => {
           onRenameBoard={(id, newTitle) => {
             setBoards(prev => prev.map(b => b.id === id ? { ...b, title: newTitle, updatedAt: new Date().toISOString() } : b));
           }}
-          onOpenTrash={() => setIsTrashModalOpen(true)}
+          onOpenTrash={() => routerNavigate('/lixeira')}
           onOpenSearch={() => setIsSearchModalOpen(true)}
           onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
           onOpenQuickSpark={() => setIsQuickSparkOpen(true)}
+          initialCategoryFilter={route.type === 'recent' ? 'recent' : 'all'}
+          onSelectRecent={() => routerNavigate('/recentes')}
+          onSelectAll={() => routerNavigate('/')}
           theme={theme}
           workspaceName="teste"
         />
@@ -839,8 +870,8 @@ export const App: React.FC = () => {
           onConvertToMindMap={(title, nodes) => {
             handleGenerateFromAgent(title, title, nodes);
           }}
-          onNavigateToDashboard={() => setCurrentView('dashboard')}
-          onOpenTemplates={() => setIsTemplateModalOpen(true)}
+          onNavigateToDashboard={() => routerNavigate('/')}
+          onOpenTemplates={() => routerNavigate('/templates')}
           onShowToast={showToast}
           theme={theme}
           workspaceName="teste"
@@ -851,7 +882,7 @@ export const App: React.FC = () => {
       {currentView === 'agent' && (
         <AgentChatView
           onGenerateBoard={handleGenerateFromAgent}
-          onNavigateToDashboard={() => setCurrentView('dashboard')}
+          onNavigateToDashboard={() => routerNavigate('/')}
           theme={theme}
           workspaceName="teste"
         />
@@ -862,7 +893,7 @@ export const App: React.FC = () => {
         <PresentationView
           board={activeBoard}
           initialSelectedNodeId={selectedNodeId}
-          onClose={() => setIsPresentationOpen(false)}
+          onClose={() => routerNavigate(`/board/${encodeURIComponent(activeBoard.id)}`)}
         />
       )}
 
@@ -879,7 +910,7 @@ export const App: React.FC = () => {
             sidebarOpen={sidebarOpen}
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             onOpenShare={() => setIsShareModalOpen(true)}
-            onStartPresentation={() => setIsPresentationOpen(true)}
+            onStartPresentation={() => routerNavigate(`/present/${encodeURIComponent(activeBoard.id)}`)}
             theme={theme}
             onToggleTheme={toggleTheme}
             totalObjects={totalObjects}
@@ -887,7 +918,7 @@ export const App: React.FC = () => {
             canRedo={canRedo}
             onUndo={handleUndo}
             onRedo={handleRedo}
-            onNavigateToDashboard={() => setCurrentView('dashboard')}
+            onNavigateToDashboard={() => routerNavigate('/')}
             onOpenSearch={() => setIsSearchModalOpen(true)}
             onOpenAgent={() => setIsAgentDrawerOpen(true)}
             onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
@@ -920,9 +951,9 @@ export const App: React.FC = () => {
           onRenameBoard={(id, newTitle) => {
             setBoards(prev => prev.map(b => b.id === id ? { ...b, title: newTitle, updatedAt: new Date().toISOString() } : b));
           }}
-          onNavigateToDashboard={() => setCurrentView('dashboard')}
-          onOpenTemplates={() => setIsTemplateModalOpen(true)}
-          onOpenTrash={() => setIsTrashModalOpen(true)}
+          onNavigateToDashboard={() => routerNavigate('/')}
+          onOpenTemplates={() => routerNavigate('/templates')}
+          onOpenTrash={() => routerNavigate('/lixeira')}
           workspaceName="teste"
         />
 
@@ -944,7 +975,7 @@ export const App: React.FC = () => {
             onAddSticky={() => handleAddSticky()}
             onAddWireframe={() => handleAddWireframe()}
             onAddText={() => handleAddText()}
-            onStartPresentation={() => setIsPresentationOpen(true)}
+            onStartPresentation={() => routerNavigate(`/present/${encodeURIComponent(activeBoard.id)}`)}
             onOpenAI={() => setIsAgentDrawerOpen(true)}
             onTogglePresentPanel={() => setIsPresentSidePanelOpen(prev => !prev)}
             onAddShape={() => handleAddFloatingTopic()}
@@ -1183,7 +1214,7 @@ export const App: React.FC = () => {
             }
           }}
           onDeleteSection={handleDeleteSection}
-          onStartPresentation={() => setIsPresentationOpen(true)}
+          onStartPresentation={() => routerNavigate(`/present/${encodeURIComponent(activeBoard.id)}`)}
           theme={theme}
         />
 
@@ -1317,8 +1348,13 @@ export const App: React.FC = () => {
 
       {/* Modal de Templates */}
       <TemplateModal
-        isOpen={isTemplateModalOpen}
-        onClose={() => setIsTemplateModalOpen(false)}
+        isOpen={isTemplateModalOpen || route.type === 'templates'}
+        onClose={() => {
+          setIsTemplateModalOpen(false);
+          if (route.type === 'templates') {
+            routerNavigate('/');
+          }
+        }}
         onSelectTemplate={handleCreateFromTemplate}
         workspaceName="teste"
       />
@@ -1346,8 +1382,13 @@ export const App: React.FC = () => {
 
       {/* Modal de Lixeira */}
       <TrashModal
-        isOpen={isTrashModalOpen}
-        onClose={() => setIsTrashModalOpen(false)}
+        isOpen={isTrashModalOpen || route.type === 'trash'}
+        onClose={() => {
+          setIsTrashModalOpen(false);
+          if (route.type === 'trash') {
+            routerNavigate('/');
+          }
+        }}
         trashBoards={trashBoards}
         onRestoreBoard={handleRestoreBoard}
         onPermanentlyDeleteBoard={handlePermanentlyDeleteBoard}

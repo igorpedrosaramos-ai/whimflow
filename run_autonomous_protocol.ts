@@ -60,7 +60,7 @@ async function runAutonomousProtocol() {
     await page.screenshot({ path: dashShot });
     reports.push({
       name: '1. Dashboard Inicial',
-      passed: title.includes('Turbine') || title.includes('Whimflow'),
+      passed: title.toLowerCase().includes('turbine') || title.toLowerCase().includes('whimflow'),
       details: `Página carregada com sucesso. Título: "${title}"`,
       screenshot: dashShot
     });

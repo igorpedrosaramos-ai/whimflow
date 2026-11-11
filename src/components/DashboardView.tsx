@@ -39,6 +39,9 @@ interface DashboardViewProps {
   onOpenSearch?: () => void;
   onOpenShortcuts?: () => void;
   onOpenQuickSpark?: () => void;
+  initialCategoryFilter?: 'all' | 'recent';
+  onSelectRecent?: () => void;
+  onSelectAll?: () => void;
   workspaceName?: string;
   theme?: 'dark' | 'light';
 }
@@ -57,6 +60,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSearch,
   onOpenShortcuts,
   onOpenQuickSpark,
+  initialCategoryFilter = 'all',
+  onSelectRecent,
+  onSelectAll,
   workspaceName = 'teste',
   theme = 'light'
 }) => {
@@ -67,10 +73,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [editingBoardId, setEditingBoardId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState<'all' | 'recent'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'recent'>(initialCategoryFilter);
   const [isTeamsOpen, setIsTeamsOpen] = useState(true);
   const [sortOption, setSortOption] = useState<'created-desc' | 'created-asc' | 'alpha' | 'modified'>('created-desc');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+
+  React.useEffect(() => {
+    if (initialCategoryFilter && initialCategoryFilter !== categoryFilter) {
+      setCategoryFilter(initialCategoryFilter);
+    }
+  }, [initialCategoryFilter]);
 
   let displayBoards = boards.filter(b => {
     if (searchFilter.trim() && !b.title.toLowerCase().includes(searchFilter.toLowerCase())) {
@@ -205,7 +217,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div style={{ display: 'flex', flexDirection: 'column', padding: '12px 10px', gap: '2px', flex: 1, overflowY: 'auto' }}>
           {/* Recent */}
           <button
-            onClick={() => setCategoryFilter('recent')}
+            id="btn-sidebar-recent"
+            onClick={() => {
+              setCategoryFilter('recent');
+              onSelectRecent?.();
+            }}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -270,7 +286,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {isTeamsOpen && (
             <button
               id="btn-sidebar-everyone"
-              onClick={() => setCategoryFilter('all')}
+              onClick={() => {
+                setCategoryFilter('all');
+                onSelectAll?.();
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -821,11 +840,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   const isEditing = editingBoardId === board.id;
 
                   return (
-                    <div
+                    <a
                       key={board.id}
-                      className="board-card"
+                      href={`/board/${encodeURIComponent(board.id)}`}
+                      className="board-card board-grid-card"
                       data-board-id={board.id}
-                      onClick={() => onOpenBoard(board.id)}
+                      onClick={e => {
+                        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                        e.preventDefault();
+                        onOpenBoard(board.id);
+                      }}
                       style={{
                         height: '190px',
                         borderRadius: '8px',
@@ -835,6 +859,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         cursor: 'pointer',
                         display: 'flex',
                         flexDirection: 'column',
+                        textDecoration: 'none',
+                        color: 'inherit',
                         transition: 'transform 0.15s, box-shadow 0.15s, border-color 0.15s',
                         position: 'relative'
                       }}
@@ -1049,7 +1075,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <rect x="145" y="38" width="40" height="16" rx="3" fill={isDark ? '#263143' : '#f1f5f9'} stroke="#c084fc" strokeWidth="1" />
                         </svg>
                       </div>
-                    </div>
+                    </a>
                   );
                 })}
               </div>
@@ -1066,18 +1092,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 }}
               >
                 {displayBoards.map(board => (
-                  <div
+                  <a
                     key={board.id}
-                    className="board-card"
+                    href={`/board/${encodeURIComponent(board.id)}`}
+                    className="board-card board-list-item"
                     data-board-id={board.id}
-                    onClick={() => onOpenBoard(board.id)}
+                    onClick={e => {
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                      e.preventDefault();
+                      onOpenBoard(board.id);
+                    }}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       padding: '12px 18px',
                       borderBottom: isDark ? '1px solid #202735' : '1px solid #f1f5f9',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                      color: 'inherit'
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1092,7 +1125,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                       {new Date(board.updatedAt || Date.now()).toLocaleDateString('pt-BR')}
                     </span>
-                  </div>
+                  </a>
                 ))}
               </div>
             )}
