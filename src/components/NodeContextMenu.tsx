@@ -173,51 +173,6 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
 
       <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-subtle, #2d3748)', margin: '0 2px' }} />
 
-      {/* Alternador de Estilo de Cartão (Accent | Border | Fill | Text) */}
-      <button
-        type="button"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          const order: Array<'accent' | 'border' | 'fill' | 'text'> = ['accent', 'border', 'fill', 'text'];
-          const next = order[(order.indexOf(currentBorderStyle) + 1) % order.length];
-          onUpdateStyle({ borderStyle: next });
-        }}
-        style={{
-          height: '24px',
-          padding: '0 5px',
-          borderRadius: '4px',
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--text-secondary, #cbd5e1)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '3px',
-          fontSize: '11px',
-          fontWeight: 600
-        }}
-        title={`Estilo do Card: ${
-          currentBorderStyle === 'accent' ? 'Destaque Lateral (Clique para Borda)' :
-          currentBorderStyle === 'border' ? 'Borda Completa (Clique para Preenchido)' :
-          currentBorderStyle === 'fill' ? 'Preenchido (Clique para Texto Puro)' :
-          'Apenas Texto (Clique para Destaque)'
-        }`}
-      >
-        {currentBorderStyle === 'text' ? (
-          <Type size={13} color={currentColor} />
-        ) : (
-          <Square 
-            size={13} 
-            fill={currentBorderStyle === 'fill' ? currentColor : 'none'} 
-            stroke={currentBorderStyle === 'fill' ? 'none' : 'currentColor'}
-          />
-        )}
-        <span style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-          {currentBorderStyle === 'accent' ? 'Lateral' : currentBorderStyle === 'border' ? 'Borda' : currentBorderStyle === 'fill' ? 'Cor' : 'Texto'}
-        </span>
-      </button>
-
       {/* Alternador de Estilo de Linha (Bézier | Reta | Cotovelo) */}
       <button
         type="button"

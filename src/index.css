@@ -110,59 +110,72 @@ html, body, #root {
   pointer-events: none;
 }
 
-/* Nodes & Mindmap Elements */
+/* Nodes & Mindmap Elements - Layout Puro de Texto (Padrão Whimsical Oficial - Imagem 2) */
 .mindmap-node-card {
   position: absolute;
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
   color: var(--text-primary);
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
-  border: 1px solid var(--border-subtle);
+  background-color: transparent;
+  border: 1.5px solid transparent;
+  box-shadow: none;
   cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-  min-width: 120px;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+  user-select: none;
+  white-space: nowrap;
+  border-radius: 4px;
+  padding: 1px 6px;
+  box-sizing: border-box;
 }
+
 .mindmap-node-card:hover {
-  border-color: var(--border-strong);
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
 }
+
 .mindmap-node-card.selected {
-  /* Outline e glow definidos dinamicamente de acordo com a cor escolhida pelo usuário */
+  background-color: rgba(56, 189, 248, 0.08);
+  border-color: #38bdf8;
 }
+
 .mindmap-node-card.root {
   font-size: 16px;
   font-weight: 700;
-  padding: 12px 24px;
-  background-color: var(--bg-surface);
-  border: 2px solid var(--border-strong);
-  border-radius: var(--radius-lg);
+  padding: 3px 10px;
+  background-color: transparent;
+  border: 1.5px solid transparent;
+  border-radius: 6px;
   color: var(--text-primary);
 }
 
-/* Contador Numérico de Ramos Ocultos / Badge Whimsical */
+.mindmap-node-card.root.selected {
+  border-color: #38bdf8;
+  background-color: rgba(56, 189, 248, 0.08);
+}
+
+/* Contador Numérico de Ramos Ocultos / Badge Whimsical (Pill Circular - Estilo Imagem 2) */
 .branch-counter-badge {
-  color: #ffffff;
+  color: #0f172a;
+  background-color: #f1f5f9;
   font-size: 11px;
   font-weight: 700;
-  min-width: 22px;
-  height: 19px;
-  padding: 0 6px;
-  border-radius: 10px;
-  display: flex;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  border: 1px solid #cbd5e1;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  margin-left: 8px;
   flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: filter 0.12s ease, transform 0.12s ease;
 }
+
 .branch-counter-badge:hover {
-  filter: brightness(1.2);
+  filter: brightness(1.1);
   transform: scale(1.08);
 }
 

@@ -560,11 +560,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         } else {
           // Conexão Horizontal / Bi-direcional
           const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
+          // No estilo Whimsical oficial, todos os ramos filhos partem do mesmo centro do pai
           const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
-
-          const startY = numChildren <= 1
-            ? pPos.y + pPos.height / 2
-            : pPos.y + pad + (usableHeight * index) / (numChildren - 1);
+          const startY = pPos.y + pPos.height / 2;
 
           endX = isChildOnLeft ? cPos.x + cPos.width : cPos.x;
           endY = cPos.y + cPos.height / 2;
@@ -585,19 +583,13 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               d={pathData}
               fill="none"
               stroke={strokeColor}
-              strokeWidth={isSelected ? "3.2" : "2.2"}
+              strokeWidth={isSelected ? "2.6" : "1.8"}
               strokeLinecap="round"
               strokeLinejoin="round"
               style={{
                 opacity: isSelected ? 1 : 0.88,
                 transition: 'stroke-width 0.15s ease, opacity 0.15s ease'
               }}
-            />
-            <circle
-              cx={endX}
-              cy={endY}
-              r={isSelected ? 3.5 : 2.5}
-              fill={strokeColor}
             />
           </g>
         );
@@ -1046,41 +1038,28 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const isHovered = hoveredNodeId === node.id;
         const isEditing = editingId === node.id;
         const isDropTarget = dropTargetNodeId === node.id;
-        const childCount = countDescendants(node.id);
+        const childCount = node.childrenIds?.length || countDescendants(node.id);
         const hasChildren = node.childrenIds && node.childrenIds.length > 0;
         const isDraggingThis = draggingNodeId === node.id;
 
         const pos = getNodePos(node);
-        const nodeColor = node.color || '#6366f1';
-        const borderStyle = node.borderStyle || 'accent';
-
-        let bg = 'var(--bg-surface)';
-        let border = `1.5px solid ${isSelected ? nodeColor : 'var(--border-subtle)'}`;
-        let borderLeft = undefined;
-
-        if (isRoot) {
-          bg = 'var(--bg-elevated)';
-          border = '2px solid var(--border-strong)';
-        } else if (borderStyle === 'fill') {
-          bg = nodeColor;
-          border = `1.5px solid ${nodeColor}`;
-        } else if (borderStyle === 'border') {
-          bg = 'var(--bg-surface)';
-          border = `2px solid ${nodeColor}`;
-        } else if (borderStyle === 'text') {
-          bg = 'transparent';
-          border = isSelected ? `1.5px dashed ${nodeColor}` : '1.5px solid transparent';
-        } else {
-          bg = 'var(--bg-surface)';
-          borderLeft = `4px solid ${nodeColor}`;
-        }
+        const nodeColor = node.color || '#38bdf8';
 
         const isBold = !!node.bold || isRoot;
         const isItalic = !!node.italic;
-        const fontSizePx = node.fontSize === 'small' ? '12px' : node.fontSize === 'large' ? '16px' : (isRoot ? '16px' : '13.5px');
-        const textColor = borderStyle === 'fill' ? '#ffffff' : (borderStyle === 'text' ? nodeColor : 'var(--text-primary)');
+        const fontSizePx = node.fontSize === 'small' ? '12px' : node.fontSize === 'large' ? '15.5px' : (isRoot ? '16px' : '13.5px');
+        const textColor = 'var(--text-primary)';
 
         const isConnectingSource = connectingSourceId === node.id;
+
+        // ESTILO 100% PURO TEXTO (SEM CAIXINHAS - ESTILO IMAGEM 2 WHIMSICAL)
+        const nodeBg = isSelected
+          ? 'rgba(56, 189, 248, 0.08)'
+          : (isHovered ? 'rgba(255, 255, 255, 0.04)' : 'transparent');
+
+        const nodeBorder = isSelected
+          ? `1.5px solid ${nodeColor}`
+          : (isHovered ? '1.5px solid rgba(255, 255, 255, 0.12)' : '1.5px solid transparent');
 
         return (
           <div
@@ -1088,38 +1067,27 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             id={`node-${node.id}`}
             className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isConnectingSource ? 'connecting-source' : ''}`}
             style={{
+              position: 'absolute',
               left: `${pos.x}px`,
               top: `${pos.y}px`,
               width: `${pos.width}px`,
-              minWidth: `${pos.width}px`,
-              minHeight: `${pos.height}px`,
-              backgroundColor: bg,
-              borderTop: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
-              borderRight: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
-              borderBottom: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : border,
-              borderLeft: isMultiSelected ? '1.5px solid var(--accent-purple, #6366f1)' : (borderLeft || border),
-              outline: isConnectingSource
-                ? '3px solid #3b82f6'
-                : (isDropTarget && dropPosition === 'inside'
-                ? `2px solid ${nodeColor}`
-                : isMultiSelected
-                ? '2px solid var(--accent-purple, #6366f1)'
-                : (isSelected ? `2px solid ${nodeColor}` : undefined)),
-              outlineOffset: '2px',
-              boxShadow: isConnectingSource
-                ? '0 0 0 4px rgba(59, 130, 246, 0.4), 0 8px 24px rgba(59, 130, 246, 0.3)'
-                : (isDropTarget && dropPosition === 'inside'
-                ? `0 0 0 3px ${nodeColor}33, 0 6px 20px ${nodeColor}25`
-                : (isSelected ? `0 0 12px ${nodeColor}55` : '0 2px 8px rgba(0, 0, 0, 0.2)')),
+              height: `${pos.height}px`,
+              display: 'inline-flex',
+              alignItems: 'center',
+              backgroundColor: nodeBg,
+              border: nodeBorder,
+              borderRadius: isRoot ? '6px' : '4px',
+              boxShadow: 'none',
+              outline: 'none',
+              padding: isRoot ? '2px 8px' : '1px 6px',
               zIndex: isConnectingSource ? 50 : (isDropTarget ? 45 : (isSelected ? 35 : 20)),
-              padding: isRoot ? '12px 24px' : '8px 14px',
-              whiteSpace: 'nowrap',
-              // Nó-fonte durante drag: semi-transparente + desfocado (como o Whimsical)
+              cursor: currentTool === 'connect' ? 'crosshair' : (isRoot ? 'default' : (isDraggingThis ? 'grabbing' : 'grab')),
               opacity: isDraggingThis ? 0.35 : 1,
               filter: isDraggingThis ? 'grayscale(0.4) blur(0.5px)' : undefined,
-              transition: isDraggingThis ? 'none' : 'opacity 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease',
-              cursor: currentTool === 'connect' ? 'crosshair' : (isRoot ? 'default' : (isDraggingThis ? 'grabbing' : 'grab')),
-              pointerEvents: isDraggingThis ? 'none' : undefined
+              userSelect: 'none',
+              whiteSpace: 'nowrap',
+              boxSizing: 'border-box',
+              transition: isDraggingThis ? 'none' : 'background-color 0.12s ease, border-color 0.12s ease'
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -1166,20 +1134,20 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   border: 'none',
                   color: textColor,
                   borderRadius: '4px',
-                  padding: '2px 4px',
+                  padding: '1px 4px',
                   fontSize: fontSizePx,
                   fontWeight: isBold ? 700 : 500,
                   fontStyle: isItalic ? 'italic' : 'normal',
                   outline: 'none',
-                  minWidth: '80px'
+                  minWidth: '60px'
                 }}
               />
             ) : node.text.includes('\n') ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', userSelect: 'none' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', userSelect: 'none' }}>
                 <span style={{
                   color: textColor,
                   fontSize: fontSizePx,
-                  fontWeight: 700,
+                  fontWeight: isBold ? 700 : 500,
                   letterSpacing: '-0.01em',
                   lineHeight: 1.25
                 }}>
@@ -1189,7 +1157,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   color: 'var(--text-muted, #64748b)',
                   fontSize: `calc(${fontSizePx} - 1.5px)`,
                   fontWeight: 400,
-                  marginTop: '2px',
+                  marginTop: '1px',
                   letterSpacing: '-0.01em',
                   lineHeight: 1.2
                 }}>
@@ -1204,7 +1172,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                 fontWeight: isBold ? 700 : 500,
                 fontStyle: isItalic ? 'italic' : 'normal',
                 letterSpacing: '-0.01em',
-                minWidth: node.text ? undefined : '50px',
+                minWidth: node.text ? undefined : '40px',
                 display: 'inline-block'
               }}>
                 {node.text}
@@ -1232,136 +1200,95 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </a>
             )}
 
-            {/* Badge de Ramos Recolhidos */}
+            {/* Badge de Ramos Ocultos / Contador Whimsical (Estilo Imagem 2) */}
             {hasChildren && node.collapsed && (
-              <div
+              <button
+                type="button"
                 className="branch-counter-badge"
-                style={{ backgroundColor: nodeColor }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleCollapse(node.id);
                 }}
-                title={`Expandir ${childCount} ramos`}
+                title={`${node.childrenIds.length} itens recolhidos. Clique para expandir.`}
+                style={{
+                  marginLeft: '8px',
+                  height: '18px',
+                  minWidth: '18px',
+                  borderRadius: '9px',
+                  padding: '0 5px',
+                  backgroundColor: '#f1f5f9',
+                  color: '#0f172a',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  border: '1px solid #cbd5e1',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                  userSelect: 'none',
+                  flexShrink: 0
+                }}
               >
-                {childCount}
-              </div>
+                {node.childrenIds.length}
+              </button>
             )}
 
-            {/* Botão de Recolher Ramo Aberto */}
-            {hasChildren && !node.collapsed && !isRoot && (
-              <div
+            {/* Botão Sutil de Recolher Ramo Aberto */}
+            {hasChildren && !node.collapsed && !isRoot && (isHovered || isSelected) && (
+              <button
+                type="button"
                 className="branch-collapse-toggle"
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleCollapse(node.id);
                 }}
                 title="Recolher ramos deste nó"
+                style={{
+                  marginLeft: '6px',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--bg-elevated, #1e293b)',
+                  color: 'var(--text-muted, #94a3b8)',
+                  border: '1px solid var(--border-subtle, #334155)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  lineHeight: 1,
+                  userSelect: 'none',
+                  flexShrink: 0
+                }}
               >
                 −
-              </div>
+              </button>
             )}
 
-            {/* Botões Externos de Adicionar (Apenas 1 botão Filho e 1 botão Irmão) */}
-            {(isSelected || isHovered) && !isEditing && !draggingNodeId && (
-              <>
-                {/* Adicionar Filho (à esquerda se o nó for do lado esquerdo, senão à direita) */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    ...(node.side === 'left' ? { left: '-34px' } : { right: '-34px' }),
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: '34px',
-                    height: '34px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 50
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddChildNode(node.id);
-                  }}
-                  title="Criar Quadrado Filho (Atalho: Tab)"
-                >
-                  <div
-                    style={{
-                      width: '22px',
-                      height: '22px',
-                      borderRadius: '50%',
-                      backgroundColor: nodeColor,
-                      color: '#ffffff',
-                      border: '2px solid var(--bg-surface, #ffffff)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 6px rgba(0,0,0,0.22)',
-                      transition: 'transform 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.15)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
-                  >
-                    <Plus size={13} strokeWidth={2.6} />
-                  </div>
-                </div>
-
-                {/* Adicionar Irmão Abaixo (se não for raiz) */}
-                {!isRoot && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      bottom: '-28px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: '34px',
-                      height: '28px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 50
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAddSiblingNode(node.id);
-                    }}
-                    title="Criar Quadrado Irmão (Atalho: Enter)"
-                  >
-                    <div
-                      style={{
-                        width: '22px',
-                        height: '22px',
-                        borderRadius: '50%',
-                        backgroundColor: 'var(--bg-surface, #ffffff)',
-                        color: nodeColor,
-                        border: `2px solid ${nodeColor}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
-                        transition: 'transform 0.15s ease, background-color 0.15s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'scale(1.15)';
-                        e.currentTarget.style.backgroundColor = nodeColor;
-                        e.currentTarget.style.color = '#ffffff';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.backgroundColor = 'var(--bg-surface, #ffffff)';
-                        e.currentTarget.style.color = nodeColor;
-                      }}
-                    >
-                      <Plus size={13} strokeWidth={2.6} />
-                    </div>
-                  </div>
-                )}
-              </>
+            {/* Ponto / Handle de Ramificação (Whimsical Branch Handle - Estilo Imagem 2) */}
+            {isSelected && !isRoot && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddChildNode(node.id);
+                }}
+                title="Adicionar ramo filho (Atalho: Tab)"
+                style={{
+                  position: 'absolute',
+                  ...(node.side === 'left' ? { left: '-12px' } : { right: '-12px' }),
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: nodeColor || '#38bdf8',
+                  border: '1.5px solid #ffffff',
+                  boxShadow: `0 0 0 2px ${nodeColor || '#38bdf8'}66`,
+                  cursor: 'pointer',
+                  zIndex: 40
+                }}
+              />
             )}
           </div>
         );

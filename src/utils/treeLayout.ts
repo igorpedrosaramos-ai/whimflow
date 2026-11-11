@@ -13,48 +13,43 @@ export interface ComputedNodeLayout {
  * Garante que o texto fique em linha legível e elegante
  */
 export function estimateNodeDimensions(node: MindMapNode): { width: number; height: number } {
-  // Se largura e altura explícitas válidas foram fornecidas pelo template, respeita-as
-  if (node.width && node.height && node.width > 40 && node.height > 24) {
-    return { width: node.width, height: node.height };
-  }
-
-  const text = node.text || '';
+  const text = (node.text || '').trim();
   const lines = text.split('\n');
   const isMultiline = lines.length > 1;
   const maxLineLen = Math.max(...lines.map(l => l.length), 0);
 
   if (node.side === 'root') {
-    const iconPadding = node.icon ? 24 : 0;
+    const iconPadding = node.icon ? 20 : 0;
     const width = isMultiline
-      ? Math.max(160, Math.round(maxLineLen * 9.2 + 50 + iconPadding))
-      : Math.max(160, Math.round(text.length * 9.5 + 56 + iconPadding));
-    const height = isMultiline ? Math.max(50, lines.length * 24 + 8) : 48;
+      ? Math.max(90, Math.round(maxLineLen * 9.2 + 24 + iconPadding))
+      : Math.max(90, Math.round(text.length * 9.2 + 24 + iconPadding));
+    const height = isMultiline ? Math.max(32, lines.length * 20 + 8) : 32;
     return { width, height };
   }
 
   if (text.length === 0) {
-    return { width: 100, height: 38 };
+    return { width: 44, height: 24 };
   }
 
   // Tratamento especial para nós curtos como marcos de timeline ('Q1', 'Q2', etc.)
   if (text.length <= 4 && !isMultiline) {
-    return { width: 64, height: 36 };
+    return { width: 40, height: 24 };
   }
 
   const hasChildBadge = Boolean(node.childrenIds && node.childrenIds.length > 0 && node.collapsed);
-  const badgePadding = hasChildBadge ? 34 : 0;
-  const iconPadding = node.icon ? 22 : 0;
-  const linkPadding = node.link ? 20 : 0;
-  const charMultiplier = node.fontSize === 'small' ? 7.8 : node.fontSize === 'large' ? 10.2 : (node.bold ? 9.4 : 8.8);
-  const basePadding = 38;
+  const badgePadding = hasChildBadge ? 28 : 0;
+  const iconPadding = node.icon ? 20 : 0;
+  const linkPadding = node.link ? 18 : 0;
+  const charMultiplier = node.fontSize === 'small' ? 7.0 : node.fontSize === 'large' ? 9.2 : (node.bold ? 8.4 : 7.8);
+  const basePadding = 14;
 
   const width = Math.max(
-    100,
+    30,
     Math.round((isMultiline ? maxLineLen : text.length) * charMultiplier + basePadding + badgePadding + iconPadding + linkPadding)
   );
   const height = isMultiline
-    ? Math.max(48, lines.length * 22 + 8)
-    : (node.fontSize === 'large' ? 44 : node.fontSize === 'small' ? 34 : 38);
+    ? Math.max(26, lines.length * 20 + 4)
+    : (node.fontSize === 'large' ? 28 : node.fontSize === 'small' ? 20 : 24);
 
   return { width, height };
 }
@@ -79,8 +74,8 @@ export function calculateMindMapLayout(
     layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'timeline' | 'free';
   } = {}
 ): Map<string, ComputedNodeLayout> {
-  const horizontalGap = options.horizontalGap ?? 100;
-  const verticalGap = options.verticalGap ?? 18;
+  const horizontalGap = options.horizontalGap ?? 65;
+  const verticalGap = options.verticalGap ?? 8;
   const rootX = options.rootX ?? 0;
   const rootY = options.rootY ?? 0;
 
@@ -457,9 +452,13 @@ export function getBezierPath(
   endY: number
 ): string {
   const dx = Math.abs(endX - startX);
+  const dy = Math.abs(endY - startY);
   const direction = endX >= startX ? 1 : -1;
-  const cpX = startX + dx * 0.5 * direction;
-  return `M ${startX} ${startY} C ${cpX} ${startY}, ${cpX} ${endY}, ${endX} ${endY}`;
+  // Curvatura adaptativa Whimsical: para distâncias verticais maiores, projeta uma curva mais aberta e orgânica
+  const curvature = Math.max(dx * 0.44, Math.min(dx * 0.82, dy * 0.22));
+  const cp1X = startX + curvature * direction;
+  const cp2X = endX - curvature * direction;
+  return `M ${startX} ${startY} C ${cp1X} ${startY}, ${cp2X} ${endY}, ${endX} ${endY}`;
 }
 
 /**
