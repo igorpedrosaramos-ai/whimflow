@@ -4,13 +4,8 @@ import {
   X, 
   Layers, 
   GitBranch, 
-  FileText, 
-  Clock, 
-  CheckCircle2, 
-  ShieldCheck, 
-  Sparkles,
-  Zap,
-  AlignLeft
+  Share2,
+  Type
 } from 'lucide-react';
 import { Board, MindMapNode } from '../types';
 
@@ -136,7 +131,7 @@ export const BoardStatsModal: React.FC<BoardStatsModalProps> = ({
                 Métricas e Estatísticas do Quadro
               </h2>
               <span style={{ fontSize: '12px', color: '#94a3b8' }}>
-                Visão executiva da estrutura e capacidade (Objetos Ilimitados Pro)
+                Visão estrutural e densidade do mapa • {totalObjects} objetos ativos
               </span>
             </div>
           </div>
@@ -159,35 +154,6 @@ export const BoardStatsModal: React.FC<BoardStatsModalProps> = ({
 
         {/* Conteúdo */}
         <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '22px' }}>
-          {/* Banner de Capacidade Pro Ilimitada */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              backgroundColor: isDark ? '#1a2233' : '#f0fdf4',
-              border: isDark ? '1px solid #27374d' : '1px solid #bbf7d0'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <ShieldCheck size={20} color="#10b981" />
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: isDark ? '#f8fafc' : '#14532d' }}>
-                  Plano Individual Completo • Capacidade Ilimitada
-                </div>
-                <div style={{ fontSize: '11.5px', color: isDark ? '#94a3b8' : '#15803d' }}>
-                  Sem limites de 50 objetos mensais e sem marcas d'água em exportações
-                </div>
-              </div>
-            </div>
-
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#10b981' }}>
-              {totalObjects} objetos ativos
-            </span>
-          </div>
-
           {/* Grid de Métricas Principais */}
           <div
             style={{
@@ -244,6 +210,14 @@ export const BoardStatsModal: React.FC<BoardStatsModalProps> = ({
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '6px', backgroundColor: isDark ? '#18202d' : '#f8fafc', border: isDark ? '1px solid #273142' : '1px solid #e2e8f0' }}>
                 <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Share2 size={15} color="#6366f1" />
+                  Conexões Transversais
+                </span>
+                <strong style={{ fontSize: '14px' }}>{(board.connectors || []).length}</strong>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '6px', backgroundColor: isDark ? '#18202d' : '#f8fafc', border: isDark ? '1px solid #273142' : '1px solid #e2e8f0' }}>
+                <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Layers size={15} color="#f59e0b" />
                   Notas Adesivas (Stickies)
                 </span>
@@ -252,18 +226,10 @@ export const BoardStatsModal: React.FC<BoardStatsModalProps> = ({
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '6px', backgroundColor: isDark ? '#18202d' : '#f8fafc', border: isDark ? '1px solid #273142' : '1px solid #e2e8f0' }}>
                 <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <CheckCircle2 size={15} color="#10b981" />
-                  Controles / Wireframes
+                  <Type size={15} color="#06b6d4" />
+                  Textos e Rascunhos Livres
                 </span>
-                <strong style={{ fontSize: '14px' }}>{wireframes.length} ({checkedWireframes} marcados)</strong>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '6px', backgroundColor: isDark ? '#18202d' : '#f8fafc', border: isDark ? '1px solid #273142' : '1px solid #e2e8f0' }}>
-                <span style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlignLeft size={15} color="#06b6d4" />
-                  Traços Livres (Desenho)
-                </span>
-                <strong style={{ fontSize: '14px' }}>{drawings.length}</strong>
+                <strong style={{ fontSize: '14px' }}>{(board.texts?.length || 0) + (drawings?.length || 0)}</strong>
               </div>
             </div>
           </div>

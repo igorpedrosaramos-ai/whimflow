@@ -252,7 +252,7 @@ export const TopNav: React.FC<TopNavProps> = ({
               fontWeight: 500,
               cursor: 'pointer'
             }}
-            title="Estatísticas e Métricas do Quadro (Objetos Ilimitados Pro)"
+            title="Estatísticas e Métricas do Quadro"
           >
             <BarChart2 size={13} color="#818cf8" />
             <span>{totalObjects} objetos</span>
