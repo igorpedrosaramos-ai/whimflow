@@ -172,7 +172,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
             style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, cursor: 'pointer' }}
           >
             <Users size={14} color="#818cf8" />
-            <span>Everyone at {workspaceName}</span>
+            <span>Todos em {workspaceName}</span>
             <ChevronDown size={13} color="#94a3b8" />
           </div>
           <Star size={14} color="#94a3b8" style={{ cursor: 'pointer', marginLeft: '4px' }} />

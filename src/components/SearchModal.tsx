@@ -257,12 +257,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Layout size={16} color="#64748b" />
                   <span style={{ fontSize: '13.5px', fontWeight: 500 }}>
-                    Templates & color themes
+                    Modelos & Temas
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#94a3b8' }}>
                   <Users size={12} />
-                  <span>Everyone at {workspaceName}</span>
+                  <span>Todos em {workspaceName}</span>
                 </div>
               </div>
             )}
@@ -344,12 +344,12 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                     {isPrivate ? (
                       <>
                         <Lock size={12} color="#94a3b8" />
-                        <span>Private</span>
+                        <span>Privado</span>
                       </>
                     ) : (
                       <>
                         <Users size={12} color="#94a3b8" />
-                        <span>Everyone at {workspaceName}</span>
+                        <span>Todos em {workspaceName}</span>
                       </>
                     )}
                   </div>

@@ -149,7 +149,7 @@ export function useBoardStorage(onBoardOpened?: (board: Board) => void) {
   const canRedo = (boardHistories[activeBoardId]?.future?.length || 0) > 0;
 
   // Criar novo quadro limpo
-  const handleCreateNewBoard = useCallback((title: string = 'untitled'): Board => {
+  const handleCreateNewBoard = useCallback((title: string = 'Quadro sem título'): Board => {
     const newBoardId = `board-${Date.now()}`;
     const newBoard: Board = {
       id: newBoardId,
@@ -160,7 +160,7 @@ export function useBoardStorage(onBoardOpened?: (board: Board) => void) {
       mindMapNodes: [
         {
           id: 'root',
-          text: 'Central Idea',
+          text: 'Ideia Central',
           x: 0,
           y: 0,
           width: 220,

@@ -429,7 +429,7 @@ Adotaremos renderização condicional dentro do container raiz comum, centraliza
             title="Voltar ao Dashboard de Projetos"
           >
             <Users size={14} color="#0284c7" />
-            <span>Everyone at {workspaceName}</span>
+            <span>Todos em {workspaceName}</span>
           </button>
 
           <span style={{ color: '#94a3b8' }}>/</span>

@@ -328,7 +328,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               }}
             >
               <Users size={15} color={categoryFilter === 'all' ? '#818cf8' : '#64748b'} />
-              <span>Everyone at {workspaceName}</span>
+              <span>Todos em {workspaceName}</span>
             </button>
           )}
 
@@ -695,11 +695,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </svg>
               </button>
             )}
-            <span style={{ color: isDark ? '#94a3b8' : '#64748b', cursor: 'pointer' }}>Teams</span>
+            <span style={{ color: isDark ? '#94a3b8' : '#64748b', cursor: 'pointer' }}>Equipes</span>
             <span style={{ color: '#94a3b8' }}>/</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: isDark ? '#f8fafc' : '#0f172a' }}>
               <Users size={15} color="#818cf8" />
-              <span>Everyone at {workspaceName}</span>
+              <span>Todos em {workspaceName}</span>
               <ChevronDown size={14} color="#94a3b8" />
             </div>
             <Star size={14} color="#94a3b8" style={{ cursor: 'pointer', marginLeft: '4px' }} />

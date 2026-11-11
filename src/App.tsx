@@ -333,7 +333,14 @@ export const App: React.FC = () => {
     } else {
       routerNavigate(`/board/${encodeURIComponent(newId)}`);
     }
-    setTimeout(() => fitView(newBoard.mindMapNodes), 100);
+    setTimeout(() => {
+      fitView({
+        nodes: newBoard.mindMapNodes,
+        stickies: newBoard.stickies,
+        wireframes: newBoard.wireframes,
+        shapes: newBoard.shapes
+      });
+    }, 120);
   }, [fitView, setBoards, setActiveBoardId, routerNavigate]);
 
   // Gestão de Seções de Apresentação
@@ -729,7 +736,14 @@ export const App: React.FC = () => {
     setBoards(prev => [newBoard, ...prev]);
     setActiveBoardId(newBoardId);
     routerNavigate(`/board/${encodeURIComponent(newBoardId)}`);
-    setTimeout(() => fitView(newBoard.mindMapNodes), 100);
+    setTimeout(() => {
+      fitView({
+        nodes: newBoard.mindMapNodes,
+        stickies: newBoard.stickies,
+        wireframes: newBoard.wireframes,
+        shapes: newBoard.shapes
+      });
+    }, 120);
   };
 
   // Alinhamento em Lote dos Nós com Cálculo Geométrico e Fixação de Coordenadas Visuais
@@ -1314,9 +1328,11 @@ export const App: React.FC = () => {
               !b.mindMapNodes[0] ||
               !b.mindMapNodes[0].text ||
               !b.mindMapNodes[0].text.trim() ||
+              b.mindMapNodes[0].text === 'Ideia Central' ||
               b.mindMapNodes[0].text === 'Central Idea' ||
               b.mindMapNodes[0].text === 'Sem título' ||
-              b.mindMapNodes[0].text === 'untitled'
+              b.mindMapNodes[0].text === 'untitled' ||
+              b.mindMapNodes[0].text === 'Quadro sem título'
             );
 
             if (isBoardEffectivelyEmpty) {

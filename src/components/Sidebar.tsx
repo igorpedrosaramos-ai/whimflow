@@ -267,7 +267,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title="Ver todos os quadros no Dashboard"
           >
             <Users size={14} color="#818cf8" />
-            <span>Everyone at {workspaceName}</span>
+            <span>Todos em {workspaceName}</span>
           </button>
         )}
 

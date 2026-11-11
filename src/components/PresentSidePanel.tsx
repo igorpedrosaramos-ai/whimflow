@@ -88,10 +88,10 @@ export const PresentSidePanel: React.FC<PresentSidePanelProps> = ({
             title="Adicionar Seção / Slide"
           >
             <Plus size={13} />
-            <span>Add section</span>
+            <span>Adicionar seção</span>
           </button>
 
-          {/* Botão ▷ Present */}
+          {/* Botão ▷ Apresentar */}
           <button
             onClick={onStartPresentation}
             style={{
@@ -111,7 +111,7 @@ export const PresentSidePanel: React.FC<PresentSidePanelProps> = ({
             title="Iniciar Apresentação"
           >
             <Play size={12} fill="#ffffff" />
-            <span>Present</span>
+            <span>Apresentar</span>
           </button>
 
           {/* Fechar */}
@@ -138,7 +138,7 @@ export const PresentSidePanel: React.FC<PresentSidePanelProps> = ({
         {sections.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '24px 12px', color: '#94a3b8', fontSize: '12.5px' }}>
             Nenhuma seção adicionada.<br />
-            Clique em <b>+ Add section</b> para criar slides de apresentação.
+            Clique em <b>+ Adicionar seção</b> para criar slides de apresentação.
           </div>
         ) : (
           sections.map((section, idx) => (
@@ -162,7 +162,7 @@ export const PresentSidePanel: React.FC<PresentSidePanelProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Folder size={15} color="#7c3aed" />
                 <span style={{ fontSize: '13px', fontWeight: 500, color: isDark ? '#f1f5f9' : '#1e293b' }}>
-                  {section.title || `untitled ${idx + 1}`}
+                  {section.title || `Seção ${idx + 1}`}
                 </span>
               </div>
 

@@ -1,6 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { MindMapNode } from '../types';
+import { MindMapNode, StickyNote, WireframeItem, FlowShape } from '../types';
 import { calculateMindMapLayout } from '../utils/treeLayout';
+
+export interface FitViewElements {
+  nodes?: MindMapNode[];
+  stickies?: StickyNote[];
+  wireframes?: WireframeItem[];
+  shapes?: FlowShape[];
+}
 
 interface UseCanvasNavigationProps {
   nodes: MindMapNode[];
@@ -24,34 +31,103 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
   const isSpacePressed = useRef(false);
   const panStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Enquadramento inteligente e automático (Fit-to-View)
-  const fitView = useCallback((nodesToFit?: MindMapNode[]) => {
-    const targetNodes = nodesToFit || nodes;
-    if (!targetNodes || targetNodes.length === 0) return;
+  // Enquadramento inteligente e automático (Fit-to-View) para nós, notas, wireframes e formas
+  const fitView = useCallback((elementsToFit?: MindMapNode[] | FitViewElements) => {
+    let targetNodes: MindMapNode[] = [];
+    let targetStickies: StickyNote[] = [];
+    let targetWireframes: WireframeItem[] = [];
+    let targetShapes: FlowShape[] = [];
 
-    const root = targetNodes.find(n => n.side === 'root') || targetNodes[0];
-    const layout = calculateMindMapLayout(targetNodes, root.id, {
-      horizontalGap: 100,
-      verticalGap: 18,
-      rootX: 0,
-      rootY: 0
-    });
+    if (Array.isArray(elementsToFit)) {
+      targetNodes = elementsToFit;
+    } else if (elementsToFit && typeof elementsToFit === 'object') {
+      targetNodes = elementsToFit.nodes || [];
+      targetStickies = elementsToFit.stickies || [];
+      targetWireframes = elementsToFit.wireframes || [];
+      targetShapes = elementsToFit.shapes || [];
+    } else {
+      targetNodes = nodes || [];
+    }
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    targetNodes.forEach(node => {
-      const computed = layout.get(node.id);
-      const x = computed ? computed.x : (node.x || 0);
-      const y = computed ? computed.y : (node.y || 0);
-      const w = computed ? computed.width : 120;
-      const h = computed ? computed.height : 38;
 
-      if (x < minX) minX = x;
-      if (y < minY) minY = y;
-      if (x + w > maxX) maxX = x + w;
-      if (y + h > maxY) maxY = y + h;
-    });
+    // 1. Processar nós de mapa mental (se existirem)
+    if (targetNodes.length > 0) {
+      const root = targetNodes.find(n => n.side === 'root') || targetNodes[0];
+      const layout = calculateMindMapLayout(targetNodes, root.id, {
+        horizontalGap: 100,
+        verticalGap: 18,
+        rootX: 0,
+        rootY: 0
+      });
 
-    if (!isFinite(minX)) return;
+      targetNodes.forEach(node => {
+        const computed = layout.get(node.id);
+        const x = computed ? computed.x : (node.x || 0);
+        const y = computed ? computed.y : (node.y || 0);
+        const w = computed ? computed.width : (node.width || 120);
+        const h = computed ? computed.height : (node.height || 38);
+
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
+      });
+    }
+
+    // 2. Processar notas adesivas (se existirem)
+    if (targetStickies.length > 0) {
+      targetStickies.forEach(s => {
+        const x = s.x || 0;
+        const y = s.y || 0;
+        const w = s.width || 180;
+        const h = s.height || 140;
+
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
+      });
+    }
+
+    // 3. Processar wireframes (se existirem)
+    if (targetWireframes.length > 0) {
+      targetWireframes.forEach(w => {
+        const x = w.x || 0;
+        const y = w.y || 0;
+        const width = w.width || 180;
+        const height = w.height || 100;
+
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + width > maxX) maxX = x + width;
+        if (y + height > maxY) maxY = y + height;
+      });
+    }
+
+    // 4. Processar formas geométricas (se existirem)
+    if (targetShapes.length > 0) {
+      targetShapes.forEach(s => {
+        const x = s.x || 0;
+        const y = s.y || 0;
+        const w = s.width || 120;
+        const h = s.height || 80;
+
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + w > maxX) maxX = x + w;
+        if (y + h > maxY) maxY = y + h;
+      });
+    }
+
+    if (!isFinite(minX)) {
+      // Fallback para centralização padrão caso não haja elementos
+      const w = typeof window !== 'undefined' ? window.innerWidth : 1280;
+      const h = typeof window !== 'undefined' ? window.innerHeight : 800;
+      setPan({ x: Math.round(w / 2 - 110), y: Math.round(h / 2 - 30) });
+      setZoom(1.0);
+      return;
+    }
 
     const width = window.innerWidth;
     const height = window.innerHeight;
@@ -70,7 +146,7 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
 
     const scaleX = availWidth / mapWidth;
     const scaleY = availHeight / mapHeight;
-    const newZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.22), 1.05);
+    const newZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.25), 1.0);
 
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;

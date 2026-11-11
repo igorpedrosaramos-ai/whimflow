@@ -132,7 +132,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           <span>Equipes</span>
           <span style={{ color: '#94a3b8' }}>/</span>
           <Users size={14} color="#818cf8" />
-          <span>Everyone at {workspaceName}</span>
+          <span>Todos em {workspaceName}</span>
         </div>
 
         {/* Separador de Navegação */}
@@ -402,10 +402,10 @@ export const TopNav: React.FC<TopNavProps> = ({
           title="Compartilhar Link ou Exportar"
         >
           <Share2 size={13} />
-          <span>Share</span>
+          <span>Compartilhar</span>
         </button>
 
-        {/* Botão ▷ Present */}
+        {/* Botão ▷ Apresentar */}
         <button
           id="btn-topnav-present"
           onClick={onStartPresentation}
@@ -425,7 +425,7 @@ export const TopNav: React.FC<TopNavProps> = ({
           title="Apresentação em Tela Cheia (F5)"
         >
           <Play size={12} fill="currentColor" />
-          <span>Present</span>
+          <span>Apresentar</span>
         </button>
 
         {/* Busca */}
