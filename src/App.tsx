@@ -1207,17 +1207,72 @@ export const App: React.FC = () => {
     )}
 
   {/* Drawer do Agente IA Turbi */}
+      {/* Drawer do Agente IA Turbi */}
       <AgentDrawer
         isOpen={isAgentDrawerOpen}
         onClose={() => setIsAgentDrawerOpen(false)}
-        onInsertNodesToCurrentBoard={(newNodes) => {
-          updateActiveBoard(b => ({
-            ...b,
-            mindMapNodes: [...b.mindMapNodes, ...newNodes]
-          }));
+        onInsertNodesToCurrentBoard={(newNodes, diagramTitle) => {
+          if (!newNodes || newNodes.length === 0) return;
+
+          let targetNodesToFit = newNodes;
+
+          updateActiveBoard(b => {
+            // Verifica se o quadro atual está vazio ou tem apenas o nó raiz em branco/padrão
+            const isBoardEffectivelyEmpty = b.mindMapNodes.length <= 1 && (
+              !b.mindMapNodes[0] ||
+              !b.mindMapNodes[0].text ||
+              !b.mindMapNodes[0].text.trim() ||
+              b.mindMapNodes[0].text === 'Central Idea' ||
+              b.mindMapNodes[0].text === 'Sem título' ||
+              b.mindMapNodes[0].text === 'untitled'
+            );
+
+            if (isBoardEffectivelyEmpty) {
+              // Substituição limpa e completa: o mapa mental da IA assume o quadro perfeitamente
+              targetNodesToFit = newNodes;
+              const shouldUpdateTitle = !b.title || b.title === 'Sem título' || b.title === 'untitled' || b.title === 'Quadro sem título';
+              return {
+                ...b,
+                title: shouldUpdateTitle ? (diagramTitle || b.title) : b.title,
+                mindMapNodes: newNodes
+              };
+            }
+
+            // Se o quadro já possui outros nós de trabalho, adiciona como nova árvore sem colisão de IDs
+            const prefix = `ai-${Date.now()}`;
+            const idMap = new Map<string, string>();
+            newNodes.forEach(n => idMap.set(n.id, `${prefix}-${n.id}`));
+
+            // Calcula deslocamento horizontal para posicionar ao lado da estrutura existente
+            const maxX = Math.max(...b.mindMapNodes.map(n => (n.x || 0) + (n.width || 200)), 350);
+            const offsetX = maxX + 280;
+
+            const adjustedNewNodes: MindMapNode[] = newNodes.map(n => ({
+              ...n,
+              id: idMap.get(n.id) || `${prefix}-${n.id}`,
+              parentId: n.parentId ? (idMap.get(n.parentId) || `${prefix}-${n.parentId}`) : null,
+              childrenIds: (n.childrenIds || []).map(cid => idMap.get(cid) || `${prefix}-${cid}`),
+              x: (n.x || 0) + offsetX,
+              side: (n.side === 'left' || n.side === 'right' || n.side === 'root') ? n.side : undefined
+            }));
+
+            targetNodesToFit = [...b.mindMapNodes, ...adjustedNewNodes];
+
+            return {
+              ...b,
+              mindMapNodes: targetNodesToFit
+            };
+          });
+
+          // Ajusta a câmera do canvas com visualização imediata da nova estrutura
+          setTimeout(() => {
+            fitView(targetNodesToFit);
+          }, 100);
+          showToast('Estrutura da IA inserida no canvas com sucesso!', 'success');
         }}
         onCreateNewBoardWithNodes={(title, nodes) => {
           handleGenerateFromAgent(title, title, nodes);
+          showToast(`Novo quadro "${title}" criado com sucesso!`, 'success');
         }}
         theme={theme}
         workspaceName="teste"

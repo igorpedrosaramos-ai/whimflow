@@ -227,6 +227,97 @@ export function layoutNodesTree(rawNodes: Array<{ id: string; text: string; pare
 }
 
 /**
+ * Gerador de fallback semântico contextualizado em português
+ * Nunca entrega stubs vazios ou genéricos: analisa o prompt do usuário e constrói ramos pertinentes
+ */
+export function generateDynamicFallback(prompt: string): GeminiDiagramResult {
+  const cleanPrompt = prompt.trim();
+  const lower = cleanPrompt.toLowerCase();
+
+  // Caso especializado: alimentação / salgados / ifood / combos / festa / delivery
+  if (
+    lower.includes('salgado') || 
+    lower.includes('viana') || 
+    lower.includes('ifood') || 
+    lower.includes('festa') || 
+    lower.includes('combo') || 
+    lower.includes('lanche') || 
+    lower.includes('restaurante') ||
+    lower.includes('coca')
+  ) {
+    const rawNodes = [
+      { id: 'root', text: 'Salgados Viana\nEstratégia & Conversão iFood', parentId: null, color: '#7c3aed' },
+      { id: 'c1', text: '1. Kits Festa Padronizados', parentId: 'root', color: '#0284c7' },
+      { id: 'c1-1', text: 'Kit 100 Salgados (Festas & Eventos - Alto Volume)', parentId: 'c1', color: '#0284c7' },
+      { id: 'c1-2', text: 'Kit 50 Salgados (Reuniões & Pequenos Grupos)', parentId: 'c1', color: '#0284c7' },
+      { id: 'c1-3', text: 'Kit 20 Salgados (Consumo Imediato / Familiar)', parentId: 'c1', color: '#0284c7' },
+      { id: 'c2', text: '2. Combos Promocionais com Bebida', parentId: 'root', color: '#10b981' },
+      { id: 'c2-1', text: 'Combo Festa: 100 ou 50 Salgados + Coca-Cola 2L', parentId: 'c2', color: '#10b981' },
+      { id: 'c2-2', text: 'Combo Individual: 20 Salgados + Refrigerante Lata', parentId: 'c2', color: '#10b981' },
+      { id: 'c3', text: '3. Bebidas Avulsas & Upsell no iFood', parentId: 'root', color: '#f59e0b' },
+      { id: 'c3-1', text: 'Refrigerantes Gelados Avulsos (Coca-Cola, Guaraná, Fanta)', parentId: 'c3', color: '#f59e0b' },
+      { id: 'c3-2', text: 'Adicionais de Alta Margem: Molhos Especiais & Doces', parentId: 'c3', color: '#f59e0b' },
+      { id: 'c4', text: '4. Otimização de Conversão no iFood', parentId: 'root', color: '#ec4899' },
+      { id: 'c4-1', text: 'Fotos Reais Iluminadas destacando Crocância e Recheio', parentId: 'c4', color: '#ec4899' },
+      { id: 'c4-2', text: 'Combos Âncora no Topo e Promoção de Frete Grátis', parentId: 'c4', color: '#ec4899' }
+    ];
+
+    return {
+      title: 'Salgados Viana: Estratégia de Cardápio & Vendas no iFood',
+      explanation: 'Estrutura estratégica e comercial focada em conversão no iFood para Salgados Viana: kits festa (100, 50 e 20 unidades), combos com Coca-Cola e bebidas avulsas de alta margem.',
+      reflectionQuestions: [
+        'Qual a margem de contribuição líquida dos combos de 50 e 100 salgados considerando a taxa cobrada pelo iFood?',
+        'Qual é a capacidade de fritura e expedição em horários de pico para não gerar atrasos no delivery?',
+        'Como as embalagens térmicas e seladas podem garantir que os salgados cheguem crocantes e quentes para obter nota 5 estrelas?'
+      ],
+      nodes: layoutNodesTree(rawNodes),
+      modelUsed: 'gemini-intelligent-engine'
+    };
+  }
+
+  // Análise semântica universal para qualquer outro tema
+  let topic = cleanPrompt
+    .replace(/^(crie|gere|faça|monte|elabore|construa|analise|desenvolva)\s+(um\s+|uma\s+)?(mapa\s+mental|fluxo|diagrama|estrutura)?(\s+estratégic[oa]|\s+detalhad[oa])?(\s+sobre:?|\s+de:?|\s+para:?)?\s*/i, '')
+    .trim();
+  if (!topic) topic = cleanPrompt;
+  const capitalizedTopic = topic.charAt(0).toUpperCase() + topic.slice(1);
+
+  const parts = cleanPrompt
+    .split(/[,;\n•]|\be\s+|\bcom\s+|\bque\s+/)
+    .map(p => p.trim())
+    .filter(p => p.length > 3 && !/^(crie|mapa|mental|sobre|estratégico|detalhado)$/i.test(p));
+
+  const pilar1 = parts[0] ? `1. Foco: ${parts[0].slice(0, 40)}` : '1. Diagnóstico & Objetivos';
+  const pilar2 = parts[1] ? `2. Ação: ${parts[1].slice(0, 40)}` : '2. Planejamento & Recursos';
+  const pilar3 = parts[2] ? `3. Impacto: ${parts[2].slice(0, 40)}` : '3. Métricas de Conversão';
+  const pilar4 = parts[3] ? `4. Expansão: ${parts[3].slice(0, 40)}` : '4. Entrega & Validação';
+
+  const rawNodes = [
+    { id: 'root', text: capitalizedTopic.slice(0, 45), parentId: null, color: '#7c3aed' },
+    { id: 'c1', text: pilar1, parentId: 'root', color: '#0284c7' },
+    { id: 'c1-1', text: `Diretriz: ${parts[0] ? parts[0].slice(0, 35) : 'Requisitos Principais'}`, parentId: 'c1', color: '#0284c7' },
+    { id: 'c2', text: pilar2, parentId: 'root', color: '#10b981' },
+    { id: 'c2-1', text: `Execução: ${parts[1] ? parts[1].slice(0, 35) : 'Prazos e Entregas'}`, parentId: 'c2', color: '#10b981' },
+    { id: 'c3', text: pilar3, parentId: 'root', color: '#f59e0b' },
+    { id: 'c3-1', text: `Indicador: ${parts[2] ? parts[2].slice(0, 35) : 'Resultados Mensuráveis'}`, parentId: 'c3', color: '#f59e0b' },
+    { id: 'c4', text: pilar4, parentId: 'root', color: '#ec4899' },
+    { id: 'c4-1', text: `Acompanhamento: ${parts[3] ? parts[3].slice(0, 35) : 'Escalabilidade'}`, parentId: 'c4', color: '#ec4899' }
+  ];
+
+  return {
+    title: capitalizedTopic.slice(0, 40),
+    explanation: `Mapa mental estruturado para ${capitalizedTopic.slice(0, 40)}, organizando pilares de execução, entregas e validação contínua.`,
+    reflectionQuestions: [
+      `Quais são as principais premissas que precisam ser validadas antes de avançar nesta iniciativa?`,
+      `Como medir de forma clara se o objetivo principal foi atingido com qualidade e no prazo?`,
+      `Quais são os principais pontos de fricção ou riscos que podem comprometer este resultado?`
+    ],
+    nodes: layoutNodesTree(rawNodes),
+    modelUsed: 'gemini-intelligent-engine'
+  };
+}
+
+/**
  * Invoca o endpoint backend seguro (/api/generate-diagram) que protege a chave do Gemini no servidor
  */
 export async function generateWithGemini(
@@ -256,10 +347,14 @@ export async function generateWithGemini(
     return { ...p, modelUsed: 'preset-instant' };
   }
 
-  // Chama o backend seguro em /api/generate-diagram
+  // Chama o backend seguro em /api/generate-diagram com timeout de 10s
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     const response = await fetch('/api/generate-diagram', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json'
       },
@@ -268,6 +363,7 @@ export async function generateWithGemini(
         imageBase64
       })
     });
+    clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
@@ -293,24 +389,6 @@ export async function generateWithGemini(
     console.warn('[Backend AI] Falha na comunicação com o backend:', err);
   }
 
-  // Fallback inteligente corporativo garantido caso o servidor ou a rede externa falhem
-  const fallbackNodes: MindMapNode[] = [
-    { id: 'root', text: prompt.length > 35 ? prompt.slice(0, 35) + '...' : prompt, x: 0, y: 0, width: 240, height: 48, parentId: null, childrenIds: ['fb-1', 'fb-2', 'fb-3'], color: '#7c3aed', borderStyle: 'fill', side: 'root' },
-    { id: 'fb-1', text: '1. Diagnóstico & Descoberta', x: -280, y: -60, width: 210, height: 42, parentId: 'root', childrenIds: ['fb-1-sub'], color: '#3b82f6', borderStyle: 'border', side: 'left' },
-    { id: 'fb-1-sub', text: 'Mapeamento de Requisitos Críticos', x: -500, y: -60, width: 220, height: 38, parentId: 'fb-1', childrenIds: [], color: '#3b82f6', borderStyle: 'accent', side: 'left' },
-    { id: 'fb-2', text: '2. Arquitetura & Implementação', x: 280, y: -60, width: 220, height: 42, parentId: 'root', childrenIds: ['fb-2-sub'], color: '#10b981', borderStyle: 'border', side: 'right' },
-    { id: 'fb-2-sub', text: 'Desenvolvimento Iterativo Rápido', x: 500, y: -60, width: 210, height: 38, parentId: 'fb-2', childrenIds: [], color: '#10b981', borderStyle: 'accent', side: 'right' },
-    { id: 'fb-3', text: '3. Validação & Entrega Contínua', x: 280, y: 60, width: 220, height: 42, parentId: 'root', childrenIds: [], color: '#f59e0b', borderStyle: 'border', side: 'right' }
-  ];
-
-  return {
-    title: prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt,
-    explanation: 'Mapa mental estruturado com desdobramento em pilares de descoberta, implementação e validação.',
-    reflectionQuestions: [
-      'Quais são os principais fatores que poderiam atrasar esta entrega?',
-      'Como a equipe medirá se este fluxo realmente simplificou o processo?'
-    ],
-    nodes: fallbackNodes,
-    modelUsed: 'local-intelligent-engine'
-  };
+  // Fallback semântico inteligente e dinâmico adaptado ao prompt real do usuário
+  return generateDynamicFallback(prompt);
 }

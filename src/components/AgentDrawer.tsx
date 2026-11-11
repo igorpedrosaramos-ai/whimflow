@@ -280,6 +280,8 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
           </div>
 
           <button
+            id="btn-close-agent"
+            data-testid="btn-close-agent"
             onClick={onClose}
             style={{
               background: 'transparent',
@@ -492,6 +494,8 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
 
                       <div style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
                         <button
+                          id="btn-insert-to-canvas"
+                          data-testid="btn-insert-to-canvas"
                           onClick={() => {
                             if (msg.generatedDiagram) {
                               onInsertNodesToCurrentBoard(msg.generatedDiagram.nodes, msg.generatedDiagram.title);
@@ -519,6 +523,8 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
                         </button>
 
                         <button
+                          id="btn-create-new-board-ai"
+                          data-testid="btn-create-new-board-ai"
                           onClick={() => {
                             if (msg.generatedDiagram) {
                               onCreateNewBoardWithNodes(msg.generatedDiagram.title, msg.generatedDiagram.nodes);
@@ -787,6 +793,8 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
 
             {/* Textarea para Pergunta ao Assistente IA em Português */}
             <textarea
+              id="agent-prompt-input"
+              data-testid="agent-prompt-input"
               ref={inputRef}
               rows={2}
               value={prompt}
@@ -841,6 +849,8 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
 
               {/* Botão de Envio Teal com Seta ↑ */}
               <button
+                id="btn-agent-send"
+                data-testid="btn-agent-send"
                 type="button"
                 onClick={() => handleSendPrompt(prompt)}
                 disabled={isGenerating || (!prompt.trim() && !attachedFile)}

@@ -3,12 +3,12 @@
 import fs from 'fs';
 import path from 'path';
 
-// Modelos Gemini validados com suporte ativo a generateContent
+// Modelos Gemini validados com suporte ativo a generateContent (ordenados por menor latência)
 const GEMINI_MODELS = [
-  'gemini-3.5-flash-lite',
   'gemini-3.1-flash-lite-preview',
-  'gemini-3.8-flash',
-  'gemini-3.5-flash'
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-flash-lite-latest'
 ];
 
 export async function handleGenerateDiagram(body: any, apiKey?: string) {
@@ -95,10 +95,13 @@ Regras:
   let lastError = null;
 
   for (const model of GEMINI_MODELS) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
       const apiRes = await fetch(url, {
         method: 'POST',
+        signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
@@ -110,6 +113,7 @@ Regras:
           }
         })
       });
+      clearTimeout(timeoutId);
 
       if (!apiRes.ok) {
         const errJson: any = await apiRes.json().catch(() => ({}));
