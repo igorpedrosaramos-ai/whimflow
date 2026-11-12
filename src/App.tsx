@@ -179,8 +179,11 @@ export const App: React.FC = () => {
     const cat = categories.find(c => c.id === categoryId);
     setCategories(prev => prev.filter(c => c.id !== categoryId));
     setBoards(prev => prev.map(b => b.categoryId === categoryId ? { ...b, categoryId: undefined, updatedAt: new Date().toISOString() } : b));
+    if (route.type === 'category' && route.categoryId === categoryId) {
+      routerNavigate('/');
+    }
     showToast(`Categoria "${cat?.name || ''}" excluída.`, 'info');
-  }, [categories, setBoards, showToast]);
+  }, [categories, route, routerNavigate, setBoards, showToast]);
 
   const handleMoveBoardCategory = useCallback((boardId: string, categoryId?: string) => {
     const targetBoard = boards.find(b => b.id === boardId);
@@ -257,13 +260,18 @@ export const App: React.FC = () => {
 
   // Sincroniza o boardId ativo quando o usuário acessa ou navega para /board/:id, /doc/:id ou /present/:id
   useEffect(() => {
-    if (route.boardId && route.boardId !== activeBoardId) {
+    if (route.boardId && boards.length > 0) {
       const exists = boards.some(b => b.id === route.boardId);
       if (exists) {
-        setActiveBoardId(route.boardId);
+        if (route.boardId !== activeBoardId) {
+          setActiveBoardId(route.boardId);
+        }
+      } else {
+        showToast('Quadro não encontrado. Redirecionando para o painel principal.', 'error');
+        routerNavigate('/');
       }
     }
-  }, [route.boardId, activeBoardId, boards, setActiveBoardId]);
+  }, [route.boardId, activeBoardId, boards, setActiveBoardId, routerNavigate, showToast]);
 
   // Atualização dinâmica do título da página no navegador de acordo com a rota e o quadro
   useEffect(() => {

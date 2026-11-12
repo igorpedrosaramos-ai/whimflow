@@ -122,7 +122,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search..."
+              placeholder="Buscar quadros, notas e documentos..."
               value={query}
               onChange={e => setQuery(e.target.value)}
               style={{

@@ -109,13 +109,14 @@ export function parseRoute(pathname: string = window.location.pathname, search: 
 export function navigate(to: string, options?: { replace?: boolean }) {
   if (typeof window === 'undefined') return;
 
+  const normalizedTo = to.startsWith('/') ? to : '/' + to;
   const currentFull = window.location.pathname + window.location.search;
-  if (currentFull === to) return;
+  if (currentFull === normalizedTo) return;
 
   if (options?.replace) {
-    window.history.replaceState({}, '', to);
+    window.history.replaceState({}, '', normalizedTo);
   } else {
-    window.history.pushState({}, '', to);
+    window.history.pushState({}, '', normalizedTo);
   }
 
   window.dispatchEvent(new Event('popstate'));

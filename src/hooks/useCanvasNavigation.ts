@@ -216,19 +216,23 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
       return;
     }
 
+    const currentSafeZoom = zoom > 0 && isFinite(zoom) ? zoom : 1.0;
     const zoomFactor = 1.08;
     const isZoomIn = e.deltaY < 0;
-    const newZoom = isZoomIn ? zoom * zoomFactor : zoom / zoomFactor;
+    const newZoom = isZoomIn ? currentSafeZoom * zoomFactor : currentSafeZoom / zoomFactor;
     const clampedZoom = Math.min(Math.max(newZoom, 0.2), 2.5);
 
-    const mouseX = e.clientX;
-    const mouseY = e.clientY;
+    const mouseX = isFinite(e.clientX) ? e.clientX : 0;
+    const mouseY = isFinite(e.clientY) ? e.clientY : 0;
 
-    const newPanX = mouseX - (mouseX - pan.x) * (clampedZoom / zoom);
-    const newPanY = mouseY - (mouseY - pan.y) * (clampedZoom / zoom);
+    const newPanX = mouseX - (mouseX - pan.x) * (clampedZoom / currentSafeZoom);
+    const newPanY = mouseY - (mouseY - pan.y) * (clampedZoom / currentSafeZoom);
 
     setZoom(Number(clampedZoom.toFixed(3)));
-    setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
+    setPan({
+      x: isFinite(newPanX) ? Math.round(newPanX) : pan.x,
+      y: isFinite(newPanY) ? Math.round(newPanY) : pan.y
+    });
   }, [zoom, pan]);
 
   const handleZoomIn = useCallback(() => {

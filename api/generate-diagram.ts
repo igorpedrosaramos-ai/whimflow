@@ -116,7 +116,7 @@ REGRAS ESTRUTURAIS:
 
   for (const model of GEMINI_MODELS) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 segundos para raciocínio profundo
+    const timeoutId = setTimeout(() => controller.abort(), 8500); // 8.5 segundos por modelo com failover ágil e sem estourar o limite de 30s da Vercel
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
       const apiRes = await fetch(url, {

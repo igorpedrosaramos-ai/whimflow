@@ -126,6 +126,12 @@ export const WorkspaceMenuDropdown: React.FC<WorkspaceMenuDropdownProps> = ({
                   onFocus={e => e.target.select()}
                   value={renameValue}
                   onChange={e => setRenameValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setIsRenaming(false);
+                    }
+                  }}
                   style={{
                     flex: 1,
                     padding: '5px 8px',
@@ -314,6 +320,12 @@ export const WorkspaceMenuDropdown: React.FC<WorkspaceMenuDropdownProps> = ({
                 placeholder="Nome do novo espaço..."
                 value={newWsName}
                 onChange={e => setNewWsName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setIsCreating(false);
+                  }
+                }}
                 style={{
                   width: '100%',
                   padding: '5px 8px',

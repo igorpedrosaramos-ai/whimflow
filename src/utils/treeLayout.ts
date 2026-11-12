@@ -511,6 +511,20 @@ export function cleanAndNormalizeMindMap(nodes: MindMapNode[]): MindMapNode[] {
         }
       });
       parentNode.childrenIds = parentNode.childrenIds.filter(id => id !== badId);
+    } else {
+      // Se não havia pai válido, ancora os nós filhos no nó raiz para evitar nós órfãos desconectados
+      const rootNode = Array.from(nodeMap.values()).find(n => n.side === 'root' || n.id === 'root') || Array.from(nodeMap.values())[0];
+      if (rootNode && !invalidIds.has(rootNode.id)) {
+        childrenToHoist.forEach(cid => {
+          const childNode = nodeMap.get(cid);
+          if (childNode) {
+            childNode.parentId = rootNode.id;
+            if (!rootNode.childrenIds.includes(cid)) {
+              rootNode.childrenIds.push(cid);
+            }
+          }
+        });
+      }
     }
   });
 

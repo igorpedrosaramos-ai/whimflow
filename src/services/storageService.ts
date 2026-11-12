@@ -38,12 +38,20 @@ export function saveWorkspaces(workspaces: Workspace[]): void {
 
 export function loadActiveWorkspaceId(): string {
   if (typeof window === 'undefined') return 'ws-teste';
-  return localStorage.getItem(ACTIVE_WORKSPACE_KEY) || 'ws-teste';
+  try {
+    return localStorage.getItem(ACTIVE_WORKSPACE_KEY) || 'ws-teste';
+  } catch (e) {
+    return 'ws-teste';
+  }
 }
 
 export function saveActiveWorkspaceId(id: string): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(ACTIVE_WORKSPACE_KEY, id);
+  try {
+    localStorage.setItem(ACTIVE_WORKSPACE_KEY, id);
+  } catch (e) {
+    console.warn('Erro ao salvar active workspace id:', e);
+  }
 }
 
 export const DEFAULT_CATEGORIES: BoardCategory[] = [
