@@ -20,7 +20,8 @@ import {
   FlowShape, 
   ShapeType, 
   TextItem,
-  Connector 
+  Connector,
+  Workspace
 } from './types';
 import { TopNav } from './components/TopNav';
 import { Sidebar } from './components/Sidebar';
@@ -51,7 +52,15 @@ import { useCanvasNavigation } from './hooks/useCanvasNavigation';
 import { useBoardStorage } from './hooks/useBoardStorage';
 import { useBoardOperations } from './hooks/useBoardOperations';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { THEME_KEY, loadCategories, saveCategories } from './services/storageService';
+import { 
+  THEME_KEY, 
+  loadCategories, 
+  saveCategories,
+  loadWorkspaces,
+  saveWorkspaces,
+  loadActiveWorkspaceId,
+  saveActiveWorkspaceId
+} from './services/storageService';
 import { useRouter } from './router';
 
 export const App: React.FC = () => {
@@ -183,6 +192,68 @@ export const App: React.FC = () => {
       showToast(`Projeto "${targetBoard?.title || 'Quadro'}" sem categoria definida.`, 'info');
     }
   }, [boards, categories, setBoards, showToast]);
+
+  // Espaços de Trabalho (Workspaces)
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => loadWorkspaces());
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(() => loadActiveWorkspaceId());
+
+  const activeWorkspace = useMemo(() => {
+    return workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0] || { id: 'ws-teste', name: 'teste' };
+  }, [workspaces, activeWorkspaceId]);
+
+  const handleRenameWorkspace = useCallback((id: string, newName: string) => {
+    setWorkspaces(prev => {
+      const updated = prev.map(w => w.id === id ? { ...w, name: newName } : w);
+      saveWorkspaces(updated);
+      return updated;
+    });
+    showToast(`Espaço de trabalho renomeado para "${newName}"!`, 'success');
+  }, [showToast]);
+
+  const handleCreateWorkspace = useCallback((name: string) => {
+    const newWs: Workspace = {
+      id: `ws-${Date.now()}`,
+      name: name
+    };
+    setWorkspaces(prev => {
+      const updated = [...prev, newWs];
+      saveWorkspaces(updated);
+      return updated;
+    });
+    setActiveWorkspaceId(newWs.id);
+    saveActiveWorkspaceId(newWs.id);
+    showToast(`Novo espaço "${name}" criado com sucesso!`, 'success');
+  }, [showToast]);
+
+  const handleSelectWorkspace = useCallback((id: string) => {
+    setActiveWorkspaceId(id);
+    saveActiveWorkspaceId(id);
+    const ws = workspaces.find(w => w.id === id);
+    showToast(`Alternado para o espaço "${ws?.name || 'Espaço'}"`, 'info');
+  }, [workspaces, showToast]);
+
+  const handleExportBackup = useCallback(() => {
+    const backupData = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      activeWorkspace: activeWorkspace,
+      workspaces: workspaces,
+      boardsCount: boards.length,
+      boards: boards,
+      categories: categories
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `backup-${activeWorkspace.name.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Backup do workspace exportado com sucesso!', 'success');
+  }, [activeWorkspace, workspaces, boards, categories, showToast]);
 
   // Sincroniza o boardId ativo quando o usuário acessa ou navega para /board/:id, /doc/:id ou /present/:id
   useEffect(() => {
@@ -918,7 +989,13 @@ export const App: React.FC = () => {
           onDeleteCategory={handleDeleteCategory}
           onMoveBoardCategory={handleMoveBoardCategory}
           theme={theme}
-          workspaceName="teste"
+          workspaceName={activeWorkspace.name}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          onSelectWorkspace={handleSelectWorkspace}
+          onRenameWorkspace={handleRenameWorkspace}
+          onCreateWorkspace={handleCreateWorkspace}
+          onExportBackup={handleExportBackup}
         />
       )}
 
@@ -941,7 +1018,7 @@ export const App: React.FC = () => {
           onOpenTemplates={() => routerNavigate('/templates')}
           onShowToast={showToast}
           theme={theme}
-          workspaceName="teste"
+          workspaceName={activeWorkspace.name}
         />
       )}
 
@@ -951,7 +1028,7 @@ export const App: React.FC = () => {
           onGenerateBoard={handleGenerateFromAgent}
           onNavigateToDashboard={() => routerNavigate('/')}
           theme={theme}
-          workspaceName="teste"
+          workspaceName={activeWorkspace.name}
         />
       )}
 
@@ -998,7 +1075,7 @@ export const App: React.FC = () => {
               updateActiveBoard(b => ({ ...b, isStarred: nextVal }));
               showToast(nextVal ? 'Quadro adicionado aos favoritos!' : 'Quadro removido dos favoritos.', 'info');
             }}
-            workspaceName="teste"
+            workspaceName={activeWorkspace.name}
           />
 
           <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
@@ -1028,7 +1105,13 @@ export const App: React.FC = () => {
           onSaveCategory={handleSaveCategory}
           onDeleteCategory={handleDeleteCategory}
           onMoveBoardCategory={handleMoveBoardCategory}
-          workspaceName="teste"
+          workspaceName={activeWorkspace.name}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          onSelectWorkspace={handleSelectWorkspace}
+          onRenameWorkspace={handleRenameWorkspace}
+          onCreateWorkspace={handleCreateWorkspace}
+          onExportBackup={handleExportBackup}
           theme={theme}
         />
 
@@ -1383,7 +1466,7 @@ export const App: React.FC = () => {
           showToast(`Novo quadro "${title}" criado com sucesso!`, 'success');
         }}
         theme={theme}
-        workspaceName="teste"
+        workspaceName={activeWorkspace.name}
       />
 
       {/* Modal de Busca Global (Ctrl+K) */}
@@ -1393,7 +1476,7 @@ export const App: React.FC = () => {
         boards={boards}
         onSelectBoard={handleOpenBoard}
         theme={theme}
-        workspaceName="teste"
+        workspaceName={activeWorkspace.name}
       />
 
       {/* Modal de Atalhos de Teclado (?) */}
@@ -1411,7 +1494,7 @@ export const App: React.FC = () => {
           handleGenerateFromAgent(title, title, nodes);
         }}
         theme={theme}
-        workspaceName="teste"
+        workspaceName={activeWorkspace.name}
       />
 
       {/* Modal de Compartilhamento */}
@@ -1433,7 +1516,7 @@ export const App: React.FC = () => {
           }
         }}
         onSelectTemplate={handleCreateFromTemplate}
-        workspaceName="teste"
+        workspaceName={activeWorkspace.name}
       />
 
       {/* Modal de Histórico de Versões */}

@@ -207,7 +207,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
               cursor: 'pointer'
             }}
           >
-            Everyone at {workspaceName}
+            Todos em {workspaceName}
           </button>
         </div>
 

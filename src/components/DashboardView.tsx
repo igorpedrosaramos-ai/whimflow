@@ -24,10 +24,11 @@ import {
   Pencil,
   Tag
 } from 'lucide-react';
-import { Board, BoardCategory } from '../types';
+import { Board, BoardCategory, Workspace } from '../types';
 import { CategoryModal } from './CategoryModal';
 import { MoveCategoryModal } from './MoveCategoryModal';
 import { BoardThumbnailPreview } from './BoardThumbnailPreview';
+import { WorkspaceMenuDropdown } from './WorkspaceMenuDropdown';
 
 interface DashboardViewProps {
   boards: Board[];
@@ -52,6 +53,12 @@ interface DashboardViewProps {
   onDeleteCategory?: (categoryId: string) => void;
   onMoveBoardCategory?: (boardId: string, categoryId?: string) => void;
   workspaceName?: string;
+  workspaces?: Workspace[];
+  activeWorkspaceId?: string;
+  onSelectWorkspace?: (id: string) => void;
+  onRenameWorkspace?: (id: string, newName: string) => void;
+  onCreateWorkspace?: (name: string) => void;
+  onExportBackup?: () => void;
   theme?: 'dark' | 'light';
 }
 
@@ -78,6 +85,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onDeleteCategory,
   onMoveBoardCategory,
   workspaceName = 'teste',
+  workspaces,
+  activeWorkspaceId,
+  onSelectWorkspace,
+  onRenameWorkspace,
+  onCreateWorkspace,
+  onExportBackup,
   theme = 'light'
 }) => {
   const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
@@ -89,6 +102,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>(initialCategoryFilter);
   const [isTeamsOpen, setIsTeamsOpen] = useState(true);
+  const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(true);
   const [activeCategoryMenuId, setActiveCategoryMenuId] = useState<string | null>(null);
   const [categoryToEdit, setCategoryToEdit] = useState<BoardCategory | null>(null);
@@ -167,7 +181,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             minWidth: '260px'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {/* Ícone de Toggle Lateral */}
             <button
               onClick={() => setIsSidebarCollapsed(true)}
@@ -189,28 +203,98 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </svg>
             </button>
 
-            {/* Badge do Espaço */}
-            <div
-              style={{
-                width: '22px',
-                height: '22px',
-                borderRadius: '50%',
-                backgroundColor: '#7c3aed',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '11px'
-              }}
-            >
-              {workspaceName.charAt(0).toUpperCase()}
-            </div>
+            {/* Dropdown do Espaço de Trabalho */}
+            <div style={{ position: 'relative' }}>
+              <div
+                id="btn-workspace-switcher"
+                data-testid="btn-workspace-switcher"
+                onClick={() => setIsWorkspaceMenuOpen(prev => !prev)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
+                  backgroundColor: isWorkspaceMenuOpen ? '#232d3f' : 'transparent',
+                  transition: 'background-color 0.15s'
+                }}
+                onMouseEnter={e => {
+                  if (!isWorkspaceMenuOpen) e.currentTarget.style.backgroundColor = '#1f2736';
+                }}
+                onMouseLeave={e => {
+                  if (!isWorkspaceMenuOpen) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                title="Gerenciar e alternar espaços de trabalho"
+              >
+                {/* Badge do Espaço */}
+                <div
+                  style={{
+                    width: '22px',
+                    height: '22px',
+                    borderRadius: '50%',
+                    backgroundColor: '#7c3aed',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: '11px',
+                    flexShrink: 0
+                  }}
+                >
+                  {workspaceName.charAt(0).toUpperCase()}
+                </div>
 
-            <span style={{ fontSize: '13.5px', fontWeight: 600, color: '#f8fafc' }}>
-              {workspaceName}
-            </span>
-            <ChevronDown size={14} color="#64748b" />
+                <span
+                  style={{
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    color: '#f8fafc',
+                    maxWidth: '135px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title={workspaceName}
+                >
+                  {workspaceName}
+                </span>
+                <ChevronDown
+                  size={14}
+                  color="#64748b"
+                  style={{
+                    transform: isWorkspaceMenuOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.18s ease'
+                  }}
+                />
+              </div>
+
+              {isWorkspaceMenuOpen && (
+                <WorkspaceMenuDropdown
+                  workspaces={workspaces || [{ id: 'ws-teste', name: workspaceName }]}
+                  activeWorkspaceId={activeWorkspaceId || 'ws-teste'}
+                  onSelectWorkspace={(id) => {
+                    onSelectWorkspace?.(id);
+                    setIsWorkspaceMenuOpen(false);
+                  }}
+                  onRenameWorkspace={(id, newName) => {
+                    onRenameWorkspace?.(id, newName);
+                  }}
+                  onCreateWorkspace={(name) => {
+                    onCreateWorkspace?.(name);
+                    setIsWorkspaceMenuOpen(false);
+                  }}
+                  onClose={() => setIsWorkspaceMenuOpen(false)}
+                  onOpenCategories={() => setIsCategoryModalOpen(true)}
+                  onOpenTemplates={onOpenTemplates}
+                  onOpenTrash={onOpenTrash}
+                  onExportBackup={onExportBackup}
+                  isDark={true}
+                  style={{ left: '-36px', width: '232px' }}
+                />
+              )}
+            </div>
           </div>
 
           {/* Botão Novo [+] */}
@@ -294,14 +378,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               e.currentTarget.style.color = '#64748b';
               e.currentTarget.style.background = 'transparent';
             }}
-            title={isTeamsOpen ? 'Recolher TEAMS' : 'Expandir TEAMS'}
+            title={isTeamsOpen ? 'Recolher EQUIPES' : 'Expandir EQUIPES'}
           >
             {isTeamsOpen ? (
               <ChevronDown size={13} color="#64748b" />
             ) : (
               <ChevronRight size={13} color="#64748b" />
             )}
-            <span>TEAMS</span>
+            <span>EQUIPES</span>
           </button>
 
           {/* Everyone at workspace (ITEM ATIVO SELECIONADO - RECOLHÍVEL) */}
