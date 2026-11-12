@@ -442,8 +442,10 @@ export function calculateMindMapLayout(
 }
 
 /**
- * Curva Bézier Cúbica Suave (Spline) orgânica idêntica ao Whimsical
- * Suporta conexões tanto para a direita quanto para a esquerda (bi-direcional)
+ * Curva Bézier Cúbica Suave (Spline Hermite) idêntica ao Whimsical
+ * Suporta conexões tanto para a direita quanto para a esquerda (bi-direcional).
+ * Os pontos de controle ficam no ponto médio horizontal exato, garantindo que a curva
+ * permaneça estritamente contida no espaço livre entre colunas e JAMAIS intercepte nós irmãos.
  */
 export function getBezierPath(
   startX: number,
@@ -453,12 +455,14 @@ export function getBezierPath(
 ): string {
   const dx = Math.abs(endX - startX);
   const dy = Math.abs(endY - startY);
-  const direction = endX >= startX ? 1 : -1;
-  // Curvatura adaptativa Whimsical: para distâncias verticais maiores, projeta uma curva mais aberta e orgânica
-  const curvature = Math.max(dx * 0.44, Math.min(dx * 0.82, dy * 0.22));
-  const cp1X = startX + curvature * direction;
-  const cp2X = endX - curvature * direction;
-  return `M ${startX} ${startY} C ${cp1X} ${startY}, ${cp2X} ${endY}, ${endX} ${endY}`;
+  if (dx < 2 && dy < 2) {
+    return `M ${startX} ${startY} L ${endX} ${endY}`;
+  }
+  if (dy === 0) {
+    return `M ${startX} ${startY} L ${endX} ${endY}`;
+  }
+  const midX = (startX + endX) / 2;
+  return `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
 }
 
 /**

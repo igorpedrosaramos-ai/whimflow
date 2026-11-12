@@ -534,8 +534,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const lineStyle = child.lineStyle || (isOrgChart ? 'stepped' : (isTimeline ? 'straight' : 'bezier'));
         const isDraggingThis = draggingNodeId === child.id;
 
-        // Determina se a conexão deve ser vertical (topo para base)
-        const isVertical = isOrgChart || isTimeline || (cPos.y >= pPos.y + pPos.height * 0.7 && Math.abs(cPos.x - pPos.x) < 400);
+        // Determina se a conexão deve ser vertical (estritamente em Organograma ou Cronograma)
+        const isVertical = isOrgChart || isTimeline;
 
         let pathData = '';
         let endX = 0;

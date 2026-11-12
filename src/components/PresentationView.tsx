@@ -435,9 +435,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
         const cPos = getNodePos(child);
         const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
         const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
-        const startY = numChildren <= 1 
-          ? pPos.y + pPos.height / 2 
-          : pPos.y + pad + (usableHeight * index) / (numChildren - 1);
+        const startY = pPos.y + pPos.height / 2;
 
         const endX = isChildOnLeft ? cPos.x + cPos.width : cPos.x;
         const endY = cPos.y + cPos.height / 2;
