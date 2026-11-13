@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Plus, ExternalLink } from 'lucide-react';
 import { MindMapNode, Connector, ToolType } from '../types';
 import { calculateMindMapLayout, getBezierPath, cleanAndNormalizeMindMap } from '../utils/treeLayout';
+import { clearMeasurementCache, measureNodeText } from '../utils/textMeasurement';
 import { NodeContextMenu } from './NodeContextMenu';
 
 interface MindMapCanvasProps {
@@ -100,6 +101,17 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         clearTimeout(hoverTimeoutRef.current);
       }
     };
+  }, []);
+
+  // Garante que após o carregamento da fonte Inter o layout seja recalculado com precisão tipográfica máxima
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    if (typeof document !== 'undefined' && document.fonts) {
+      document.fonts.ready.then(() => {
+        clearMeasurementCache();
+        setFontsReady(true);
+      });
+    }
   }, []);
 
   // ─── DRAG STATE ──────────────────────────────────────────────────────────────
@@ -206,18 +218,21 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       rootY: 0,
       layoutType: effectiveLayout
     });
-  }, [effectiveNodes, effectiveLayout]);
+  }, [effectiveNodes, effectiveLayout, fontsReady]);
 
   // Posição final calculada estritamente pelo algoritmo responsivo (Zero entrelaçamento)
   const getNodePos = (node: MindMapNode) => {
     const computed = layoutMap.get(node.id);
+    const measured = measureNodeText(node);
+    const computedWidth = computed ? Math.max(computed.width, measured.width) : measured.width;
+    const computedHeight = computed ? Math.max(computed.height, measured.height) : measured.height;
     const baseX = computed ? computed.x : (node.x || 0);
     const baseY = computed ? computed.y : (node.y || 0);
     return {
       x: baseX + (node.offsetX || 0),
       y: baseY + (node.offsetY || 0),
-      width: computed ? computed.width : 160,
-      height: computed ? computed.height : 40
+      width: computedWidth,
+      height: computedHeight
     };
   };
 
@@ -1144,7 +1159,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               borderRadius: isRoot ? '6px' : '4px',
               boxShadow: nodeBoxShadow,
               outline: 'none',
-              padding: isEditing ? '3px 8px' : (isRoot ? '2px 8px' : '1px 6px'),
+              padding: isEditing ? '3px 8px' : (isRoot ? '2px 8px' : '1px 8px'),
               zIndex: isEditing ? 100 : (isConnectingSource ? 50 : (isDropTarget ? 45 : (isSelected ? 35 : 20))),
               cursor: currentTool === 'connect' ? 'crosshair' : (isRoot ? 'default' : (isDraggingThis ? 'grabbing' : 'grab')),
               opacity: isDraggingThis ? 0.35 : 1,

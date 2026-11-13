@@ -1,7 +1,7 @@
 import { Board, MindMapNode, BoardCategory, Workspace } from '../types';
 
-export const STORAGE_KEY = 'whimflow_boards_v6';
-export const LEGACY_STORAGE_KEY = 'whimflow_boards_v5';
+export const STORAGE_KEY = 'whimflow_boards_v7';
+export const LEGACY_STORAGE_KEY = 'whimflow_boards_v6';
 export const ACTIVE_BOARD_KEY = 'whimflow_active_board_id';
 export const CURRENT_VIEW_KEY = 'whimflow_current_view';
 export const THEME_KEY = 'whimflow_theme';

@@ -1,4 +1,5 @@
 import { MindMapNode } from '../types';
+import { measureNodeText } from './textMeasurement';
 
 export interface ComputedNodeLayout {
   x: number;
@@ -9,48 +10,15 @@ export interface ComputedNodeLayout {
 }
 
 /**
- * Calcula a largura estimada do nó baseada no tamanho do texto
- * Garante que o texto fique em linha legível e elegante
+ * Calcula a largura e altura exatas do nó baseadas em medição tipográfica real (Canvas measureText)
+ * Garante que o texto, o espaçamento, os ícones e os conectores fiquem perfeitamente alinhados, sem sobreposição
  */
 export function estimateNodeDimensions(node: MindMapNode): { width: number; height: number } {
-  const text = (node.text || '').trim();
-  const lines = text.split('\n');
-  const isMultiline = lines.length > 1;
-  const maxLineLen = Math.max(...lines.map(l => l.length), 0);
-
-  if (node.side === 'root') {
-    const iconPadding = node.icon ? 20 : 0;
-    const width = isMultiline
-      ? Math.max(90, Math.round(maxLineLen * 9.2 + 24 + iconPadding))
-      : Math.max(90, Math.round(text.length * 9.2 + 24 + iconPadding));
-    const height = isMultiline ? Math.max(32, lines.length * 20 + 8) : 32;
-    return { width, height };
-  }
-
-  if (text.length === 0) {
-    return { width: 44, height: 24 };
-  }
-
-  // Tratamento especial para nós curtos como marcos de timeline ('Q1', 'Q2', etc.)
-  if (text.length <= 4 && !isMultiline) {
-    return { width: 40, height: 24 };
-  }
-
-  const badgePadding = 0; // O badge de filhos recolhidos agora fica elegantemente acoplado no corredor de ações externo
-  const iconPadding = node.icon ? 20 : 0;
-  const linkPadding = node.link ? 18 : 0;
-  const charMultiplier = node.fontSize === 'small' ? 6.2 : node.fontSize === 'large' ? 8.2 : (node.bold ? 7.3 : 6.75);
-  const basePadding = 12;
-
-  const width = Math.max(
-    30,
-    Math.round((isMultiline ? maxLineLen : text.length) * charMultiplier + basePadding + badgePadding + iconPadding + linkPadding)
-  );
-  const height = isMultiline
-    ? Math.max(26, lines.length * 20 + 4)
-    : (node.fontSize === 'large' ? 28 : node.fontSize === 'small' ? 20 : 24);
-
-  return { width, height };
+  const measured = measureNodeText(node);
+  return {
+    width: measured.width,
+    height: measured.height
+  };
 }
 
 /**

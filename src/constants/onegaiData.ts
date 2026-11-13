@@ -17,6 +17,7 @@ export const ONEGAI_BOARD: Board = {
       height: 52,
       parentId: null,
       childrenIds: [
+        'on-upsell',
         'on-pedidos',
         'on-melhor-hot',
         'on-segundo-temaki',
@@ -36,6 +37,86 @@ export const ONEGAI_BOARD: Board = {
       borderStyle: 'border',
       lineStyle: 'bezier',
       side: 'root'
+    },
+
+    // 0. UPSSELL (Cenário Real do Usuário)
+    {
+      id: 'on-upsell',
+      text: 'UPSSELL',
+      x: 280,
+      y: -360,
+      parentId: 'root',
+      childrenIds: ['up-1', 'up-2', 'up-3', 'up-4'],
+      collapsed: false,
+      color: '#f43f5e',
+      borderStyle: 'accent',
+      lineStyle: 'bezier',
+      side: 'right'
+    },
+    {
+      id: 'up-1',
+      text: 'Escolha o sabor do seu salgado',
+      x: 560,
+      y: -420,
+      parentId: 'on-upsell',
+      childrenIds: [],
+      collapsed: false,
+      color: '#f43f5e',
+      borderStyle: 'accent',
+      lineStyle: 'bezier',
+      side: 'right'
+    },
+    {
+      id: 'up-2',
+      text: 'Bebidas',
+      x: 560,
+      y: -380,
+      parentId: 'on-upsell',
+      childrenIds: [],
+      collapsed: false,
+      color: '#f43f5e',
+      borderStyle: 'accent',
+      lineStyle: 'bezier',
+      side: 'right'
+    },
+    {
+      id: 'up-3',
+      text: 'Leve mais salgado por menos preço',
+      x: 560,
+      y: -340,
+      parentId: 'on-upsell',
+      childrenIds: [],
+      collapsed: false,
+      color: '#f43f5e',
+      borderStyle: 'accent',
+      lineStyle: 'bezier',
+      side: 'right'
+    },
+    {
+      id: 'up-4',
+      text: 'Leve Salgado Grande com um descontão',
+      x: 560,
+      y: -300,
+      parentId: 'on-upsell',
+      childrenIds: ['sub-novo'],
+      collapsed: false,
+      color: '#f43f5e',
+      borderStyle: 'accent',
+      lineStyle: 'bezier',
+      side: 'right'
+    },
+    {
+      id: 'sub-novo',
+      text: 'Novo item',
+      x: 880,
+      y: -300,
+      parentId: 'up-4',
+      childrenIds: [],
+      collapsed: false,
+      color: '#f43f5e',
+      borderStyle: 'accent',
+      lineStyle: 'bezier',
+      side: 'right'
     },
 
     // 1. Os Mais Pedidos no Onegai Sushi (Laranja #f97316)
