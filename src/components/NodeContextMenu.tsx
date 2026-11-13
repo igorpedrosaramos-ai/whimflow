@@ -131,7 +131,7 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
         alignItems: 'center',
         gap: '4px',
         boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
-        zIndex: 9999,
+        zIndex: 150,
         pointerEvents: 'auto',
         userSelect: 'none'
       }}

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Board, MindMapNode } from '../types';
 import { calculateMindMapLayout, getBezierPath, estimateNodeDimensions, cleanAndNormalizeMindMap } from '../utils/treeLayout';
+import { measureNodeText } from '../utils/textMeasurement';
 
 interface PresentationViewProps {
   board: Board;
@@ -240,11 +241,32 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
     return true;
   };
 
-  // Layout espacial calculado exclusivamente para os nós visíveis (Zero sobreposição)
+  const countDescendants = (nodeId: string): number => {
+    const node = slideNodeMap.get(nodeId);
+    if (!node || !node.childrenIds || node.childrenIds.length === 0) return 0;
+    let count = 0;
+    const stack = [...node.childrenIds];
+    const visited = new Set<string>();
+    while (stack.length > 0) {
+      const cid = stack.pop()!;
+      if (visited.has(cid)) continue;
+      visited.add(cid);
+      count++;
+      const child = slideNodeMap.get(cid);
+      if (child && child.childrenIds) {
+        child.childrenIds.forEach(id => {
+          if (!visited.has(id)) stack.push(id);
+        });
+      }
+    }
+    return count;
+  };
+
+  // Layout espacial calculado exclusivamente para os nós visíveis (Zero sobreposição e precisão tipográfica subpixel)
   const layoutMap = useMemo(() => {
     if (!rootNode || slideNodes.length === 0) return new Map();
     return calculateMindMapLayout(slideNodes, rootNode.id, {
-      horizontalGap: Math.round(95 * cardScale),
+      horizontalGap: Math.round(100 * cardScale),
       verticalGap: Math.round(18 * cardScale),
       rootX: 0,
       rootY: 0
@@ -253,14 +275,14 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
 
   const getNodePos = (node: MindMapNode) => {
     const computed = layoutMap.get(node.id);
-    const dims = estimateNodeDimensions(node);
-    const scaledWidth = Math.round(dims.width * cardScale);
-    const scaledHeight = Math.round(dims.height * cardScale);
+    const measured = measureNodeText(node);
+    const baseW = computed ? Math.max(computed.width, measured.width) : measured.width;
+    const baseH = computed ? Math.max(computed.height, measured.height) : measured.height;
     return {
       x: computed ? computed.x : (node.x || 0),
       y: computed ? computed.y : (node.y || 0),
-      width: computed ? Math.round(computed.width * cardScale) : scaledWidth,
-      height: computed ? Math.round(computed.height * cardScale) : scaledHeight
+      width: Math.round(baseW * cardScale),
+      height: Math.round(baseH * cardScale)
     };
   };
 
@@ -777,7 +799,7 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
           {/* Conectores com portas distribuídas */}
           {renderConnectors()}
 
-          {/* Cards Visuais Interativos */}
+          {/* Nós do Mapa Mental (Visual Executivo 100% Sem Cards, Tipografia Ampla e Alta Legibilidade) */}
           {slideNodes.map(node => {
             if (!isNodeVisible(node)) return null;
 
@@ -785,27 +807,20 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
             const pos = getNodePos(node);
             const nodeColor = node.color || '#6366f1';
             const isHighlighted = activeHighlightedIds.has(node.id);
-            const borderStyle = node.borderStyle || 'accent';
+            const isFocused = activeFocusNodeId === node.id;
             const hasChildren = node.childrenIds && node.childrenIds.length > 0;
             const isCollapsed = !!node.collapsed;
+            const childCount = countDescendants(node.id);
 
-            let bg = '#181d26';
-            let border = `1.5px solid ${nodeColor}`;
-            let borderLeft: string | undefined = `4px solid ${nodeColor}`;
-
-            if (isRoot) {
-              bg = '#1a2233';
-              border = '2px solid #64748b';
-              borderLeft = undefined;
-            } else if (borderStyle === 'fill') {
-              bg = nodeColor;
-              border = `2px solid ${nodeColor}`;
-              borderLeft = undefined;
-            } else if (borderStyle === 'border') {
-              bg = '#181d26';
-              border = `2px solid ${nodeColor}`;
-              borderLeft = undefined;
-            }
+            // Estilo Executivo Sóbrio sem Cards (fundo transparente, sem caixas/cards flutuantes)
+            const bg = isRoot 
+              ? '#1e293b' 
+              : (isFocused ? 'rgba(99, 102, 241, 0.14)' : 'transparent');
+            const border = isRoot 
+              ? '1.5px solid #6366f1' 
+              : (isFocused ? `1px solid ${nodeColor}88` : '1.5px solid transparent');
+            const borderRadius = isRoot ? '6px' : '4px';
+            const padding = isRoot ? '4px 14px' : '1px 6px';
 
             return (
               <div
@@ -823,62 +838,86 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
                   minHeight: `${pos.height}px`,
                   backgroundColor: bg,
                   border: border,
-                  borderLeft: borderLeft,
-                  borderRadius: isRoot ? '10px' : '6px',
-                  boxShadow: isHighlighted ? `0 0 16px ${nodeColor}35` : 'none',
-                  padding: isRoot ? '10px 20px' : '6px 12px',
-                  display: 'flex',
+                  borderRadius: borderRadius,
+                  boxShadow: 'none',
+                  padding: padding,
+                  display: 'inline-flex',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
                   gap: '8px',
                   whiteSpace: 'nowrap',
-                  opacity: isHighlighted ? 1 : 0.16,
+                  opacity: isHighlighted ? 1 : 0.18,
                   transform: isHighlighted && !isRoot && currentSlideIndex > 0 ? 'scale(1.02)' : 'scale(1)',
-                  transition: 'opacity 0.35s ease, transform 0.35s ease, box-shadow 0.35s ease',
+                  transition: 'opacity 0.35s ease, transform 0.35s ease',
                   zIndex: isRoot ? 25 : (isHighlighted ? 20 : 10),
                   cursor: 'pointer'
                 }}
-                title={hasChildren ? (isCollapsed ? 'Clique no botão + para abrir' : 'Clique no botão − para recolher') : undefined}
               >
+                {/* Texto do nó com largura tipográfica real - ZERO reticências (...) */}
                 <span style={{
-                  color: borderStyle === 'fill' ? '#ffffff' : (isRoot ? '#ffffff' : '#f8fafc'),
-                  fontSize: isRoot ? `${16 * cardScale}px` : `${13 * cardScale}px`,
-                  fontWeight: isRoot ? 700 : 500,
+                  color: isRoot ? '#ffffff' : (isHighlighted ? '#f8fafc' : '#64748b'),
+                  fontSize: isRoot ? `${16 * cardScale}px` : `${13.5 * cardScale}px`,
+                  fontWeight: isRoot || node.bold ? 700 : 500,
                   letterSpacing: '-0.01em',
-                  minWidth: node.text ? undefined : '40px',
-                  display: 'inline-block',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
+                  whiteSpace: 'nowrap',
+                  display: 'inline-block'
                 }}>
                   {node.text}
                 </span>
 
-                {/* Botão Interativo de Diminuir/Aumentar (Recolher/Expandir) diretamente no Card */}
-                {hasChildren && !isRoot && (
+                {/* Badge Numérico quando o ramo está recolhido */}
+                {hasChildren && !isRoot && isCollapsed && (
                   <button
                     onClick={(e) => toggleNodeCollapse(node.id, e)}
+                    className="branch-counter-badge"
                     style={{
-                      width: '20px',
                       height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: isCollapsed ? nodeColor : 'rgba(255,255,255,0.12)',
-                      color: '#ffffff',
-                      border: 'none',
-                      display: 'flex',
+                      minWidth: '20px',
+                      borderRadius: '10px',
+                      padding: '0 6px',
+                      backgroundColor: '#f8fafc',
+                      color: '#0f172a',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      border: `1.5px solid ${nodeColor || '#6366f1'}`,
+                      display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       cursor: 'pointer',
-                      fontSize: '11px',
-                      fontWeight: 700,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                      userSelect: 'none',
                       flexShrink: 0,
-                      boxShadow: isCollapsed ? '0 1px 4px rgba(0,0,0,0.4)' : 'none',
-                      transition: 'transform 0.15s ease, background-color 0.15s ease'
+                      lineHeight: 1
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                    title={isCollapsed ? `Expandir ${node.childrenIds.length} sub-ramos` : 'Recolher sub-ramos'}
+                    title={`Clique para expandir ${childCount} sub-itens`}
                   >
-                    {isCollapsed ? '+' : '−'}
+                    {childCount > 0 ? childCount : node.childrenIds.length}
+                  </button>
+                )}
+
+                {/* Botão de recolher quando o ramo está aberto */}
+                {hasChildren && !isRoot && !isCollapsed && (
+                  <button
+                    onClick={(e) => toggleNodeCollapse(node.id, e)}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      borderRadius: '50%',
+                      backgroundColor: '#1e293b',
+                      color: '#cbd5e1',
+                      border: '1.5px solid #475569',
+                      display: isHighlighted || isFocused ? 'inline-flex' : 'none',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      flexShrink: 0,
+                      opacity: 0.85
+                    }}
+                    title="Recolher sub-ramos"
+                  >
+                    −
                   </button>
                 )}
               </div>

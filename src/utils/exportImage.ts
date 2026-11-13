@@ -1,5 +1,6 @@
 import { Board, MindMapNode, FlowShape, StickyNote, WireframeItem, TextItem, DrawingStroke, Connector } from '../types';
 import { calculateMindMapLayout, getBezierPath, estimateNodeDimensions } from './treeLayout';
+import { measureNodeText } from './textMeasurement';
 
 function escapeXml(unsafe: string): string {
   if (!unsafe) return '';
@@ -158,11 +159,11 @@ export function generateBoardSVG(board: Board, theme: 'light' | 'dark' = 'light'
 
     visibleNodes.forEach(node => {
       const computed = layout.get(node.id);
-      const dims = estimateNodeDimensions(node);
+      const dims = measureNodeText(node);
       const x = computed ? computed.x : 0;
       const y = computed ? computed.y : 0;
-      const w = computed ? computed.width : dims.width;
-      const h = computed ? computed.height : dims.height;
+      const w = computed ? Math.max(computed.width, dims.width) : dims.width;
+      const h = computed ? Math.max(computed.height, dims.height) : dims.height;
 
       positions.set(node.id, { x, y, width: w, height: h });
 
@@ -488,39 +489,35 @@ export function generateBoardSVG(board: Board, theme: 'light' | 'dark' = 'light'
 
     const isRoot = node.side === 'root';
     const color = node.color || '#6366f1';
-    const bg = isRoot ? rootBg : cardBg;
-    const border = isRoot ? rootBorder : borderColor;
+    const bg = isRoot ? (isLight ? '#ffffff' : '#1e293b') : 'transparent';
+    const border = isRoot ? (isLight ? '#334155' : '#6366f1') : 'transparent';
     const hasChildren = node.childrenIds && node.childrenIds.length > 0;
     const isCollapsed = node.collapsed;
     const count = countDescendants(node.id);
 
     let badgeSvg = '';
     if (hasChildren && isCollapsed) {
-      const badgeW = count > 99 ? 32 : count > 9 ? 26 : 22;
-      const badgeX = pos.width - badgeW - 8;
+      const badgeW = count > 99 ? 30 : count > 9 ? 24 : 20;
+      const badgeX = pos.width + 6;
       const badgeY = (pos.height - 18) / 2;
       badgeSvg = `
         <rect x="${badgeX}" y="${badgeY}" width="${badgeW}" height="18" rx="9" fill="${color}" />
-        <text x="${badgeX + badgeW / 2}" y="${badgeY + 13}" fill="#ffffff" font-family="system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle">${count}</text>
+        <text x="${badgeX + badgeW / 2}" y="${badgeY + 13}" fill="#ffffff" font-family="Inter, system-ui, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle">${count}</text>
       `;
     }
 
     mindMapNodesSvg += `
       <g transform="translate(${pos.x}, ${pos.y})">
-        <!-- Sombra sutil -->
-        <rect x="0" y="2" width="${pos.width}" height="${pos.height}" rx="8" fill="rgba(0,0,0,0.06)" />
-        <!-- Cartão -->
-        <rect width="${pos.width}" height="${pos.height}" rx="8" fill="${bg}" stroke="${border}" stroke-width="${isRoot ? 2 : 1.5}" />
-        <!-- Acento colorido na borda esquerda -->
-        ${!isRoot ? `<rect x="0" y="0" width="5" height="${pos.height}" rx="3" fill="${color}" />` : ''}
-        <!-- Texto do Nó -->
+        ${isRoot ? `
+          <rect width="${pos.width}" height="${pos.height}" rx="6" fill="${bg}" stroke="${border}" stroke-width="1.5" />
+        ` : ''}
         <text 
-          x="${isRoot ? 20 : 16}" 
+          x="${isRoot ? 14 : 4}" 
           y="${pos.height / 2 + 5}" 
           fill="${textColor}" 
-          font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" 
+          font-family="Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" 
           font-size="${isRoot ? 16 : 13.5}" 
-          font-weight="${isRoot ? 700 : 500}"
+          font-weight="${isRoot || node.bold ? 700 : 500}"
         >${escapeXml(node.text)}</text>
         ${badgeSvg}
       </g>
@@ -617,6 +614,68 @@ export function exportBoardAsPNG(
           URL.revokeObjectURL(url);
           resolve();
         }, 'image/png');
+      };
+
+      img.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
+
+      img.src = url;
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+export function exportBoardAsJPEG(
+  board: Board,
+  options: { scale?: number; theme?: 'light' | 'dark'; quality?: number } = {}
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      const currentTheme = options.theme || (localStorage.getItem('whimflow_theme') as 'light' | 'dark') || 'light';
+      const scale = options.scale || 2;
+      const quality = options.quality ?? 0.95;
+
+      const svg = generateBoardSVG(board, currentTheme);
+      const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas 2D context não suportado'));
+          return;
+        }
+
+        // JPEG requer fundo sólido de alto contraste
+        ctx.fillStyle = currentTheme === 'light' ? '#ffffff' : '#121418';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0);
+
+        canvas.toBlob((jpegBlob) => {
+          if (!jpegBlob) {
+            reject(new Error('Falha ao gerar JPEG'));
+            return;
+          }
+          const jpegUrl = URL.createObjectURL(jpegBlob);
+          const a = document.createElement('a');
+          a.href = jpegUrl;
+          a.download = `${board.title.replace(/\s+/g, '_')}_alta_resolucao.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(jpegUrl);
+          URL.revokeObjectURL(url);
+          resolve();
+        }, 'image/jpeg', quality);
       };
 
       img.onerror = (e) => {

@@ -17,7 +17,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { Board } from '../types';
-import { exportBoardAsPNG, exportBoardAsSVG, exportBoardAsMarkdown } from '../utils/exportImage';
+import { exportBoardAsPNG, exportBoardAsJPEG, exportBoardAsSVG, exportBoardAsMarkdown } from '../utils/exportImage';
 import { exportBoardAsPPTX, exportBoardAsPDF } from '../utils/exportDocument';
 
 interface ShareModalProps {
@@ -39,6 +39,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const [isExportingPPTX, setIsExportingPPTX] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingPNG, setIsExportingPNG] = useState(false);
+  const [isExportingJPEG, setIsExportingJPEG] = useState(false);
   const [pngScale, setPngScale] = useState<number>(2);
   const [pngTransparent, setPngTransparent] = useState<boolean>(false);
   const [exportFeedback, setExportFeedback] = useState<string | null>(null);
@@ -117,6 +118,22 @@ export const ShareModal: React.FC<ShareModalProps> = ({
     }
   };
 
+  const handleJPEG = async () => {
+    try {
+      setIsExportingJPEG(true);
+      await exportBoardAsJPEG(activeBoard, {
+        scale: pngScale,
+        theme: isDark ? 'dark' : 'light'
+      });
+      notify('Imagem JPEG (.jpg) exportada com sucesso!', 'success');
+    } catch (e) {
+      console.error('Erro ao exportar JPEG:', e);
+      notify('Falha ao gerar JPEG.', 'error');
+    } finally {
+      setIsExportingJPEG(false);
+    }
+  };
+
   const handleSVG = () => {
     exportBoardAsSVG(activeBoard);
   };
@@ -142,7 +159,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
         inset: 0,
         backgroundColor: 'rgba(0, 0, 0, 0.65)',
         backdropFilter: 'blur(3px)',
-        zIndex: 6000,
+        zIndex: 10000,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -314,26 +331,52 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    onClick={!isExportingPNG ? handlePNG : undefined}
-                    disabled={isExportingPNG}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      padding: '7px 14px',
-                      borderRadius: '5px',
-                      border: 'none',
-                      backgroundColor: '#7c3aed',
-                      color: '#ffffff',
-                      fontSize: '12.5px',
-                      fontWeight: 600,
-                      cursor: isExportingPNG ? 'wait' : 'pointer'
-                    }}
-                  >
-                    {isExportingPNG ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                    <span>Baixar PNG</span>
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      id="btn-download-png"
+                      onClick={!isExportingPNG ? handlePNG : undefined}
+                      disabled={isExportingPNG}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '7px 14px',
+                        borderRadius: '5px',
+                        border: 'none',
+                        backgroundColor: '#7c3aed',
+                        color: '#ffffff',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        cursor: isExportingPNG ? 'wait' : 'pointer'
+                      }}
+                    >
+                      {isExportingPNG ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                      <span>Baixar PNG</span>
+                    </button>
+
+                    <button
+                      id="btn-download-jpeg"
+                      onClick={!isExportingJPEG ? handleJPEG : undefined}
+                      disabled={isExportingJPEG}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '7px 14px',
+                        borderRadius: '5px',
+                        border: isDark ? '1px solid #334155' : '1px solid #cbd5e1',
+                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                        color: isDark ? '#f1f5f9' : '#0f172a',
+                        fontSize: '12.5px',
+                        fontWeight: 600,
+                        cursor: isExportingJPEG ? 'wait' : 'pointer'
+                      }}
+                      title="Download em formato JPEG (.jpg) de alta definição"
+                    >
+                      {isExportingJPEG ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                      <span>Baixar JPEG (.jpg)</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Controles de Qualidade PNG */}
