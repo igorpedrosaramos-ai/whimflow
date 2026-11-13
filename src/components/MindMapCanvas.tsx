@@ -74,6 +74,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  // Rastreia se o nó em edição é recém-criado (texto vazio) — protege contra deleção acidental ao perder foco
+  const isNewNodeRef = useRef<boolean>(false);
 
   // ─── DRAG STATE ──────────────────────────────────────────────────────────────
   // draggingNodeId: React state (causa re-render para mostrar/esconder ghost)
@@ -112,6 +114,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       if (target) {
         setEditingId(target.id);
         setEditingText(target.text);
+        // Marca como nó novo: texto vazio significa que é recém-criado
+        isNewNodeRef.current = !target.text || target.text.trim() === '';
       }
       onClearEditingNodeId?.();
     }
@@ -202,6 +206,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
   const handleStartEdit = (node: MindMapNode, e: React.MouseEvent) => {
     e.stopPropagation();
+    isNewNodeRef.current = false; // edição manual nunca é "nó novo"
     setEditingId(node.id);
     setEditingText(node.text || '');
     onSelectNode(node.id);
@@ -211,11 +216,13 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     if (editingId) {
       const trimmed = editingText.trim();
       const node = nodeMap.get(editingId);
-      // Se o usuário não digitou nada em um nó novo (ou limpou o texto), remove para não deixar espaço em branco
-      if (!trimmed && node && node.side !== 'root' && node.id !== 'root') {
+      // Só remove ao perder foco se o nó for recém-criado (nunca editado pelo usuário) E ainda estiver vazio
+      const wasNew = isNewNodeRef.current;
+      isNewNodeRef.current = false;
+      if (!trimmed && wasNew && node && node.side !== 'root' && node.id !== 'root') {
         onDeleteNode(editingId);
       } else {
-        onUpdateNodeText(editingId, trimmed);
+        onUpdateNodeText(editingId, trimmed || node?.text || '');
       }
     }
     setEditingId(null);
@@ -224,23 +231,30 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent, node: MindMapNode) => {
     if (e.altKey && e.key === 'Enter') {
       e.preventDefault();
+      isNewNodeRef.current = false;
       handleCommitEdit();
       onAddParentNode?.(node.id);
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
+      isNewNodeRef.current = false;
       handleCommitEdit();
       onAddSiblingAboveNode?.(node.id);
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      isNewNodeRef.current = false;
       handleCommitEdit();
       onAddSiblingNode(node.id);
     } else if (e.key === 'Tab') {
       e.preventDefault();
+      isNewNodeRef.current = false;
       handleCommitEdit();
       onAddChildNode(node.id);
     } else if (e.key === 'Escape') {
+      // Escape sempre descarta o nó novo vazio, mas preserva nós existentes mesmo sem texto
       const trimmed = editingText.trim();
-      if (!trimmed && node.side !== 'root' && node.id !== 'root') {
+      const wasNew = isNewNodeRef.current;
+      isNewNodeRef.current = false;
+      if (!trimmed && wasNew && node.side !== 'root' && node.id !== 'root') {
         onDeleteNode(node.id);
       }
       setEditingId(null);
@@ -1289,6 +1303,94 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   zIndex: 40
                 }}
               />
+            )}
+
+            {/* Botão + rápido ao passar o mouse (hover) — aparece no lado filho */}
+            {!isEditing && !isSelected && isHovered && !draggingNodeId && currentTool === 'select' && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddChildNode(node.id);
+                }}
+                title="Adicionar filho (Tab)"
+                style={{
+                  position: 'absolute',
+                  ...(node.side === 'left' ? { left: '-22px' } : { right: '-22px' }),
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: nodeColor || '#6366f1',
+                  border: '2px solid #ffffff',
+                  boxShadow: `0 2px 8px ${nodeColor || '#6366f1'}66`,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 45,
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  lineHeight: 1,
+                  fontWeight: 700,
+                  userSelect: 'none',
+                  transition: 'transform 0.1s ease, box-shadow 0.1s ease'
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1.2)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1)';
+                }}
+              >
+                +
+              </button>
+            )}
+
+            {/* Botão + rápido ao passar o mouse no nó raiz — versão root */}
+            {isRoot && !isEditing && isHovered && !draggingNodeId && currentTool === 'select' && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddChildNode(node.id);
+                }}
+                title="Adicionar ramo (Tab)"
+                style={{
+                  position: 'absolute',
+                  right: '-22px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '18px',
+                  height: '18px',
+                  borderRadius: '50%',
+                  backgroundColor: '#6366f1',
+                  border: '2px solid #ffffff',
+                  boxShadow: '0 2px 8px rgba(99,102,241,0.5)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 45,
+                  color: '#ffffff',
+                  fontSize: '14px',
+                  lineHeight: 1,
+                  fontWeight: 700,
+                  userSelect: 'none',
+                  transition: 'transform 0.1s ease'
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1.2)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1)';
+                }}
+              >
+                +
+              </button>
             )}
           </div>
         );
