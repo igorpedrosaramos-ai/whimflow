@@ -36,12 +36,11 @@ export function estimateNodeDimensions(node: MindMapNode): { width: number; heig
     return { width: 40, height: 24 };
   }
 
-  const hasChildBadge = Boolean(node.childrenIds && node.childrenIds.length > 0 && node.collapsed);
-  const badgePadding = hasChildBadge ? 28 : 0;
+  const badgePadding = 0; // O badge de filhos recolhidos agora fica elegantemente acoplado no corredor de ações externo
   const iconPadding = node.icon ? 20 : 0;
   const linkPadding = node.link ? 18 : 0;
-  const charMultiplier = node.fontSize === 'small' ? 7.0 : node.fontSize === 'large' ? 9.2 : (node.bold ? 8.4 : 7.8);
-  const basePadding = 14;
+  const charMultiplier = node.fontSize === 'small' ? 6.2 : node.fontSize === 'large' ? 8.2 : (node.bold ? 7.3 : 6.75);
+  const basePadding = 12;
 
   const width = Math.max(
     30,

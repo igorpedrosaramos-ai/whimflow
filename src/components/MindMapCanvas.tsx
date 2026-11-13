@@ -163,6 +163,27 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     return map;
   }, [effectiveNodes]);
 
+  // Mapeamento bidirecional e infalível de filhos (suporta childrenIds E parentId)
+  const nodeChildrenMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    effectiveNodes.forEach(child => {
+      if (child.parentId) {
+        const list = map.get(child.parentId) || [];
+        if (!list.includes(child.id)) {
+          list.push(child.id);
+        }
+        map.set(child.parentId, list);
+      }
+    });
+    return map;
+  }, [effectiveNodes]);
+
+  const getNodeChildrenIds = (node: MindMapNode): string[] => {
+    const fromParent = nodeChildrenMap.get(node.id) || [];
+    const fromNode = node.childrenIds || [];
+    return Array.from(new Set([...fromNode, ...fromParent]));
+  };
+
   // Determina o layout efetivo (passado explicitamente pelo board/template ou auto-detectado com elegância)
   const effectiveLayout = useMemo(() => {
     if (layoutType) return layoutType;
@@ -212,17 +233,24 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   };
 
   const countDescendants = (nodeId: string): number => {
+    const direct = nodeChildrenMap.get(nodeId) || [];
     const node = nodeMap.get(nodeId);
-    if (!node || !node.childrenIds || node.childrenIds.length === 0) return 0;
+    const initial = Array.from(new Set([...(node?.childrenIds || []), ...direct]));
+    if (initial.length === 0) return 0;
     let count = 0;
-    const stack = [...node.childrenIds];
+    const visited = new Set<string>();
+    const stack = [...initial];
     while (stack.length > 0) {
       const cid = stack.pop()!;
+      if (visited.has(cid)) continue;
+      visited.add(cid);
       count++;
+      const childDirect = nodeChildrenMap.get(cid) || [];
       const child = nodeMap.get(cid);
-      if (child && child.childrenIds && child.childrenIds.length > 0) {
-        stack.push(...child.childrenIds);
-      }
+      const combined = Array.from(new Set([...(child?.childrenIds || []), ...childDirect]));
+      combined.forEach(id => {
+        if (!visited.has(id)) stack.push(id);
+      });
     }
     return count;
   };
@@ -1044,7 +1072,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           onDelete={() => onDeleteNode(selectedNode.id)}
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
-          hasChildren={selectedNode.childrenIds && selectedNode.childrenIds.length > 0}
+          hasChildren={getNodeChildrenIds(selectedNode).length > 0}
         />
       )}
 
@@ -1059,8 +1087,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const isHovered = hoveredNodeId === node.id;
         const isEditing = editingId === node.id;
         const isDropTarget = dropTargetNodeId === node.id;
-        const childCount = node.childrenIds?.length || countDescendants(node.id);
-        const hasChildren = node.childrenIds && node.childrenIds.length > 0;
+        const directChildrenIds = getNodeChildrenIds(node);
+        const hasChildren = directChildrenIds.length > 0;
+        const totalDescendants = countDescendants(node.id);
+        const childCount = totalDescendants > 0 ? totalDescendants : directChildrenIds.length;
         const isDraggingThis = draggingNodeId === node.id;
 
         const pos = getNodePos(node);
@@ -1237,119 +1267,133 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </a>
             )}
 
-            {/* Badge de Ramos Ocultos / Contador Whimsical (Estilo Imagem 2) */}
-            {hasChildren && node.collapsed && (
-              <button
-                type="button"
-                className="branch-counter-badge"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleCollapse(node.id);
-                }}
-                title={`${node.childrenIds.length} itens recolhidos. Clique para expandir.`}
-                style={{
-                  marginLeft: '8px',
-                  height: '18px',
-                  minWidth: '18px',
-                  borderRadius: '9px',
-                  padding: '0 5px',
-                  backgroundColor: '#f1f5f9',
-                  color: '#0f172a',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  border: '1px solid #cbd5e1',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
-                  userSelect: 'none',
-                  flexShrink: 0
-                }}
-              >
-                {node.childrenIds.length}
-              </button>
-            )}
-
-            {/* Botão Sutil de Recolher Ramo Aberto */}
-            {hasChildren && !node.collapsed && !isRoot && (isHovered || isSelected) && (
-              <button
-                type="button"
-                className="branch-collapse-toggle"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleCollapse(node.id);
-                }}
-                title="Recolher ramos deste nó"
-                style={{
-                  marginLeft: '6px',
-                  width: '16px',
-                  height: '16px',
-                  borderRadius: '50%',
-                  backgroundColor: 'var(--bg-elevated, #1e293b)',
-                  color: 'var(--text-muted, #94a3b8)',
-                  border: '1px solid var(--border-subtle, #334155)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                  lineHeight: 1,
-                  userSelect: 'none',
-                  flexShrink: 0
-                }}
-              >
-                −
-              </button>
-            )}
-
-            {/* Botão + rápido para adicionar nó filho (aparece no hover OU quando selecionado) */}
-            {!isEditing && (isHovered || isSelected) && !draggingNodeId && currentTool === 'select' && (
+            {/* Corredor de Ações Rápidas: Minimizar/Expandir e Adicionar Nós Filhos com Espaçamento Limpo */}
+            {!isEditing && !draggingNodeId && currentTool === 'select' && (
               <div
-                className="node-quick-add-bridge"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddChildNode(node.id);
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                title="Adicionar nó filho (Atalho: Tab)"
+                className="node-actions-bridge"
                 style={{
                   position: 'absolute',
                   ...(node.side === 'left'
-                    ? { right: '100%', paddingRight: '6px', paddingLeft: '4px' }
-                    : { left: '100%', paddingLeft: '6px', paddingRight: '4px' }
+                    ? { right: '100%', paddingRight: '8px', paddingLeft: '4px', flexDirection: 'row-reverse' }
+                    : { left: '100%', paddingLeft: '8px', paddingRight: '4px', flexDirection: 'row' }
                   ),
                   top: '0',
                   bottom: '0',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: '10px',
                   zIndex: 60,
-                  cursor: 'pointer'
+                  pointerEvents: 'auto',
+                  // Se recolhido, o badge é sempre visível; se expandido, os botões surgem no hover ou seleção
+                  visibility: (hasChildren && node.collapsed) || (isHovered || isSelected) ? 'visible' : 'hidden',
+                  opacity: (hasChildren && node.collapsed) || (isHovered || isSelected) ? 1 : 0,
+                  transition: 'opacity 0.15s ease'
                 }}
               >
-                <div
-                  className="node-quick-add-btn"
-                  style={{
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '50%',
-                    backgroundColor: nodeColor || '#6366f1',
-                    border: '2px solid #ffffff',
-                    boxShadow: `0 2px 8px ${nodeColor || '#6366f1'}55`,
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '14px',
-                    fontWeight: 700,
-                    lineHeight: 1,
-                    userSelect: 'none',
-                    transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease'
-                  }}
-                >
-                  +
-                </div>
+                {/* Se o ramo estiver RECOLHIDO: exibe Badge Contador com total de itens ocultos */}
+                {hasChildren && node.collapsed && (
+                  <button
+                    type="button"
+                    className="branch-counter-badge"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleCollapse(node.id);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    title={`${childCount} ${childCount === 1 ? 'item recolhido' : 'itens recolhidos'}. Clique para expandir (Atalho: Ctrl+/).`}
+                    style={{
+                      height: '22px',
+                      minWidth: '22px',
+                      borderRadius: '11px',
+                      padding: '0 7px',
+                      backgroundColor: '#f8fafc',
+                      color: '#0f172a',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      border: `1.5px solid ${nodeColor || '#6366f1'}`,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+                      userSelect: 'none',
+                      flexShrink: 0,
+                      lineHeight: 1,
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                    }}
+                  >
+                    {childCount}
+                  </button>
+                )}
+
+                {/* Se o ramo estiver ABERTO e tiver filhos: exibe Botão de Minimizar / Recolher com espaçamento confortável de 10px em relação ao + */}
+                {hasChildren && !node.collapsed && (isHovered || isSelected) && (
+                  <button
+                    type="button"
+                    className="node-collapse-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleCollapse(node.id);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    title={`Recolher ramo (${childCount} ${childCount === 1 ? 'item' : 'itens'}) (Atalho: Ctrl+/)`}
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--bg-surface, #1e293b)',
+                      color: 'var(--text-secondary, #cbd5e1)',
+                      border: '1.5px solid var(--border-subtle, #475569)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      userSelect: 'none',
+                      flexShrink: 0,
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+                      transition: 'transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease'
+                    }}
+                  >
+                    −
+                  </button>
+                )}
+
+                {/* Botão + rápido para Adicionar Nó Filho (visível no hover ou seleção) */}
+                {(isHovered || isSelected) && (
+                  <div
+                    className="node-quick-add-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddChildNode(node.id);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    title="Adicionar nó filho (Atalho: Tab)"
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      backgroundColor: nodeColor || '#6366f1',
+                      border: '2px solid #ffffff',
+                      boxShadow: `0 2px 8px ${nodeColor || '#6366f1'}55`,
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      userSelect: 'none',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease'
+                    }}
+                  >
+                    +
+                  </div>
+                )}
               </div>
             )}
           </div>
