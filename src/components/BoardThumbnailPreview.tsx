@@ -1,10 +1,20 @@
 import React, { useMemo } from 'react';
 import { Board, MindMapNode } from '../types';
-import { calculateMindMapLayout } from '../utils/treeLayout';
+import { calculateMindMapLayout, getBezierPath } from '../utils/treeLayout';
+import { measureNodeText } from '../utils/textMeasurement';
 
 interface BoardThumbnailPreviewProps {
   board: Board;
   isDark?: boolean;
+}
+
+function escapeXml(unsafe: string): string {
+  return (unsafe || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ board, isDark = false }) => {
@@ -13,14 +23,68 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
   const wireframes = board.wireframes || [];
   const shapes = board.shapes || [];
   const texts = board.texts || [];
+  const drawings = board.drawings || [];
 
-  // 1. Determina o perfil predominante do projeto
-  const isStickiesDominant = stickies.length > 0 && nodes.length <= 1;
+  // 1. Determinação de perfil do projeto
+  const isStickiesDominant = stickies.length > 0 && nodes.length <= 1 && shapes.length === 0;
   const isWireframeDominant = wireframes.length > 0 && nodes.length <= 1;
-  const isDocDominant = (texts.length > 0 || (board.title?.toLowerCase().includes('doc') && nodes.length <= 1)) && stickies.length === 0;
-  const isEmptyBoard = nodes.length <= 1 && stickies.length === 0 && wireframes.length === 0 && shapes.length === 0 && texts.length === 0;
+  const isDocDominant = (texts.length > 0 || (board.title?.toLowerCase().includes('doc') && nodes.length <= 1)) && stickies.length === 0 && shapes.length === 0;
+  
+  const rootNodeCandidate = nodes.find(n => n.side === 'root' || !n.parentId) || nodes[0];
+  const isRootDefault = !rootNodeCandidate || 
+    !rootNodeCandidate.text || 
+    rootNodeCandidate.text === 'Ideia Central' || 
+    rootNodeCandidate.text === 'Meu Novo Projeto';
 
-  // ─── CASO 1: MINIATURA DE NOTAS ADESIVAS (STICKIES) ─────────────────────────
+  const isEmptyBoard = (nodes.length === 0 || (nodes.length === 1 && isRootDefault && (!rootNodeCandidate.childrenIds || rootNodeCandidate.childrenIds.length === 0))) &&
+    stickies.length === 0 && 
+    wireframes.length === 0 && 
+    shapes.length === 0 && 
+    texts.length === 0 &&
+    drawings.length === 0;
+
+  // ─── CASO 1: QUADRO EM BRANCO (ESTADO VAZIO LIMPO) ─────────────────────────
+  if (isEmptyBoard) {
+    return (
+      <svg
+        viewBox="0 0 240 120"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ width: '100%', height: '100%', display: 'block' }}
+      >
+        <defs>
+          <pattern id={`dot-grid-empty-${board.id}`} width="18" height="18" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1.1" fill={isDark ? '#2e3a4e' : '#e2e8f0'} />
+          </pattern>
+        </defs>
+        <rect x="0" y="0" width="240" height="120" fill={`url(#dot-grid-empty-${board.id})`} />
+
+        <rect
+          x="65"
+          y="42"
+          width="110"
+          height="36"
+          rx="6"
+          fill={isDark ? '#1a2230' : '#ffffff'}
+          stroke="#818cf8"
+          strokeWidth="1.6"
+          strokeDasharray="4 3"
+        />
+        <text
+          x="120"
+          y="64"
+          textAnchor="middle"
+          fontSize="11"
+          fontWeight="600"
+          fill={isDark ? '#94a3b8' : '#64748b'}
+          fontFamily="Inter, system-ui, -apple-system, sans-serif"
+        >
+          + Quadro em branco
+        </text>
+      </svg>
+    );
+  }
+
+  // ─── CASO 2: MINIATURA DE NOTAS ADESIVAS (STICKIES) ─────────────────────────
   if (isStickiesDominant) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     stickies.forEach(s => {
@@ -60,7 +124,6 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
 
           return (
             <g key={s.id}>
-              {/* Sombra sutil da nota adesiva */}
               <rect
                 x={s.x + 2}
                 y={s.y + 3}
@@ -69,7 +132,6 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
                 rx="6"
                 fill="rgba(0,0,0,0.06)"
               />
-              {/* Corpo da nota com cor real */}
               <rect
                 x={s.x}
                 y={s.y}
@@ -80,7 +142,6 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
                 stroke={isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)'}
                 strokeWidth="1.5"
               />
-              {/* Linhas indicativas de texto manuscrito com alta legibilidade visual */}
               <rect
                 x={s.x + 14}
                 y={s.y + 20}
@@ -112,7 +173,7 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
     );
   }
 
-  // ─── CASO 2: MINIATURA DE WIREFRAMES ─────────────────────────────────────────
+  // ─── CASO 3: MINIATURA DE WIREFRAMES ─────────────────────────────────────────
   if (isWireframeDominant) {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     wireframes.forEach(w => {
@@ -202,7 +263,7 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
     );
   }
 
-  // ─── CASO 3: MINIATURA DE DOCUMENTO / TEXTO EXECUTIVO ────────────────────────
+  // ─── CASO 4: MINIATURA DE DOCUMENTO EXECUTIVO ────────────────────────────────
   if (isDocDominant) {
     return (
       <svg
@@ -243,238 +304,449 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
     );
   }
 
-  // ─── CASO 4: QUADRO VAZIO / SEM ELEMENTOS RELEVANTES ────────────────────────
-  if (isEmptyBoard) {
+  // ─── CASO 5: MINIATURA 100% REAL DE MAPA MENTAL / FLUXOGRAMA / QUADRO GERAL ──
+  return useMemo(() => {
+    const isOrg = board.layoutType === 'orgchart';
+    const rootNode = nodes.find(n => n.side === 'root' || !n.parentId) || nodes[0];
+    const nodeMap = new Map<string, MindMapNode>();
+    nodes.forEach(n => nodeMap.set(n.id, n));
+
+    // Determina visibilidade com base no colapso de nós ancestrais
+    const isNodeVisible = (node: MindMapNode): boolean => {
+      let cur = node;
+      while (cur.parentId) {
+        const parent = nodeMap.get(cur.parentId);
+        if (!parent) break;
+        if (parent.collapsed) return false;
+        cur = parent;
+      }
+      return true;
+    };
+
+    const visibleNodes = nodes.filter(isNodeVisible);
+    const effectiveNodes = visibleNodes.length > 0 ? visibleNodes : (rootNode ? [rootNode] : []);
+
+    // Layout calculado com proporção equilibrada (horizontalGap amplo para curvas orgânicas)
+    const layout = calculateMindMapLayout(effectiveNodes, rootNode?.id || 'root', {
+      horizontalGap: isOrg ? 45 : 170,
+      verticalGap: isOrg ? 36 : 10,
+      rootX: 0,
+      rootY: 0,
+      layoutType: board.layoutType
+    });
+
+    const nodePositions = new Map<string, { 
+      x: number; 
+      y: number; 
+      w: number; 
+      h: number; 
+      color: string; 
+      isRoot: boolean;
+      text: string;
+      collapsed?: boolean;
+      hasChildren: boolean;
+      descendantCount: number;
+      isPrimaryChild: boolean;
+    }>();
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    // Função de contagem de descendentes recolhidos
+    const countDescendants = (nodeId: string): number => {
+      let count = 0;
+      const stack = [nodeId];
+      const visited = new Set<string>();
+      while (stack.length > 0) {
+        const curId = stack.pop()!;
+        if (visited.has(curId)) continue;
+        visited.add(curId);
+        const n = nodeMap.get(curId);
+        if (!n || !n.childrenIds) continue;
+        for (const cid of n.childrenIds) {
+          if (!visited.has(cid)) {
+            count++;
+            stack.push(cid);
+          }
+        }
+      }
+      return count;
+    };
+
+    const totalNodesCount = effectiveNodes.length;
+    const isDenseMap = totalNodesCount > 30;
+
+    effectiveNodes.forEach(node => {
+      const computed = layout.get(node.id);
+      const isRoot = node.id === rootNode?.id;
+      const isPrimaryChild = node.parentId === rootNode?.id;
+      const measured = measureNodeText(node);
+
+      const baseX = computed ? computed.x : (node.x || 0);
+      const baseY = computed ? computed.y : (node.y || 0);
+      const x = baseX + (node.offsetX || 0);
+      const y = baseY + (node.offsetY || 0);
+
+      const textLen = (node.text || '').length;
+      const estimatedWidth = Math.max(30, Math.min(180, textLen * 7.5 + 16));
+      const w = isRoot 
+        ? Math.max(120, Math.min(240, (measured?.width || estimatedWidth) + 32))
+        : Math.max(24, Math.min(180, measured?.width || estimatedWidth));
+      const h = isRoot 
+        ? Math.max(34, (measured?.height || 26) + 12) 
+        : Math.max(16, measured?.height || 18);
+
+      const rawColor = node.color;
+      const isColorWhite = !rawColor || rawColor.toLowerCase() === '#ffffff' || rawColor.toLowerCase() === '#fff';
+      const color = isColorWhite ? (isDark ? '#6366f1' : '#7c3aed') : rawColor;
+      
+      const hasChildren = Boolean(node.childrenIds && node.childrenIds.length > 0);
+      const descendantCount = node.collapsed ? countDescendants(node.id) : 0;
+
+      nodePositions.set(node.id, {
+        x,
+        y,
+        w,
+        h,
+        color,
+        isRoot,
+        text: node.text || '',
+        collapsed: node.collapsed,
+        hasChildren,
+        descendantCount,
+        isPrimaryChild
+      });
+
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x + w > maxX) maxX = x + w;
+      if (y + h > maxY) maxY = y + h;
+    });
+
+    // Engloba formas geométricas (shapes) no bounding box
+    shapes.forEach(sh => {
+      const w = sh.width || 140;
+      const h = sh.height || 60;
+      if (sh.x < minX) minX = sh.x;
+      if (sh.y < minY) minY = sh.y;
+      if (sh.x + w > maxX) maxX = sh.x + w;
+      if (sh.y + h > maxY) maxY = sh.y + h;
+    });
+
+    // Engloba notas adesivas (stickies) no bounding box
+    stickies.forEach(s => {
+      const w = s.width || 160;
+      const h = s.height || 120;
+      if (s.x < minX) minX = s.x;
+      if (s.y < minY) minY = s.y;
+      if (s.x + w > maxX) maxX = s.x + w;
+      if (s.y + h > maxY) maxY = s.y + h;
+    });
+
+    // Engloba wireframes no bounding box
+    wireframes.forEach(wf => {
+      const w = wf.width || 160;
+      const h = wf.height || 60;
+      if (wf.x < minX) minX = wf.x;
+      if (wf.y < minY) minY = wf.y;
+      if (wf.x + w > maxX) maxX = wf.x + w;
+      if (wf.y + h > maxY) maxY = wf.y + h;
+    });
+
+    // Engloba textos livres
+    texts.forEach(txt => {
+      const w = txt.width || 140;
+      const h = txt.height || 40;
+      if (txt.x < minX) minX = txt.x;
+      if (txt.y < minY) minY = txt.y;
+      if (txt.x + w > maxX) maxX = txt.x + w;
+      if (txt.y + h > maxY) maxY = txt.y + h;
+    });
+
+    // Fallback de segurança se minX/minY forem infinitos
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      minX = -120;
+      minY = -60;
+      maxX = 120;
+      maxY = 60;
+    }
+
+    const rawSpanX = Math.max(160, maxX - minX);
+    const rawSpanY = Math.max(90, maxY - minY);
+
+    // ENQUADRAMENTO NATURAL HARMONIOSO:
+    // O viewBox abraça o conteúdo com respiro proporcional.
+    // Se o canvas for excessivamente vertical (ex: Orion Sushi com 25 ramos verticais de uma linha só),
+    // limitamos a altura máxima do enquadramento a 1.25x a largura para preservar legibilidade e amplitude!
+    const padX = Math.max(28, rawSpanX * 0.06);
+    const padY = Math.max(22, rawSpanY * 0.06);
+
+    let viewMinX = minX - padX;
+    let viewMinY = minY - padY;
+    let viewWidth = rawSpanX + padX * 2;
+    let viewHeight = rawSpanY + padY * 2;
+
+    const isExcessivelyVertical = viewHeight > viewWidth * 1.25;
+    if (isExcessivelyVertical) {
+      const rootPos = nodePositions.get(rootNode?.id || '');
+      const rootY = rootPos ? rootPos.y + rootPos.h / 2 : minY;
+      
+      viewHeight = viewWidth * 1.10;
+      viewMinY = Math.max(minY - padY, rootY - viewHeight * 0.35);
+    }
+
+    const viewBox = `${viewMinX} ${viewMinY} ${viewWidth} ${viewHeight}`;
+
+    // Agrupamento pai -> filhos para linhas conectoras limpas
+    const parentChildrenMap = new Map<string, MindMapNode[]>();
+    effectiveNodes.forEach(child => {
+      if (!child.parentId) return;
+      const parent = nodeMap.get(child.parentId);
+      if (!parent || parent.collapsed) return;
+      if (!parentChildrenMap.has(child.parentId)) {
+        parentChildrenMap.set(child.parentId, []);
+      }
+      parentChildrenMap.get(child.parentId)!.push(child);
+    });
+
     return (
       <svg
-        viewBox="0 0 240 120"
+        viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: '100%', display: 'block' }}
       >
         <defs>
-          <pattern id={`dot-grid-empty-${board.id}`} width="18" height="18" patternUnits="userSpaceOnUse">
+          <pattern id={`dot-grid-mindmap-${board.id}`} width="20" height="20" patternUnits="userSpaceOnUse">
             <circle cx="2" cy="2" r="1.1" fill={isDark ? '#2e3a4e' : '#e2e8f0'} />
           </pattern>
         </defs>
-        <rect x="0" y="0" width="240" height="120" fill={`url(#dot-grid-empty-${board.id})`} />
 
+        {/* Fundo do Canvas */}
         <rect
-          x="65"
-          y="42"
-          width="110"
-          height="36"
-          rx="6"
-          fill={isDark ? '#1a2230' : '#ffffff'}
-          stroke="#818cf8"
-          strokeWidth="1.6"
-          strokeDasharray="4 3"
+          x={viewMinX}
+          y={viewMinY}
+          width={viewWidth}
+          height={viewHeight}
+          fill={`url(#dot-grid-mindmap-${board.id})`}
         />
-        <text
-          x="120"
-          y="64"
-          textAnchor="middle"
-          fontSize="11"
-          fontWeight="600"
-          fill={isDark ? '#94a3b8' : '#64748b'}
-        >
-          + Quadro em branco
-        </text>
-      </svg>
-    );
-  }
 
-  // ─── CASO 5: MINIATURA REAL DE MAPA MENTAL / ÁRVORE HIERÁRQUICA ───────────────
-  // Para árvores densas ou muito extensas (como cardápios de 100+ itens),
-  // selecionamos ramos estruturais representativos equilibrados (esquerda e direita)
-  // para compor uma miniatura harmônica com proporção horizontal ideal (2:1).
-  const root = nodes.find(n => n.side === 'root' || !n.parentId) || nodes[0];
-  const isOrg = board.layoutType === 'orgchart';
+        {/* 1. Conectores e Ramos Reais do Mapa Mental */}
+        {Array.from(parentChildrenMap.entries()).map(([parentId, children]) => {
+          const parentPos = nodePositions.get(parentId);
+          if (!parentPos) return null;
 
-  // Filhos imediatos do root
-  const rootChildren = nodes.filter(n => n.parentId === (root?.id || 'root'));
+          const isRootParent = parentPos.isRoot;
 
-  let displayNodes: MindMapNode[] = [];
+          return children.map(child => {
+            const childPos = nodePositions.get(child.id);
+            if (!childPos) return null;
 
-  if (nodes.length <= 16) {
-    displayNodes = nodes;
-  } else {
-    // Para boards com muitos nós, seleciona até 6 a 8 ramos primários
-    const maxPrimary = isOrg ? 5 : 6;
-    const selectedPrimary = rootChildren.slice(0, maxPrimary);
-    const selectedPrimaryIds = new Set(selectedPrimary.map(p => p.id));
+            let pathD = '';
+            if (isOrg) {
+              const startX = parentPos.x + parentPos.w / 2;
+              const startY = parentPos.y + parentPos.h;
+              const endX = childPos.x + childPos.w / 2;
+              const endY = childPos.y;
+              const midY = (startY + endY) / 2;
+              pathD = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
+            } else {
+              const isChildOnLeft = (childPos.x + childPos.w / 2) < (parentPos.x + parentPos.w / 2);
+              const startX = isChildOnLeft ? parentPos.x : parentPos.x + parentPos.w;
+              const startY = parentPos.y + parentPos.h / 2;
+              const endX = isChildOnLeft ? childPos.x + childPos.w : childPos.x;
+              const endY = childPos.y + childPos.h / 2;
+              pathD = getBezierPath(startX, startY, endX, endY);
+            }
 
-    // Se todos estiverem no mesmo lado (unilateral), balanceia para a miniatura
-    const allSameSide = !isOrg && selectedPrimary.length >= 2 && (
-      selectedPrimary.every(p => p.side === 'right') ||
-      selectedPrimary.every(p => p.side === 'left') ||
-      selectedPrimary.every(p => !p.side)
-    );
+            const strokeColor = childPos.color || parentPos.color || '#818cf8';
+            const strokeWidth = isRootParent ? 2.8 : 1.9;
 
-    displayNodes = [root ? { ...root, side: 'root' as const } : nodes[0]];
+            return (
+              <path
+                key={`conn-${child.id}`}
+                d={pathD}
+                fill="none"
+                stroke={strokeColor}
+                strokeWidth={strokeWidth}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={0.92}
+              />
+            );
+          });
+        })}
 
-    selectedPrimary.forEach((p, idx) => {
-      const assignedSide: 'left' | 'right' | 'root' | undefined = allSameSide
-        ? (idx < Math.ceil(selectedPrimary.length / 2) ? 'right' : 'left')
-        : p.side;
+        {/* 2. Formas Geométricas (se houverem no board) */}
+        {shapes.map(sh => {
+          const w = sh.width || 140;
+          const h = sh.height || 60;
+          const bg = sh.color || (isDark ? '#1a2230' : '#ffffff');
+          const border = sh.borderColor || (isDark ? '#3b4961' : '#cbd5e1');
 
-      displayNodes.push({
-        ...p,
-        side: assignedSide
-      });
+          if (sh.type === 'circle') {
+            const r = Math.min(w, h) / 2;
+            return (
+              <circle
+                key={`sh-${sh.id}`}
+                cx={sh.x + w / 2}
+                cy={sh.y + h / 2}
+                r={r}
+                fill={bg}
+                stroke={border}
+                strokeWidth="1.5"
+              />
+            );
+          }
 
-      // Pega até 2 filhos imediatos de cada ramo primário
-      const grandChildren = nodes.filter(n => n.parentId === p.id).slice(0, 2);
-      grandChildren.forEach(gc => {
-        displayNodes.push({
-          ...gc,
-          side: assignedSide
-        });
-      });
-    });
-  }
+          if (sh.type === 'diamond') {
+            const cx = sh.x + w / 2;
+            const cy = sh.y + h / 2;
+            return (
+              <polygon
+                key={`sh-${sh.id}`}
+                points={`${cx},${sh.y} ${sh.x + w},${cy} ${cx},${sh.y + h} ${sh.x},${cy}`}
+                fill={bg}
+                stroke={border}
+                strokeWidth="1.5"
+              />
+            );
+          }
 
-  const layout = calculateMindMapLayout(displayNodes, root?.id || 'root', {
-    layoutType: isOrg ? 'orgchart' : 'bidirectional',
-    horizontalGap: isOrg ? 35 : 55,
-    verticalGap: isOrg ? 28 : 14,
-    rootX: 0,
-    rootY: 0
-  });
-
-  const nodePositions = new Map<string, { x: number; y: number; w: number; h: number; color: string; isRoot: boolean }>();
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-  displayNodes.forEach(n => {
-    const computed = layout.get(n.id);
-    const x = (computed ? computed.x : (n.x || 0)) + (n.offsetX || 0);
-    const y = (computed ? computed.y : (n.y || 0)) + (n.offsetY || 0);
-    const isRoot = n.id === root?.id;
-    const w = isRoot ? 100 : (computed ? Math.min(85, Math.max(45, computed.width * 0.65)) : 55);
-    const h = isRoot ? 26 : (computed ? Math.min(22, Math.max(16, computed.height * 0.65)) : 18);
-    const color = n.color || (isRoot ? '#7c3aed' : '#818cf8');
-
-    nodePositions.set(n.id, { x, y, w, h, color, isRoot });
-
-    if (x < minX) minX = x;
-    if (y < minY) minY = y;
-    if (x + w > maxX) maxX = x + w;
-    if (y + h > maxY) maxY = y + h;
-  });
-
-  const spanX = Math.max(140, maxX - minX);
-  const spanY = Math.max(90, maxY - minY);
-  const padX = Math.max(24, spanX * 0.08);
-  const padY = Math.max(18, spanY * 0.12);
-
-  const viewBox = `${minX - padX} ${minY - padY} ${spanX + 2 * padX} ${spanY + 2 * padY}`;
-
-  return (
-    <svg
-      viewBox={viewBox}
-      preserveAspectRatio="xMidYMid meet"
-      style={{ width: '100%', height: '100%', display: 'block' }}
-    >
-      <defs>
-        <pattern id={`dot-grid-mindmap-${board.id}`} width="20" height="20" patternUnits="userSpaceOnUse">
-          <circle cx="2" cy="2" r="1.1" fill={isDark ? '#2e3a4e' : '#e2e8f0'} />
-        </pattern>
-      </defs>
-      <rect
-        x={minX - padX}
-        y={minY - padY}
-        width={spanX + 2 * padX}
-        height={spanY + 2 * padY}
-        fill={`url(#dot-grid-mindmap-${board.id})`}
-      />
-
-      {/* 1. Conectores e Ramos em SVG */}
-      {displayNodes.map(node => {
-        if (!node.parentId) return null;
-        const parentPos = nodePositions.get(node.parentId);
-        const childPos = nodePositions.get(node.id);
-        if (!parentPos || !childPos) return null;
-
-        let pathD = '';
-        if (isOrg) {
-          const startX = parentPos.x + parentPos.w / 2;
-          const startY = parentPos.y + parentPos.h;
-          const endX = childPos.x + childPos.w / 2;
-          const endY = childPos.y;
-          const midY = (startY + endY) / 2;
-          pathD = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
-        } else {
-          const isRight = childPos.x >= parentPos.x;
-          const startX = isRight ? parentPos.x + parentPos.w : parentPos.x;
-          const startY = parentPos.y + parentPos.h / 2;
-          const endX = isRight ? childPos.x : childPos.x + childPos.w;
-          const endY = childPos.y + childPos.h / 2;
-          const midX = (startX + endX) / 2;
-          pathD = `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`;
-        }
-
-        return (
-          <path
-            key={`conn-${node.id}`}
-            d={pathD}
-            fill="none"
-            stroke={childPos.color || '#818cf8'}
-            strokeWidth="1.8"
-            strokeOpacity={0.75}
-          />
-        );
-      })}
-
-      {/* 2. Nós do Mapa Mental com cores e proporções reais */}
-      {displayNodes.map(node => {
-        const pos = nodePositions.get(node.id);
-        if (!pos) return null;
-
-        if (pos.isRoot) {
           return (
-            <g key={node.id}>
-              <rect
-                x={pos.x}
-                y={pos.y}
-                width={pos.w}
-                height={pos.h}
-                rx="6"
-                fill={pos.color || '#7c3aed'}
-              />
-              <rect
-                x={pos.x + 8}
-                y={pos.y + pos.h / 2 - 2.5}
-                width={Math.max(20, pos.w - 16)}
-                height="5"
-                rx="1.5"
-                fill="#ffffff"
-              />
+            <rect
+              key={`sh-${sh.id}`}
+              x={sh.x}
+              y={sh.y}
+              width={w}
+              height={h}
+              rx={sh.type === 'rounded' ? 8 : 4}
+              fill={bg}
+              stroke={border}
+              strokeWidth="1.5"
+            />
+          );
+        })}
+
+        {/* 3. Notas Adesivas (se houverem no board) */}
+        {stickies.map(s => {
+          const w = s.width || 160;
+          const h = s.height || 120;
+          return (
+            <g key={`st-${s.id}`}>
+              <rect x={s.x + 2} y={s.y + 3} width={w} height={h} rx="5" fill="rgba(0,0,0,0.06)" />
+              <rect x={s.x} y={s.y} width={w} height={h} rx="5" fill={s.color || '#fef08a'} />
             </g>
           );
-        }
+        })}
 
-        return (
-          <g key={node.id}>
-            <rect
-              x={pos.x}
-              y={pos.y}
-              width={pos.w}
-              height={pos.h}
-              rx="4"
-              fill={isDark ? '#1a2230' : '#ffffff'}
-              stroke={pos.color || '#94a3b8'}
-              strokeWidth="1.6"
-            />
-            <rect
-              x={pos.x + 6}
-              y={pos.y + pos.h / 2 - 2}
-              width={Math.max(12, pos.w - 12)}
-              height="4"
-              rx="1.2"
-              fill={isDark ? '#475569' : '#cbd5e1'}
-            />
-          </g>
-        );
-      })}
-    </svg>
-  );
+        {/* 4. Nós do Mapa Mental (100% Sem Cards Artificiais) */}
+        {effectiveNodes.map(node => {
+          const pos = nodePositions.get(node.id);
+          if (!pos) return null;
+
+          // Nó Raiz Principal: Cápsula Executiva Sólida com Texto Nítido e Alto Contraste
+          if (pos.isRoot) {
+            const rawNodeColor = node.color;
+            const isWhiteRoot = !rawNodeColor || rawNodeColor.toLowerCase() === '#ffffff' || rawNodeColor.toLowerCase() === '#fff';
+            
+            const rootFill = isWhiteRoot ? (isDark ? '#1e293b' : '#ffffff') : (pos.color || '#7c3aed');
+            const rootStroke = isWhiteRoot ? (isDark ? '#475569' : '#334155') : 'none';
+            const rootTextColor = isWhiteRoot ? (isDark ? '#f8fafc' : '#0f172a') : '#ffffff';
+
+            return (
+              <g key={`node-${node.id}`}>
+                <rect
+                  x={pos.x}
+                  y={pos.y}
+                  width={pos.w}
+                  height={pos.h}
+                  rx="6"
+                  fill={rootFill}
+                  stroke={rootStroke}
+                  strokeWidth="1.8"
+                />
+                <text
+                  x={pos.x + pos.w / 2}
+                  y={pos.y + pos.h / 2 + 5}
+                  textAnchor="middle"
+                  fill={rootTextColor}
+                  fontFamily="Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                  fontSize="13"
+                  fontWeight="700"
+                  letterSpacing="-0.01em"
+                >
+                  {escapeXml(pos.text)}
+                </text>
+              </g>
+            );
+          }
+
+          // Se o mapa for moderado (<= 35 nós) ou ramo primário, renderiza texto real em SVG
+          const shouldRenderRealText = !isDenseMap || pos.isPrimaryChild;
+
+          return (
+            <g key={`node-${node.id}`}>
+              {shouldRenderRealText ? (
+                <text
+                  x={pos.x}
+                  y={pos.y + pos.h / 2 + 4.5}
+                  fill={isDark ? '#f1f5f9' : '#0f172a'}
+                  fontFamily="Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                  fontSize={pos.isPrimaryChild ? '12' : '11'}
+                  fontWeight={pos.isPrimaryChild ? '600' : '500'}
+                  letterSpacing="-0.01em"
+                >
+                  {escapeXml(pos.text)}
+                </text>
+              ) : (
+                // Em árvores muito densas (> 35 nós em ramos profundos), traço tipográfico proporcional
+                <rect
+                  x={pos.x}
+                  y={pos.y + pos.h / 2 - 2}
+                  width={Math.max(20, Math.min(pos.w * 0.8, 90))}
+                  height="4"
+                  rx="2"
+                  fill={isDark ? '#94a3b8' : '#64748b'}
+                  opacity={0.85}
+                />
+              )}
+
+              {/* Badge de nós colapsados (se houver filhos recolhidos) */}
+              {pos.collapsed && pos.descendantCount > 0 && (
+                <g>
+                  <circle
+                    cx={pos.x + pos.w + 10}
+                    cy={pos.y + pos.h / 2}
+                    r="7.5"
+                    fill={pos.color || '#818cf8'}
+                  />
+                  <text
+                    x={pos.x + pos.w + 10}
+                    y={pos.y + pos.h / 2 + 3}
+                    textAnchor="middle"
+                    fill="#ffffff"
+                    fontFamily="Inter, system-ui, -apple-system, sans-serif"
+                    fontSize="9"
+                    fontWeight="700"
+                  >
+                    {pos.descendantCount > 99 ? '99+' : pos.descendantCount}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    );
+  }, [
+    board.id,
+    board.updatedAt,
+    board.layoutType,
+    nodes,
+    stickies,
+    wireframes,
+    shapes,
+    texts,
+    drawings,
+    isDark
+  ]);
 };
