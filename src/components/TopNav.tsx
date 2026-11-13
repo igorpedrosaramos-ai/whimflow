@@ -15,7 +15,9 @@ import {
   Grid,
   Clock,
   BarChart2,
-  Sparkles
+  Sparkles,
+  FoldHorizontal,
+  UnfoldHorizontal
 } from 'lucide-react';
 import { Board, BoardCategory } from '../types';
 
@@ -47,6 +49,9 @@ interface TopNavProps {
   workspaceName?: string;
   isStarred?: boolean;
   onToggleFavorite?: () => void;
+  onCollapseAllBranches?: () => void;
+  onExpandAllBranches?: () => void;
+  hasCollapsedBranches?: boolean;
 }
 
 export const TopNav: React.FC<TopNavProps> = ({
@@ -69,6 +74,9 @@ export const TopNav: React.FC<TopNavProps> = ({
   onOpenVersionHistory,
   onOpenBoardStats,
   onMoveCategory,
+  onCollapseAllBranches,
+  onExpandAllBranches,
+  hasCollapsedBranches = false,
   totalObjects = 0,
   workspaceName = 'teste',
   isStarred = false,
@@ -308,6 +316,72 @@ export const TopNav: React.FC<TopNavProps> = ({
 
       {/* Direita: Presença, Compartilhar, Apresentar, Atalhos */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+        {/* Controle Rápido de Ramos: Minimizar / Maximizar Todos */}
+        {onCollapseAllBranches && onExpandAllBranches && (
+          <div
+            id="branch-collapse-expand-control"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: isDark ? '#1a222f' : '#f8fafc',
+              border: isDark ? '1px solid #2a3444' : '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '2px',
+              gap: '2px'
+            }}
+          >
+            <button
+              id="btn-topnav-collapse-all"
+              type="button"
+              onClick={onCollapseAllBranches}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: hasCollapsedBranches ? (isDark ? '#263142' : '#e2e8f0') : 'transparent',
+                color: isDark ? '#f1f5f9' : '#0f172a',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Minimizar todos os ramos (Atalho: Ctrl+Shift+[)"
+            >
+              <FoldHorizontal size={14} color={isDark ? '#cbd5e1' : '#475569'} />
+              <span>Recolher ramos</span>
+            </button>
+
+            <div style={{ width: '1px', height: '14px', backgroundColor: isDark ? '#2e384b' : '#cbd5e1' }} />
+
+            <button
+              id="btn-topnav-expand-all"
+              type="button"
+              onClick={onExpandAllBranches}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '3px 8px',
+                borderRadius: '4px',
+                border: 'none',
+                backgroundColor: !hasCollapsedBranches ? (isDark ? '#263142' : '#e2e8f0') : 'transparent',
+                color: isDark ? '#f1f5f9' : '#0f172a',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              title="Maximizar / Expandir todos os ramos (Atalho: Ctrl+Shift+])"
+            >
+              <UnfoldHorizontal size={14} color={isDark ? '#cbd5e1' : '#475569'} />
+              <span>Expandir ramos</span>
+            </button>
+          </div>
+        )}
+
         {/* Contador de Objetos Ilimitados Pro / Estatísticas do Quadro */}
         {onOpenBoardStats && (
           <button

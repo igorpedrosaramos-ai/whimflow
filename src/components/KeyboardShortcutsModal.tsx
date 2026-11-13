@@ -26,6 +26,9 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
         { key: 'F2 ou Duplo Clique', desc: 'Editar texto do nó' },
         { key: 'Delete / Backspace', desc: 'Excluir nó selecionado e seus ramos' },
         { key: 'Ctrl + C / Ctrl + V', desc: 'Copiar e colar nós com conexões' },
+        { key: 'Ctrl + /', desc: 'Recolher ou expandir ramo do nó selecionado' },
+        { key: 'Ctrl + Shift + [', desc: 'Minimizar / Recolher todos os ramos do mapa' },
+        { key: 'Ctrl + Shift + ]', desc: 'Maximizar / Expandir todos os ramos do mapa' },
         { key: 'Ctrl + Z / Ctrl + Y', desc: 'Desfazer e refazer ações' }
       ]
     },

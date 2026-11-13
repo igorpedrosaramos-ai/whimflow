@@ -21,6 +21,8 @@ interface UseKeyboardShortcutsProps {
   handleAddSiblingAboveNode: (id: string) => void;
   handleAddParentNode: (id: string) => void;
   handleToggleCollapse: (id: string) => void;
+  handleCollapseAllBranches?: () => void;
+  handleExpandAllBranches?: () => void;
   handleDeleteNode: (id: string) => void;
   handleDeleteMultipleNodes: (ids: string[]) => void;
   handleDuplicateNode: (id: string) => void;
@@ -50,6 +52,8 @@ export function useKeyboardShortcuts({
   handleAddSiblingAboveNode,
   handleAddParentNode,
   handleToggleCollapse,
+  handleCollapseAllBranches,
+  handleExpandAllBranches,
   handleDeleteNode,
   handleDeleteMultipleNodes,
   handleDuplicateNode,
@@ -127,11 +131,30 @@ export function useKeyboardShortcuts({
         return;
       }
 
+      // Minimizar Todos os Ramos do Mapa (Ctrl + Shift + [ ou Ctrl + Shift + -)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === '[' || e.key === '{' || e.key === '-' || e.key === '_')) {
+        e.preventDefault();
+        handleCollapseAllBranches?.();
+        return;
+      }
+
+      // Maximizar / Expandir Todos os Ramos do Mapa (Ctrl + Shift + ] ou Ctrl + Shift + +)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === ']' || e.key === '}' || e.key === '+' || e.key === '=')) {
+        e.preventDefault();
+        handleExpandAllBranches?.();
+        return;
+      }
+
       // Recolher / Expandir Ramo (Ctrl + /)
       if ((e.ctrlKey || e.metaKey) && e.key === '/') {
         if (selectedNodeId) {
           e.preventDefault();
           handleToggleCollapse(selectedNodeId);
+          return;
+        } else {
+          // Se nenhum nó estiver selecionado, alterna entre expandir e recolher todos
+          e.preventDefault();
+          handleCollapseAllBranches?.();
           return;
         }
       }
@@ -316,6 +339,8 @@ export function useKeyboardShortcuts({
     handleAddSiblingAboveNode,
     handleAddParentNode,
     handleToggleCollapse,
+  handleCollapseAllBranches,
+  handleExpandAllBranches,
     handleDeleteNode,
     handleDeleteMultipleNodes,
     handleDuplicateNode,

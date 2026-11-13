@@ -6,7 +6,9 @@ import {
   Minus, 
   Plus, 
   Zap, 
-  HelpCircle 
+  HelpCircle,
+  FoldHorizontal,
+  UnfoldHorizontal
 } from 'lucide-react';
 
 interface ZoomControlsProps {
@@ -22,6 +24,8 @@ interface ZoomControlsProps {
   onOpenShortcuts?: () => void;
   onOpenSearch?: () => void;
   onOpenQuickSpark?: () => void;
+  onCollapseAllBranches?: () => void;
+  onExpandAllBranches?: () => void;
   theme?: 'dark' | 'light';
 }
 
@@ -38,6 +42,8 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
   onOpenShortcuts,
   onOpenSearch,
   onOpenQuickSpark,
+  onCollapseAllBranches,
+  onExpandAllBranches,
   theme = 'light'
 }) => {
   const zoomPercent = Math.round(zoom * 100);
@@ -190,6 +196,57 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
       >
         <Plus size={14} />
       </button>
+
+      {/* Divisor */}
+      {(onCollapseAllBranches || onExpandAllBranches) && (
+        <div style={{ width: '1px', height: '18px', backgroundColor: isDark ? '#2e384b' : '#e2e8f0', margin: '0 3px' }} />
+      )}
+
+      {/* Minimizar todos os ramos */}
+      {onCollapseAllBranches && (
+        <button
+          id="btn-zoom-collapse-all"
+          onClick={onCollapseAllBranches}
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '5px',
+            border: 'none',
+            backgroundColor: 'transparent',
+            color: isDark ? '#f1f5f9' : '#475569',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer'
+          }}
+          title="Minimizar todos os ramos (Ctrl+Shift+[)"
+        >
+          <FoldHorizontal size={14} />
+        </button>
+      )}
+
+      {/* Maximizar todos os ramos */}
+      {onExpandAllBranches && (
+        <button
+          id="btn-zoom-expand-all"
+          onClick={onExpandAllBranches}
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '5px',
+            border: 'none',
+            backgroundColor: 'transparent',
+            color: isDark ? '#f1f5f9' : '#475569',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer'
+          }}
+          title="Maximizar / Expandir todos os ramos (Ctrl+Shift+])"
+        >
+          <UnfoldHorizontal size={14} />
+        </button>
+      )}
 
       {/* Divisor */}
       <div style={{ width: '1px', height: '18px', backgroundColor: isDark ? '#2e384b' : '#e2e8f0', margin: '0 3px' }} />

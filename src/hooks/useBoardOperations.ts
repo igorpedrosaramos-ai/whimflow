@@ -63,11 +63,55 @@ export function useBoardOperations({
     }));
   }, [updateActiveBoard]);
 
-  // Recolher / Expandir Ramo
+  // Recolher / Expandir Ramo Individual
   const handleToggleCollapse = useCallback((id: string) => {
     updateActiveBoard(board => ({
       ...board,
       mindMapNodes: board.mindMapNodes.map(n => n.id === id ? { ...n, collapsed: !n.collapsed } : n)
+    }));
+  }, [updateActiveBoard]);
+
+  // Minimizar / Recolher Todos os Ramos do Mapa (mantém nós-raiz e tópicos principais visíveis com contadores)
+  const handleCollapseAllBranches = useCallback(() => {
+    updateActiveBoard(board => {
+      // Mapeamento bidirecional infalível de nós que possuem filhos
+      const parentIdsWithChildren = new Set<string>();
+      board.mindMapNodes.forEach(node => {
+        if (node.childrenIds && node.childrenIds.length > 0) {
+          parentIdsWithChildren.add(node.id);
+        }
+        if (node.parentId) {
+          parentIdsWithChildren.add(node.parentId);
+        }
+      });
+
+      return {
+        ...board,
+        mindMapNodes: board.mindMapNodes.map(node => {
+          // Os nós raiz ('root' ou side === 'root' ou sem parentId) NUNCA são recolhidos,
+          // garantindo que a estrutura principal do projeto permaneça 100% legível.
+          const isRoot = node.id === 'root' || node.side === 'root' || !node.parentId;
+          if (isRoot) {
+            return { ...node, collapsed: false };
+          }
+          // Todos os nós que possuem filhos são recolhidos
+          if (parentIdsWithChildren.has(node.id)) {
+            return { ...node, collapsed: true };
+          }
+          return node;
+        })
+      };
+    });
+  }, [updateActiveBoard]);
+
+  // Maximizar / Expandir Todos os Ramos do Mapa (expande 100% da árvore)
+  const handleExpandAllBranches = useCallback(() => {
+    updateActiveBoard(board => ({
+      ...board,
+      mindMapNodes: board.mindMapNodes.map(node => ({
+        ...node,
+        collapsed: false
+      }))
     }));
   }, [updateActiveBoard]);
 
@@ -580,6 +624,8 @@ export function useBoardOperations({
     handleDeleteMultipleNodes,
     handleUpdateNodeText,
     handleToggleCollapse,
+    handleCollapseAllBranches,
+    handleExpandAllBranches,
     handleAddChildNode,
     handleAddSiblingNode,
     handleAddSiblingAboveNode,

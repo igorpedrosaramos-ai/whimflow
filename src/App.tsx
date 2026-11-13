@@ -324,6 +324,8 @@ export const App: React.FC = () => {
     handleDeleteMultipleNodes,
     handleUpdateNodeText,
     handleToggleCollapse,
+    handleCollapseAllBranches,
+    handleExpandAllBranches,
     handleAddChildNode,
     handleAddSiblingNode,
     handleAddSiblingAboveNode,
@@ -366,6 +368,8 @@ export const App: React.FC = () => {
     handleAddSiblingAboveNode,
     handleAddParentNode,
     handleToggleCollapse,
+    handleCollapseAllBranches,
+    handleExpandAllBranches,
     handleDeleteNode,
     handleDeleteMultipleNodes,
     handleDuplicateNode,
@@ -959,6 +963,12 @@ export const App: React.FC = () => {
     (activeBoard.texts?.length || 0) + 
     (activeBoard.drawings?.length || 0);
 
+  const hasCollapsedBranches = useMemo(() => {
+    return (activeBoard.mindMapNodes || []).some(
+      n => n.collapsed && n.side !== 'root' && n.parentId
+    );
+  }, [activeBoard.mindMapNodes]);
+
   const currentBoardSnapshots = activeBoard.historySnapshots || [];
 
   return (
@@ -1077,6 +1087,9 @@ export const App: React.FC = () => {
             onOpenAgent={() => setIsAgentDrawerOpen(true)}
             onOpenVersionHistory={() => setIsVersionHistoryOpen(true)}
             onOpenBoardStats={() => setIsBoardStatsOpen(true)}
+            onCollapseAllBranches={handleCollapseAllBranches}
+            onExpandAllBranches={handleExpandAllBranches}
+            hasCollapsedBranches={hasCollapsedBranches}
             isStarred={!!activeBoard.isStarred}
             onToggleFavorite={() => {
               const nextVal = !activeBoard.isStarred;
@@ -1397,6 +1410,8 @@ export const App: React.FC = () => {
             onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
             onOpenSearch={() => setIsSearchModalOpen(true)}
             onOpenQuickSpark={() => setIsQuickSparkOpen(true)}
+            onCollapseAllBranches={handleCollapseAllBranches}
+            onExpandAllBranches={handleExpandAllBranches}
             theme={theme}
           />
         </div>
