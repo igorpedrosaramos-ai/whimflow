@@ -53,21 +53,15 @@ export function useBoardOperations({
     handleDeleteMultipleNodes([id]);
   }, [handleDeleteMultipleNodes]);
 
-  // Atualizar texto do nó
+  // Atualizar texto do nó - Mantém o nó seguro sem nunca deletar acidentalmente
   const handleUpdateNodeText = useCallback((id: string, text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) {
-      const target = activeBoard.mindMapNodes.find(n => n.id === id);
-      if (target && target.side !== 'root' && target.id !== 'root') {
-        handleDeleteNode(id);
-        return;
-      }
-    }
+    const finalVal = trimmed || 'Novo item';
     updateActiveBoard(board => ({
       ...board,
-      mindMapNodes: board.mindMapNodes.map(n => n.id === id ? { ...n, text: trimmed } : n)
+      mindMapNodes: board.mindMapNodes.map(n => n.id === id ? { ...n, text: finalVal } : n)
     }));
-  }, [activeBoard.mindMapNodes, updateActiveBoard, handleDeleteNode]);
+  }, [updateActiveBoard]);
 
   // Recolher / Expandir Ramo
   const handleToggleCollapse = useCallback((id: string) => {
@@ -91,7 +85,7 @@ export function useBoardOperations({
 
     const newNode: MindMapNode = {
       id: newId,
-      text: '',
+      text: 'Novo item',
       x: parent.x + 240,
       y: parent.y + parent.childrenIds.length * 45,
       parentId: parent.id,
@@ -100,7 +94,7 @@ export function useBoardOperations({
       color: branchColor,
       borderStyle: parent.borderStyle || 'accent',
       lineStyle: parent.lineStyle || 'bezier',
-      side: 'right'
+      side: parent.side === 'root' ? 'right' : parent.side
     };
 
     updateActiveBoard(board => ({
@@ -136,7 +130,7 @@ export function useBoardOperations({
     const newId = `node-${Date.now()}`;
     const newNode: MindMapNode = {
       id: newId,
-      text: '',
+      text: 'Novo item',
       x: sibling.x,
       y: sibling.y + 45,
       parentId: parent.id,
@@ -185,7 +179,7 @@ export function useBoardOperations({
     const newId = `node-${Date.now()}`;
     const newNode: MindMapNode = {
       id: newId,
-      text: '',
+      text: 'Novo item',
       x: sibling.x,
       y: sibling.y - 45,
       parentId: parent.id,
@@ -234,7 +228,7 @@ export function useBoardOperations({
     const newId = `node-${Date.now()}`;
     const newParentNode: MindMapNode = {
       id: newId,
-      text: '',
+      text: 'Novo item',
       x: (child.x + grandParent.x) / 2,
       y: child.y,
       parentId: grandParent.id,

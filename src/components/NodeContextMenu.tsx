@@ -556,6 +556,33 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
         </button>
       )}
 
+      {/* Adicionar Irmão Abaixo */}
+      {onAddSibling && node.side !== 'root' && (
+        <button
+          type="button"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddSibling();
+          }}
+          style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '4px',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--text-secondary, #cbd5e1)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title="Adicionar Irmão Abaixo (Atalho: Enter)"
+        >
+          <CornerDownRight size={13} />
+        </button>
+      )}
+
       <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-subtle, #2d3748)', margin: '0 2px' }} />
 
       {/* Duplicar Nó */}

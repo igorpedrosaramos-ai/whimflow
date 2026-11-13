@@ -74,8 +74,33 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  // Rastreia se o nó em edição é recém-criado (texto vazio) — protege contra deleção acidental ao perder foco
-  const isNewNodeRef = useRef<boolean>(false);
+  const hoverTimeoutRef = useRef<number | null>(null);
+
+  const handleMouseEnterNode = (nodeId: string) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredNodeId(nodeId);
+  };
+
+  const handleMouseLeaveNode = (nodeId: string) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = window.setTimeout(() => {
+      setHoveredNodeId(prev => (prev === nodeId ? null : prev));
+      hoverTimeoutRef.current = null;
+    }, 250);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ─── DRAG STATE ──────────────────────────────────────────────────────────────
   // draggingNodeId: React state (causa re-render para mostrar/esconder ghost)
@@ -113,9 +138,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       const target = nodes.find(n => n.id === editingNodeId);
       if (target) {
         setEditingId(target.id);
-        setEditingText(target.text);
-        // Marca como nó novo: texto vazio significa que é recém-criado
-        isNewNodeRef.current = !target.text || target.text.trim() === '';
+        setEditingText(target.text || '');
       }
       onClearEditingNodeId?.();
     }
@@ -206,7 +229,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
   const handleStartEdit = (node: MindMapNode, e: React.MouseEvent) => {
     e.stopPropagation();
-    isNewNodeRef.current = false; // edição manual nunca é "nó novo"
     setEditingId(node.id);
     setEditingText(node.text || '');
     onSelectNode(node.id);
@@ -216,14 +238,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     if (editingId) {
       const trimmed = editingText.trim();
       const node = nodeMap.get(editingId);
-      // Só remove ao perder foco se o nó for recém-criado (nunca editado pelo usuário) E ainda estiver vazio
-      const wasNew = isNewNodeRef.current;
-      isNewNodeRef.current = false;
-      if (!trimmed && wasNew && node && node.side !== 'root' && node.id !== 'root') {
-        onDeleteNode(editingId);
-      } else {
-        onUpdateNodeText(editingId, trimmed || node?.text || '');
-      }
+      // Mantém o nó aberto com o texto digitado ou com 'Novo item' se o usuário não digitou nada
+      const finalVal = trimmed || node?.text || 'Novo item';
+      onUpdateNodeText(editingId, finalVal);
     }
     setEditingId(null);
   };
@@ -231,32 +248,22 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent, node: MindMapNode) => {
     if (e.altKey && e.key === 'Enter') {
       e.preventDefault();
-      isNewNodeRef.current = false;
       handleCommitEdit();
       onAddParentNode?.(node.id);
     } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
-      isNewNodeRef.current = false;
       handleCommitEdit();
       onAddSiblingAboveNode?.(node.id);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      isNewNodeRef.current = false;
       handleCommitEdit();
       onAddSiblingNode(node.id);
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      isNewNodeRef.current = false;
       handleCommitEdit();
       onAddChildNode(node.id);
     } else if (e.key === 'Escape') {
-      // Escape sempre descarta o nó novo vazio, mas preserva nós existentes mesmo sem texto
-      const trimmed = editingText.trim();
-      const wasNew = isNewNodeRef.current;
-      isNewNodeRef.current = false;
-      if (!trimmed && wasNew && node.side !== 'root' && node.id !== 'root') {
-        onDeleteNode(node.id);
-      }
+      // Escape encerra o modo de edição sem descartar o nó
       setEditingId(null);
     }
   };
@@ -1059,6 +1066,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const pos = getNodePos(node);
         const nodeColor = node.color || '#38bdf8';
 
+        // Dimensões dinâmicas: durante a edição, garante espaço confortável de no mínimo 160px para acomodar todo o texto e placeholder
+        const editMinWidth = 160;
+        const cardWidth = isEditing ? Math.max(pos.width, editMinWidth) : pos.width;
+        const cardLeft = isEditing && node.side === 'left' ? (pos.x + pos.width - cardWidth) : pos.x;
+
         const isBold = !!node.bold || isRoot;
         const isItalic = !!node.italic;
         const fontSizePx = node.fontSize === 'small' ? '12px' : node.fontSize === 'large' ? '15.5px' : (isRoot ? '16px' : '13.5px');
@@ -1066,42 +1078,51 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
         const isConnectingSource = connectingSourceId === node.id;
 
-        // ESTILO 100% PURO TEXTO (SEM CAIXINHAS - ESTILO IMAGEM 2 WHIMSICAL)
-        const nodeBg = isSelected
+        // ESTILO DO CARD (Normal vs Edição)
+        // Quando em edição: fundo sólido corporativo de alto contraste, borda viva, sombra elegante
+        const nodeBg = isEditing
+          ? 'var(--bg-surface, #1e222a)'
+          : isSelected
           ? 'rgba(56, 189, 248, 0.08)'
           : (isHovered ? 'rgba(255, 255, 255, 0.04)' : 'transparent');
 
-        const nodeBorder = isSelected
+        const nodeBorder = isEditing
+          ? `1.5px solid ${nodeColor}`
+          : isSelected
           ? `1.5px solid ${nodeColor}`
           : (isHovered ? '1.5px solid rgba(255, 255, 255, 0.12)' : '1.5px solid transparent');
+
+        const nodeBoxShadow = isEditing
+          ? `0 0 0 3px ${nodeColor}28, 0 6px 18px rgba(0,0,0,0.35)`
+          : 'none';
 
         return (
           <div
             key={node.id}
             id={`node-${node.id}`}
-            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isConnectingSource ? 'connecting-source' : ''}`}
+            className={`mindmap-node-card ${isRoot ? 'root' : ''} ${isSelected ? 'selected' : ''} ${isConnectingSource ? 'connecting-source' : ''} ${isEditing ? 'editing' : ''}`}
             style={{
               position: 'absolute',
-              left: `${pos.x}px`,
+              left: `${cardLeft}px`,
               top: `${pos.y}px`,
-              width: `${pos.width}px`,
-              height: `${pos.height}px`,
+              width: `${cardWidth}px`,
+              minHeight: `${pos.height}px`,
               display: 'inline-flex',
               alignItems: 'center',
               backgroundColor: nodeBg,
               border: nodeBorder,
               borderRadius: isRoot ? '6px' : '4px',
-              boxShadow: 'none',
+              boxShadow: nodeBoxShadow,
               outline: 'none',
-              padding: isRoot ? '2px 8px' : '1px 6px',
-              zIndex: isConnectingSource ? 50 : (isDropTarget ? 45 : (isSelected ? 35 : 20)),
+              padding: isEditing ? '3px 8px' : (isRoot ? '2px 8px' : '1px 6px'),
+              zIndex: isEditing ? 100 : (isConnectingSource ? 50 : (isDropTarget ? 45 : (isSelected ? 35 : 20))),
               cursor: currentTool === 'connect' ? 'crosshair' : (isRoot ? 'default' : (isDraggingThis ? 'grabbing' : 'grab')),
               opacity: isDraggingThis ? 0.35 : 1,
               filter: isDraggingThis ? 'grayscale(0.4) blur(0.5px)' : undefined,
               userSelect: 'none',
               whiteSpace: 'nowrap',
               boxSizing: 'border-box',
-              transition: isDraggingThis ? 'none' : 'background-color 0.12s ease, border-color 0.12s ease'
+              transition: isDraggingThis ? 'none' : 'background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease'
             }}
             onClick={(e) => {
               e.stopPropagation();
@@ -1122,8 +1143,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               }
             }}
             onDoubleClick={(e) => handleStartEdit(node, e)}
-            onMouseEnter={() => setHoveredNodeId(node.id)}
-            onMouseLeave={() => setHoveredNodeId(null)}
+            onMouseEnter={() => handleMouseEnterNode(node.id)}
+            onMouseLeave={() => handleMouseLeaveNode(node.id)}
             onMouseDown={(e) => handleMouseDown(node, e)}
           >
             {/* Ícone / Emoji Associado */}
@@ -1138,22 +1159,24 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               <input
                 ref={inputRef}
                 type="text"
-                placeholder="Digite algo..."
+                placeholder="Digite o texto..."
                 value={editingText}
                 onChange={(e) => setEditingText(e.target.value)}
                 onBlur={handleCommitEdit}
                 onKeyDown={(e) => handleKeyDown(e, node)}
                 style={{
+                  width: '100%',
                   background: 'transparent',
                   border: 'none',
                   color: textColor,
-                  borderRadius: '4px',
-                  padding: '1px 4px',
+                  borderRadius: '2px',
+                  padding: '2px 4px',
                   fontSize: fontSizePx,
                   fontWeight: isBold ? 700 : 500,
                   fontStyle: isItalic ? 'italic' : 'normal',
                   outline: 'none',
-                  minWidth: '60px'
+                  caretColor: nodeColor,
+                  lineHeight: '1.3'
                 }}
               />
             ) : node.text.includes('\n') ? (
@@ -1280,117 +1303,54 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               </button>
             )}
 
-            {/* Ponto / Handle de Ramificação (Whimsical Branch Handle - Estilo Imagem 2) */}
-            {isSelected && !isRoot && (
+            {/* Botão + rápido para adicionar nó filho (aparece no hover OU quando selecionado) */}
+            {!isEditing && (isHovered || isSelected) && !draggingNodeId && currentTool === 'select' && (
               <div
+                className="node-quick-add-bridge"
                 onClick={(e) => {
                   e.stopPropagation();
                   onAddChildNode(node.id);
                 }}
-                title="Adicionar ramo filho (Atalho: Tab)"
-                style={{
-                  position: 'absolute',
-                  ...(node.side === 'left' ? { left: '-12px' } : { right: '-12px' }),
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: nodeColor || '#38bdf8',
-                  border: '1.5px solid #ffffff',
-                  boxShadow: `0 0 0 2px ${nodeColor || '#38bdf8'}66`,
-                  cursor: 'pointer',
-                  zIndex: 40
-                }}
-              />
-            )}
-
-            {/* Botão + rápido ao passar o mouse (hover) — aparece no lado filho */}
-            {!isEditing && !isSelected && isHovered && !draggingNodeId && currentTool === 'select' && (
-              <button
-                type="button"
                 onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddChildNode(node.id);
-                }}
-                title="Adicionar filho (Tab)"
+                title="Adicionar nó filho (Atalho: Tab)"
                 style={{
                   position: 'absolute',
-                  ...(node.side === 'left' ? { left: '-22px' } : { right: '-22px' }),
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  backgroundColor: nodeColor || '#6366f1',
-                  border: '2px solid #ffffff',
-                  boxShadow: `0 2px 8px ${nodeColor || '#6366f1'}66`,
-                  cursor: 'pointer',
+                  ...(node.side === 'left'
+                    ? { right: '100%', paddingRight: '6px', paddingLeft: '4px' }
+                    : { left: '100%', paddingLeft: '6px', paddingRight: '4px' }
+                  ),
+                  top: '0',
+                  bottom: '0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  zIndex: 45,
-                  color: '#ffffff',
-                  fontSize: '14px',
-                  lineHeight: 1,
-                  fontWeight: 700,
-                  userSelect: 'none',
-                  transition: 'transform 0.1s ease, box-shadow 0.1s ease'
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1.2)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1)';
+                  zIndex: 60,
+                  cursor: 'pointer'
                 }}
               >
-                +
-              </button>
-            )}
-
-            {/* Botão + rápido ao passar o mouse no nó raiz — versão root */}
-            {isRoot && !isEditing && isHovered && !draggingNodeId && currentTool === 'select' && (
-              <button
-                type="button"
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddChildNode(node.id);
-                }}
-                title="Adicionar ramo (Tab)"
-                style={{
-                  position: 'absolute',
-                  right: '-22px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '18px',
-                  height: '18px',
-                  borderRadius: '50%',
-                  backgroundColor: '#6366f1',
-                  border: '2px solid #ffffff',
-                  boxShadow: '0 2px 8px rgba(99,102,241,0.5)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 45,
-                  color: '#ffffff',
-                  fontSize: '14px',
-                  lineHeight: 1,
-                  fontWeight: 700,
-                  userSelect: 'none',
-                  transition: 'transform 0.1s ease'
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1.2)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.transform = 'translateY(-50%) scale(1)';
-                }}
-              >
-                +
-              </button>
+                <div
+                  className="node-quick-add-btn"
+                  style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    backgroundColor: nodeColor || '#6366f1',
+                    border: '2px solid #ffffff',
+                    boxShadow: `0 2px 8px ${nodeColor || '#6366f1'}55`,
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    lineHeight: 1,
+                    userSelect: 'none',
+                    transition: 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease'
+                  }}
+                >
+                  +
+                </div>
+              </div>
             )}
           </div>
         );
