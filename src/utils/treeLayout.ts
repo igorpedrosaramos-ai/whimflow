@@ -38,7 +38,7 @@ export function calculateMindMapLayout(
     verticalGap?: number;
     rootX?: number;
     rootY?: number;
-    layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'timeline' | 'free';
+    layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'flowchart' | 'timeline' | 'free';
   } = {}
 ): Map<string, ComputedNodeLayout> {
   const horizontalGap = options.horizontalGap ?? 65;
@@ -114,9 +114,9 @@ export function calculateMindMapLayout(
   }
 
   // -------------------------------------------------------------
-  // MODO A: LAYOUT LIVRE PRESERVADO ('free')
+  // MODO A: LAYOUT LIVRE PRESERVADO ('free' ou 'flowchart')
   // -------------------------------------------------------------
-  if (effectiveLayout === 'free') {
+  if (effectiveLayout === 'free' || effectiveLayout === 'flowchart') {
     nodes.forEach(n => {
       const { width, height } = estimateNodeDimensions(n);
       layoutMap.set(n.id, {

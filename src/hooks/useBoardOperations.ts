@@ -1,6 +1,8 @@
 import { useCallback } from 'react';
 import { Board, MindMapNode } from '../types';
 import { EXECUTIVE_PALETTE } from '../components/NodeContextMenu';
+import { getTemplateEngine } from '../engines/templateEngineManager';
+import { NodeDirection } from '../engines/templateEngineTypes';
 
 interface UseBoardOperationsProps {
   activeBoard: Board;
@@ -115,8 +117,8 @@ export function useBoardOperations({
     }));
   }, [updateActiveBoard]);
 
-  // Criar Nó Filho
-  const handleAddChildNode = useCallback((parentId: string) => {
+  // Criar Nó Filho com Suporte à Direção do Motor do Template
+  const handleAddChildNode = useCallback((parentId: string, direction?: NodeDirection) => {
     const parent = activeBoard.mindMapNodes.find(n => n.id === parentId);
     if (!parent) return;
 
@@ -127,18 +129,28 @@ export function useBoardOperations({
       branchColor = EXECUTIVE_PALETTE[paletteIndex].hex;
     }
 
+    const engine = getTemplateEngine(activeBoard.layoutType);
+    const chosenDirection: NodeDirection = direction || (engine.isVerticalHierarchy() ? 'bottom' : (parent.side === 'left' ? 'left' : 'right'));
+    
+    const computedProps = engine.computeNewNode(
+      parent,
+      chosenDirection,
+      branchColor,
+      parent.childrenIds.length + 1
+    );
+
     const newNode: MindMapNode = {
       id: newId,
-      text: 'Novo item',
-      x: parent.x + 240,
-      y: parent.y + parent.childrenIds.length * 45,
-      parentId: parent.id,
+      text: computedProps.text || 'Novo item',
+      x: computedProps.x ?? (parent.x + 240),
+      y: computedProps.y ?? (parent.y + parent.childrenIds.length * 45),
+      parentId: computedProps.parentId ?? parent.id,
       childrenIds: [],
       collapsed: false,
-      color: branchColor,
-      borderStyle: parent.borderStyle || 'accent',
-      lineStyle: parent.lineStyle || 'bezier',
-      side: parent.side === 'root' ? 'right' : parent.side
+      color: computedProps.color ?? branchColor,
+      borderStyle: computedProps.borderStyle ?? parent.borderStyle ?? 'accent',
+      lineStyle: computedProps.lineStyle ?? parent.lineStyle ?? engine.getDefaultLineStyle(),
+      side: computedProps.side ?? (parent.side === 'root' ? (chosenDirection === 'left' ? 'left' : 'right') : parent.side)
     };
 
     updateActiveBoard(board => ({
@@ -156,7 +168,26 @@ export function useBoardOperations({
     setSelectedNodeId(newId);
     setSelectedNodeIds([newId]);
     setEditingNodeId(newId);
-  }, [activeBoard.mindMapNodes, updateActiveBoard, setSelectedNodeId, setSelectedNodeIds, setEditingNodeId]);
+  }, [activeBoard.mindMapNodes, activeBoard.layoutType, updateActiveBoard, setSelectedNodeId, setSelectedNodeIds, setEditingNodeId]);
+
+  // Reposicionamento Livre / Modelagem de nós no canvas
+  const handleMoveNodeFree = useCallback((nodeId: string, deltaX: number, deltaY: number) => {
+    updateActiveBoard(board => ({
+      ...board,
+      mindMapNodes: board.mindMapNodes.map(n => {
+        if (n.id !== nodeId) return n;
+        const curOffsetX = n.offsetX || 0;
+        const curOffsetY = n.offsetY || 0;
+        return {
+          ...n,
+          offsetX: curOffsetX + deltaX,
+          offsetY: curOffsetY + deltaY,
+          x: (n.x || 0) + deltaX,
+          y: (n.y || 0) + deltaY
+        };
+      })
+    }));
+  }, [updateActiveBoard]);
 
   // Criar Nó Irmão Abaixo
   const handleAddSiblingNode = useCallback((siblingId: string) => {
@@ -637,6 +668,7 @@ export function useBoardOperations({
     handleDuplicateNode,
     handleDuplicateMultipleNodes,
     handleAddConnectedNode,
-    handleAddGeneratedBranches
+    handleAddGeneratedBranches,
+    handleMoveNodeFree
   };
 }

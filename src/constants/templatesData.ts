@@ -166,7 +166,7 @@ export const TEMPLATES: TemplateItem[] = [
     boardData: {
       title: 'Fluxograma Simples de Processos',
       workspaceId: 'ws-default',
-      layoutType: 'orgchart',
+      layoutType: 'flowchart',
       mindMapNodes: [
         { id: 'root', text: 'Início: Cadastro de Novo Usuário', x: 0, y: -100, width: 230, height: 46, parentId: null, childrenIds: ['step-verify'], collapsed: false, color: '#6366f1', borderStyle: 'fill', lineStyle: 'stepped', side: 'root' },
         { id: 'step-verify', text: 'Decisão: É domínio corporativo?', x: 0, y: 0, width: 230, height: 48, parentId: 'root', childrenIds: ['branch-corp', 'branch-public'], collapsed: false, color: '#f59e0b', borderStyle: 'border', lineStyle: 'stepped', side: 'root' },

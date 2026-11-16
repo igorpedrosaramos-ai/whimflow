@@ -337,7 +337,8 @@ export const App: React.FC = () => {
     handleDuplicateNode,
     handleDuplicateMultipleNodes,
     handleAddConnectedNode,
-    handleAddGeneratedBranches
+    handleAddGeneratedBranches,
+    handleMoveNodeFree
   } = useBoardOperations({
     activeBoard,
     updateActiveBoard,
@@ -1206,6 +1207,7 @@ export const App: React.FC = () => {
               onReorderNode={handleReorderNode}
               onReparentNode={handleReparentNode}
               onReorderInsertNode={handleReorderInsertNode}
+              onMoveNodeFree={handleMoveNodeFree}
               onUpdateNodeStyle={handleUpdateNodeStyle}
               onDuplicateNode={handleDuplicateNode}
               pan={pan}

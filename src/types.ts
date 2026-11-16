@@ -32,7 +32,7 @@ export interface MindMapNode {
   icon?: string; // Emoji ou ícone corporativo associado
   link?: string; // URL externa associada
   notes?: string; // Notas ou descrição complementar
-  side?: 'left' | 'right' | 'root';
+  side?: 'left' | 'right' | 'root' | 'top' | 'bottom';
 }
 
 export type ShapeType = 'rectangle' | 'rounded' | 'diamond' | 'pill' | 'circle' | 'card';
@@ -148,7 +148,7 @@ export interface Board {
   updatedAt: string;
   isPrivate?: boolean;
   isStarred?: boolean;
-  layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'timeline' | 'free';
+  layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'flowchart' | 'timeline' | 'free';
   docContent?: string;
   discussions?: DocDiscussion[];
   historySnapshots?: BoardVersionSnapshot[];

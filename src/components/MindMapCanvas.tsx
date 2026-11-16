@@ -5,6 +5,8 @@ import { MindMapNode, Connector, ToolType } from '../types';
 import { calculateMindMapLayout, getBezierPath, cleanAndNormalizeMindMap } from '../utils/treeLayout';
 import { clearMeasurementCache, measureNodeText } from '../utils/textMeasurement';
 import { NodeContextMenu } from './NodeContextMenu';
+import { getTemplateEngine } from '../engines/templateEngineManager';
+import { NodeDirection } from '../engines/templateEngineTypes';
 
 interface MindMapCanvasProps {
   nodes: MindMapNode[];
@@ -17,13 +19,13 @@ interface MindMapCanvasProps {
   selectedNodeId: string | null;
   selectedNodeIds?: string[];
   editingNodeId?: string | null;
-  layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'timeline' | 'free';
+  layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'flowchart' | 'timeline' | 'free';
   onClearEditingNodeId?: () => void;
   onSelectNode: (id: string | null) => void;
   onSelectMultipleNodes?: (ids: string[]) => void;
   onUpdateNodeText: (id: string, text: string) => void;
   onToggleCollapse: (id: string) => void;
-  onAddChildNode: (parentId: string) => void;
+  onAddChildNode: (parentId: string, direction?: NodeDirection) => void;
   onAddSiblingNode: (nodeId: string) => void;
   onAddSiblingAboveNode?: (nodeId: string) => void;
   onAddParentNode?: (nodeId: string) => void;
@@ -31,6 +33,7 @@ interface MindMapCanvasProps {
   onDeleteMultipleNodes?: (ids: string[]) => void;
   onDuplicateMultipleNodes?: (ids: string[]) => void;
   onMoveNodeOffset?: (id: string, dx: number, dy: number) => void;
+  onMoveNodeFree?: (nodeId: string, deltaX: number, deltaY: number) => void;
   onReorderNode: (nodeId: string, direction: 'up' | 'down') => void;
   onReparentNode: (childId: string, newParentId: string) => void;
   onReorderInsertNode?: (draggedId: string, targetId: string, position: 'before' | 'after' | 'inside') => void;
@@ -64,6 +67,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   onDeleteNode,
   onDeleteMultipleNodes,
   onDuplicateMultipleNodes,
+  onMoveNodeFree,
   onReorderNode,
   onReparentNode,
   onReorderInsertNode,
@@ -202,10 +206,14 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     const root = effectiveNodes.find(n => n.side === 'root') || effectiveNodes[0];
     const rootText = (root?.text || '').toLowerCase();
     if (rootText.includes('timeline') || rootText.includes('roadmap') || rootText.includes('cronograma')) return 'timeline';
+    if (rootText.includes('fluxograma') || rootText.includes('flowchart')) return 'flowchart';
     if (rootText.includes('org chart') || rootText.includes('pod structure') || rootText.includes('organograma')) return 'orgchart';
     if (effectiveNodes.some(n => n.side === 'left')) return 'bidirectional';
     return 'bidirectional';
   }, [layoutType, effectiveNodes]);
+
+  // Motor especializado do template ativo (isolado por layoutType)
+  const engine = useMemo(() => getTemplateEngine(effectiveLayout), [effectiveLayout]);
 
   // Layout base da árvore - 100% Responsivo e sem sobreposição
   const layoutMap = useMemo(() => {
@@ -477,6 +485,14 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         } else {
           onReparentNode(dragId, targetId);
         }
+      } else if (dragId && !targetId && dragSourceScreenPosRef.current && dragCursorRef.current) {
+        // Solto no espaço livre do canvas: modelagem e posicionamento livre!
+        const curZoom = zoom || 1;
+        const deltaX = (dragCursorRef.current.x - dragSourceScreenPosRef.current.x) / curZoom;
+        const deltaY = (dragCursorRef.current.y - dragSourceScreenPosRef.current.y) / curZoom;
+        if (Math.hypot(deltaX, deltaY) > 8 && onMoveNodeFree) {
+          onMoveNodeFree(dragId, deltaX, deltaY);
+        }
       }
 
       // Reset completo do estado de drag
@@ -580,11 +596,12 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
       const isOrgChart = effectiveLayout === 'orgchart';
       const isTimeline = effectiveLayout === 'timeline';
+      const isFlowchart = effectiveLayout === 'flowchart';
 
       children.sort((a, b) => {
         const aPos = getNodePos(a);
         const bPos = getNodePos(b);
-        return isOrgChart || isTimeline ? aPos.x - bPos.x : aPos.y - bPos.y;
+        return isOrgChart || isTimeline || isFlowchart ? aPos.x - bPos.x : aPos.y - bPos.y;
       });
 
       const numChildren = children.length;
@@ -595,11 +612,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const cPos = getNodePos(child);
         const strokeColor = child.color || parent.color || '#6366f1';
         const isSelected = selectedNodeId === child.id || selectedNodeId === parent.id;
-        const lineStyle = child.lineStyle || (isOrgChart ? 'stepped' : (isTimeline ? 'straight' : 'bezier'));
+        const lineStyle = child.lineStyle || (isOrgChart || isFlowchart ? 'stepped' : (isTimeline ? 'straight' : 'bezier'));
         const isDraggingThis = draggingNodeId === child.id;
 
-        // Determina se a conexão deve ser vertical (estritamente em Organograma ou Cronograma)
-        const isVertical = isOrgChart || isTimeline;
+        // Determina se a conexão deve ser vertical
+        const isVertical = isOrgChart || isTimeline || (isFlowchart && Math.abs(cPos.y - pPos.y) >= Math.abs(cPos.x - pPos.x) * 0.6);
 
         let pathData = '';
         let endX = 0;
@@ -1376,8 +1393,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   </button>
                 )}
 
-                {/* Botão + rápido para Adicionar Nó Filho (visível no hover ou seleção) */}
-                {(isHovered || isSelected) && (
+                {/* Se não houver alças direcionais dedicadas do motor: exibe o botão + rápido lateral clássico */}
+                {engine.id === 'mindmap' && (isHovered || isSelected) && (
                   <div
                     className="node-quick-add-btn"
                     onClick={(e) => {
@@ -1410,6 +1427,53 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Alças de Ação Direcional Específicas do Motor do Template (Organograma e Fluxograma) */}
+            {!isEditing && !draggingNodeId && currentTool === 'select' && (isHovered || isSelected) && engine.id !== 'mindmap' && (
+              <>
+                {engine.getActionHandles(node, isRoot).map(handle => (
+                  <button
+                    key={handle.id}
+                    type="button"
+                    className="template-engine-handle"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAddChildNode(node.id, handle.direction);
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    title={handle.tooltip}
+                    style={{
+                      ...handle.style,
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: handle.color || nodeColor || '#6366f1',
+                      border: '2px solid #ffffff',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      userSelect: 'none',
+                      cursor: 'pointer',
+                      padding: 0,
+                      transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = `${handle.style.transform || ''} scale(1.2)`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = `${handle.style.transform || ''} scale(1)`;
+                    }}
+                  >
+                    +
+                  </button>
+                ))}
+              </>
             )}
           </div>
         );
