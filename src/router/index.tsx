@@ -26,9 +26,9 @@ export function parseRoute(pathname: string = window.location.pathname, search: 
   let cleanPath = pathname.replace(/\/+$/, '') || '/';
 
   // Suporte resiliente a navegação por hash (ex: #/templates, #/doc/id, #/board/id)
-  if (cleanPath === '/' && typeof window !== 'undefined' && window.location.hash) {
+  if (typeof window !== 'undefined' && window.location.hash) {
     const rawHash = window.location.hash.replace(/^#\/?/, '/');
-    if (rawHash && rawHash !== '/') {
+    if (rawHash && rawHash !== '/' && !rawHash.startsWith('?') && !rawHash.startsWith('&')) {
       cleanPath = rawHash.split('?')[0].replace(/\/+$/, '') || '/';
     }
   }
@@ -60,8 +60,8 @@ export function parseRoute(pathname: string = window.location.pathname, search: 
     };
   }
 
-  // 3. Central de Templates (/templates)
-  if (cleanPath === '/templates') {
+  // 3. Central de Templates (/templates ou /modelos)
+  if (cleanPath === '/templates' || cleanPath === '/modelos') {
     return { type: 'templates', path: cleanPath, query };
   }
 

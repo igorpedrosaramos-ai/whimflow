@@ -523,6 +523,8 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
   return (
     <div 
       ref={containerRef}
+      className="presentation-container"
+      data-testid="presentation-view"
       style={{
         position: 'fixed',
         inset: 0,
@@ -751,6 +753,8 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
             {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
           </button>
           <button
+            id="btn-close-presentation"
+            data-testid="btn-close-presentation"
             onClick={onClose}
             style={{
               background: '#37181f',
