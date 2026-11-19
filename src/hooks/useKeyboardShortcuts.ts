@@ -105,7 +105,7 @@ export function useKeyboardShortcuts({
 
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [handleUndo, handleRedo, onToggleSearch, onToggleShortcuts]);
+  }, [handleUndo, handleRedo, onToggleSearch, onToggleShortcuts, onToggleQuickSpark]);
 
   // Atalhos do Canvas e Árvore (Tab, Enter, Alt+Enter, Ctrl+Enter, Setas, Ctrl+D, Ctrl+C, Ctrl+V, Delete)
   useEffect(() => {

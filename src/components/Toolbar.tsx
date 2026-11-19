@@ -46,8 +46,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         left: '20px',
         top: '20px',
         zIndex: 100,
-        backgroundColor: '#1b212c',
-        border: '1px solid #2c3647',
+        backgroundColor: 'var(--bg-elevated, #1b212c)',
+        border: '1px solid var(--border-strong, #2c3647)',
         borderRadius: '12px',
         padding: '6px 4px',
         display: 'flex',
@@ -106,7 +106,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </button>
 
       {/* Divisor */}
-      <div style={{ width: '22px', height: '1px', backgroundColor: '#2d3748', margin: '2px 0' }} />
+      <div style={{ width: '22px', height: '1px', backgroundColor: 'var(--border-subtle, #2d3748)', margin: '2px 0' }} />
 
       {/* 3. Ferramenta de Seleção / Mover */}
       <button
@@ -269,7 +269,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
       </button>
 
       {/* Divisor */}
-      <div style={{ width: '22px', height: '1px', backgroundColor: '#2d3748', margin: '2px 0' }} />
+      <div style={{ width: '22px', height: '1px', backgroundColor: 'var(--border-subtle, #2d3748)', margin: '2px 0' }} />
 
       {/* 10. Assistente IA Turbi */}
       <button

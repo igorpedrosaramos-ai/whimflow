@@ -638,6 +638,13 @@ export const App: React.FC = () => {
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
   const isMarqueeActiveRef = useRef(false);
 
+  const activeNodesRef = useRef(activeBoard.mindMapNodes);
+  activeNodesRef.current = activeBoard.mindMapNodes;
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
   useEffect(() => {
     let rAFId: number | null = null;
 
@@ -665,13 +672,15 @@ export const App: React.FC = () => {
       if (rAFId !== null) cancelAnimationFrame(rAFId);
 
       rAFId = requestAnimationFrame(() => {
-        const canvasX1 = (x1 - pan.x) / zoom;
-        const canvasY1 = (y1 - pan.y) / zoom;
-        const canvasX2 = (x2 - pan.x) / zoom;
-        const canvasY2 = (y2 - pan.y) / zoom;
+        const curPan = panRef.current;
+        const curZoom = zoomRef.current;
+        const canvasX1 = (x1 - curPan.x) / curZoom;
+        const canvasY1 = (y1 - curPan.y) / curZoom;
+        const canvasX2 = (x2 - curPan.x) / curZoom;
+        const canvasY2 = (y2 - curPan.y) / curZoom;
 
         const hitIds: string[] = [];
-        activeBoard.mindMapNodes.forEach(node => {
+        activeNodesRef.current.forEach(node => {
           const nw = node.width || 180;
           const nh = node.height || 42;
           const nx = (node.x || 0) + (node.offsetX || 0);
@@ -697,12 +706,6 @@ export const App: React.FC = () => {
         rAFId = null;
       }
       if (isMarqueeActiveRef.current) {
-        if (!marqueeRect) {
-          setSelectedNodeId(null);
-          setSelectedNodeIds([]);
-          setSelectedStickyId(null);
-          setSelectedShapeId(null);
-        }
         isMarqueeActiveRef.current = false;
         marqueeStartRef.current = null;
         setMarqueeRect(null);
@@ -716,7 +719,7 @@ export const App: React.FC = () => {
       window.removeEventListener('mousemove', handleWindowMouseMove);
       window.removeEventListener('mouseup', handleWindowMouseUp);
     };
-  }, [marqueeRect, activeBoard.mindMapNodes, pan, zoom]);
+  }, []);
 
   // Eventos de Mouse no Canvas
   const handleMouseDownCanvas = (e: React.MouseEvent) => {

@@ -158,21 +158,29 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
     setPan({ x: Math.round(newPanX), y: Math.round(newPanY) });
   }, [nodes, sidebarOpen]);
 
-  // Listener de redimensionamento da janela
+  // Listener de redimensionamento da janela: preserva o foco e a escala do usuário,
+  // ajustando apenas o centro da tela proporcionalmente à variação de tamanho do viewport
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let lastW = window.innerWidth;
+    let lastH = window.innerHeight;
+
     const handleResize = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        fitView(nodes);
-      }, 150);
+      const dw = window.innerWidth - lastW;
+      const dh = window.innerHeight - lastH;
+      lastW = window.innerWidth;
+      lastH = window.innerHeight;
+
+      if (dw !== 0 || dh !== 0) {
+        setPan(prev => ({
+          x: prev.x + Math.round(dw / 2),
+          y: prev.y + Math.round(dh / 2)
+        }));
+      }
     };
+
     window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(timer);
-    };
-  }, [fitView, nodes]);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Auto-enquadramento ao alternar quadros
   useEffect(() => {

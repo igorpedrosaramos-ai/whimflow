@@ -23,7 +23,16 @@ export interface RouteState {
  * Analisa a URL atual do navegador e converte para um estado de rota tipado
  */
 export function parseRoute(pathname: string = window.location.pathname, search: string = window.location.search): RouteState {
-  const cleanPath = pathname.replace(/\/+$/, '') || '/';
+  let cleanPath = pathname.replace(/\/+$/, '') || '/';
+
+  // Suporte resiliente a navegação por hash (ex: #/templates, #/doc/id, #/board/id)
+  if (cleanPath === '/' && typeof window !== 'undefined' && window.location.hash) {
+    const rawHash = window.location.hash.replace(/^#\/?/, '/');
+    if (rawHash && rawHash !== '/') {
+      cleanPath = rawHash.split('?')[0].replace(/\/+$/, '') || '/';
+    }
+  }
+
   const queryParams = new URLSearchParams(search);
   const query: Record<string, string> = {};
   queryParams.forEach((value, key) => {
@@ -139,8 +148,10 @@ export function useRouter() {
     };
 
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
     };
   }, []);
 
