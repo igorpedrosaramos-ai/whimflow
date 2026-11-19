@@ -1161,7 +1161,23 @@ export const App: React.FC = () => {
             onAddShape={() => handleAddFloatingTopic()}
           />
 
-          <div className="canvas-background" />
+          {/* Fundo Infinito Corporativo Sincronizado com Pan e Zoom */}
+          {(() => {
+            let baseGrid = 24 * zoom;
+            while (baseGrid < 16) baseGrid *= 2;
+            while (baseGrid > 64) baseGrid /= 2;
+            const bgPosX = pan.x % baseGrid;
+            const bgPosY = pan.y % baseGrid;
+            return (
+              <div
+                className="canvas-background"
+                style={{
+                  backgroundPosition: `${bgPosX}px ${bgPosY}px`,
+                  backgroundSize: `${baseGrid}px ${baseGrid}px`
+                }}
+              />
+            );
+          })()}
 
           {/* Camada Espacial Transformada do Canvas */}
           <div

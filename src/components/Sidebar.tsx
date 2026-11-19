@@ -89,6 +89,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   if (!isOpen) return null;
 
+  const isDark = theme === 'dark';
+
   const filteredBoards = boards.filter(b => 
     b.title.toLowerCase().includes(search.toLowerCase())
   );
@@ -104,11 +106,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside
       style={{
         width: '260px',
-        backgroundColor: '#161920',
-        borderRight: '1px solid #232936',
+        backgroundColor: isDark ? '#161920' : '#ffffff',
+        borderRight: isDark ? '1px solid #232936' : '1px solid #e2e8f0',
         display: 'flex',
         flexDirection: 'column',
-        color: '#94a3b8',
+        color: isDark ? '#94a3b8' : '#475569',
         userSelect: 'none',
         flexShrink: 0,
         height: '100%',
@@ -122,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 14px',
-          borderBottom: '1px solid #202633'
+          borderBottom: isDark ? '1px solid #202633' : '1px solid #e2e8f0'
         }}
       >
         <div style={{ position: 'relative' }}>
@@ -137,11 +139,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               cursor: 'pointer',
               padding: '4px 6px',
               borderRadius: '6px',
-              backgroundColor: isWorkspaceMenuOpen ? '#232d3f' : 'transparent',
+              backgroundColor: isWorkspaceMenuOpen ? (isDark ? '#232d3f' : '#f1f5f9') : 'transparent',
               transition: 'background-color 0.15s'
             }}
             onMouseEnter={e => {
-              if (!isWorkspaceMenuOpen) e.currentTarget.style.backgroundColor = '#1f2736';
+              if (!isWorkspaceMenuOpen) e.currentTarget.style.backgroundColor = isDark ? '#1f2736' : '#f8fafc';
             }}
             onMouseLeave={e => {
               if (!isWorkspaceMenuOpen) e.currentTarget.style.backgroundColor = 'transparent';
@@ -169,7 +171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               style={{
                 fontSize: '13px',
                 fontWeight: 600,
-                color: '#f8fafc',
+                color: isDark ? '#f8fafc' : '#0f172a',
                 maxWidth: '125px',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -181,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
             <ChevronDown
               size={14}
-              color="#64748b"
+              color={isDark ? '#64748b' : '#94a3b8'}
               style={{
                 transform: isWorkspaceMenuOpen ? 'rotate(180deg)' : 'none',
                 transition: 'transform 0.18s ease'
@@ -209,7 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onOpenTemplates={onOpenTemplates}
               onOpenTrash={onOpenTrash}
               onExportBackup={onExportBackup}
-              isDark={true}
+              isDark={isDark}
               style={{ left: '0px', width: '216px' }}
             />
           )}
@@ -221,9 +223,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             width: '24px',
             height: '24px',
             borderRadius: '50%',
-            backgroundColor: '#262f3f',
-            border: '1px solid #333e52',
-            color: '#ffffff',
+            backgroundColor: isDark ? '#262f3f' : '#f1f5f9',
+            border: isDark ? '1px solid #333e52' : '1px solid #cbd5e1',
+            color: isDark ? '#ffffff' : '#0f172a',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -242,10 +244,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            backgroundColor: '#11141a',
+            backgroundColor: isDark ? '#11141a' : '#f8fafc',
             padding: '5px 8px',
             borderRadius: '5px',
-            border: '1px solid #242c3b'
+            border: isDark ? '1px solid #242c3b' : '1px solid #e2e8f0'
           }}
         >
           <Search size={13} color="#64748b" />
@@ -258,7 +260,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               background: 'transparent',
               border: 'none',
               outline: 'none',
-              color: '#f8fafc',
+              color: isDark ? '#f8fafc' : '#0f172a',
               fontSize: '12px',
               width: '100%'
             }}

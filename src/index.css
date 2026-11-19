@@ -11,6 +11,7 @@
   --bg-elevated: #282d38;
   --border-subtle: #2d3340;
   --border-strong: #3d4556;
+  --canvas-dot: #2a3344;
   
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
@@ -36,6 +37,7 @@
   --bg-elevated: #ffffff;
   --border-subtle: #e2e8f0;
   --border-strong: #cbd5e1;
+  --canvas-dot: #cbd5e1;
   
   --text-primary: #0f172a;
   --text-secondary: #334155;
@@ -105,7 +107,7 @@ html, body, #root {
   position: absolute;
   inset: 0;
   background-color: var(--bg-canvas);
-  background-image: radial-gradient(var(--border-subtle) 1.2px, transparent 1.2px);
+  background-image: radial-gradient(var(--canvas-dot, var(--border-subtle)) 1.25px, transparent 1.25px);
   background-size: 24px 24px;
   pointer-events: none;
 }

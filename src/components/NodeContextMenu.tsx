@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   ArrowUp, 
@@ -104,25 +104,120 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
     setActivePopover(null);
   };
 
-  const z = zoom || 1;
-  const pX = pan?.x || 0;
-  const pY = pan?.y || 0;
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ left: number; top: number; isVisible: boolean }>({
+    left: -9999,
+    top: -9999,
+    isVisible: false
+  });
 
-  const screenCenterX = (position.x + position.width / 2) * z + pX;
-  const screenNodeTop = position.y * z + pY;
-  const isNearTop = screenNodeTop < 120;
-  const screenTop = isNearTop 
-    ? (position.y + position.height) * z + pY + 14 
-    : screenNodeTop - 52;
+  const updatePosition = useCallback(() => {
+    const nodeEl = document.getElementById(`node-${node.id}`);
+    const menuEl = menuRef.current;
+
+    const menuWidth = menuEl ? menuEl.offsetWidth : 440;
+    const menuHeight = menuEl ? menuEl.offsetHeight : 36;
+    const halfMenu = menuWidth / 2;
+
+    let targetCenterX: number;
+    let targetNodeTop: number;
+    let targetNodeBottom: number;
+    let isVisibleInScreen = true;
+
+    if (nodeEl) {
+      const rect = nodeEl.getBoundingClientRect();
+      targetCenterX = rect.left + rect.width / 2;
+      targetNodeTop = rect.top;
+      targetNodeBottom = rect.bottom;
+
+      // Se o nó estiver totalmente fora da área visível do viewport, oculta graciosamente
+      if (rect.bottom < 40 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        isVisibleInScreen = false;
+      }
+    } else {
+      const mainCanvasArea = document.getElementById('main-canvas-area');
+      const canvasRect = mainCanvasArea ? mainCanvasArea.getBoundingClientRect() : { left: 0, top: 0 };
+      const z = zoom || 1;
+      const pX = pan?.x || 0;
+      const pY = pan?.y || 0;
+      targetCenterX = canvasRect.left + (position.x + position.width / 2) * z + pX;
+      targetNodeTop = canvasRect.top + position.y * z + pY;
+      targetNodeBottom = targetNodeTop + position.height * z;
+    }
+
+    // CLAMPING HORIZONTAL (Impede que a barra transborde para fora da tela nas laterais)
+    const minLeft = halfMenu + 12;
+    const maxLeft = Math.max(minLeft, window.innerWidth - halfMenu - 12);
+    const clampedCenterX = Math.max(minLeft, Math.min(maxLeft, targetCenterX));
+
+    // POSICIONAMENTO VERTICAL INTELIGENTE (Flip):
+    // TopNav tem altura de ~56px.
+    const spaceAbove = targetNodeTop - 56;
+    const isNearTop = spaceAbove < (menuHeight + 14);
+
+    let targetTop: number;
+    if (isNearTop) {
+      targetTop = targetNodeBottom + 10;
+    } else {
+      targetTop = targetNodeTop - menuHeight - 10;
+    }
+
+    // Clamping vertical seguro contra cortes na borda da tela
+    const clampedTop = Math.max(60, Math.min(window.innerHeight - menuHeight - 12, targetTop));
+
+    setCoords({
+      left: Math.round(clampedCenterX),
+      top: Math.round(clampedTop),
+      isVisible: isVisibleInScreen
+    });
+  }, [node.id, position.x, position.y, position.width, position.height, pan?.x, pan?.y, zoom]);
+
+  useLayoutEffect(() => {
+    updatePosition();
+  }, [updatePosition]);
+
+  useEffect(() => {
+    let rafId: number;
+    const handleSync = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updatePosition);
+    };
+
+    window.addEventListener('resize', handleSync);
+    window.addEventListener('scroll', handleSync, true);
+    window.addEventListener('wheel', handleSync, { passive: true });
+
+    // Observa redimensionamento do card do nó no DOM
+    const nodeEl = document.getElementById(`node-${node.id}`);
+    let ro: ResizeObserver | null = null;
+    if (nodeEl && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        handleSync();
+      });
+      ro.observe(nodeEl);
+    }
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', handleSync);
+      window.removeEventListener('scroll', handleSync, true);
+      window.removeEventListener('wheel', handleSync);
+      if (ro) ro.disconnect();
+    };
+  }, [updatePosition, node.id]);
 
   const menu = (
     <div
+      ref={menuRef}
       className="node-context-menu"
       style={{
         position: 'fixed',
-        left: `${screenCenterX}px`,
-        top: `${screenTop}px`,
+        left: `${coords.left}px`,
+        top: `${coords.top}px`,
         transform: 'translateX(-50%)',
+        opacity: coords.isVisible ? 1 : 0,
+        pointerEvents: coords.isVisible ? 'auto' : 'none',
+        transition: 'opacity 0.12s ease',
         backgroundColor: 'var(--bg-elevated, #181d28)',
         border: '1.5px solid var(--border-strong, #333d4e)',
         borderRadius: '8px',
@@ -132,7 +227,6 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
         gap: '4px',
         boxShadow: '0 10px 30px rgba(0,0,0,0.45)',
         zIndex: 150,
-        pointerEvents: 'auto',
         userSelect: 'none'
       }}
       onMouseDown={(e) => e.stopPropagation()}

@@ -51,13 +51,6 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: '100%', display: 'block' }}
       >
-        <defs>
-          <pattern id={`dot-grid-empty-${board.id}`} width="18" height="18" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.1" fill={isDark ? '#2e3a4e' : '#e2e8f0'} />
-          </pattern>
-        </defs>
-        <rect x="0" y="0" width="240" height="120" fill={`url(#dot-grid-empty-${board.id})`} />
-
         <rect
           x="65"
           y="42"
@@ -110,13 +103,6 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: '100%', display: 'block' }}
       >
-        <defs>
-          <pattern id={`dot-grid-stickies-${board.id}`} width="18" height="18" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.1" fill={isDark ? '#2e3a4e' : '#e2e8f0'} />
-          </pattern>
-        </defs>
-        <rect x={minX - padX} y={minY - padY} width={boxW} height={boxH} fill={`url(#dot-grid-stickies-${board.id})`} />
-
         {stickies.map(s => {
           const w = s.width || 180;
           const h = s.height || 140;
@@ -199,13 +185,6 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: '100%', display: 'block' }}
       >
-        <defs>
-          <pattern id={`dot-grid-wf-${board.id}`} width="18" height="18" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.1" fill={isDark ? '#2e3a4e' : '#e2e8f0'} />
-          </pattern>
-        </defs>
-        <rect x={minX - padX} y={minY - padY} width={boxW} height={boxH} fill={`url(#dot-grid-wf-${board.id})`} />
-
         {wireframes.map(wf => {
           const w = wf.width || 180;
           const h = wf.height || 100;
@@ -271,13 +250,6 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: '100%', display: 'block' }}
       >
-        <defs>
-          <pattern id={`dot-grid-doc-${board.id}`} width="18" height="18" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.1" fill={isDark ? '#2e3a4e' : '#e2e8f0'} />
-          </pattern>
-        </defs>
-        <rect x="0" y="0" width="240" height="130" fill={`url(#dot-grid-doc-${board.id})`} />
-
         <rect x="48" y="10" width="144" height="110" rx="6" fill="rgba(0,0,0,0.08)" />
         <rect
           x="45"
@@ -514,21 +486,6 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
         preserveAspectRatio="xMidYMid meet"
         style={{ width: '100%', height: '100%', display: 'block' }}
       >
-        <defs>
-          <pattern id={`dot-grid-mindmap-${board.id}`} width="20" height="20" patternUnits="userSpaceOnUse">
-            <circle cx="2" cy="2" r="1.1" fill={isDark ? '#2e3a4e' : '#e2e8f0'} />
-          </pattern>
-        </defs>
-
-        {/* Fundo do Canvas */}
-        <rect
-          x={viewMinX}
-          y={viewMinY}
-          width={viewWidth}
-          height={viewHeight}
-          fill={`url(#dot-grid-mindmap-${board.id})`}
-        />
-
         {/* 1. Conectores e Ramos Reais do Mapa Mental */}
         {Array.from(parentChildrenMap.entries()).map(([parentId, children]) => {
           const parentPos = nodePositions.get(parentId);

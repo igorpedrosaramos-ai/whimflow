@@ -1580,6 +1580,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           style={{
                             flex: 1,
                             backgroundColor: isDark ? '#141a24' : '#ffffff',
+                            backgroundImage: isDark
+                              ? 'radial-gradient(#283548 1.1px, transparent 1.1px)'
+                              : 'radial-gradient(#cbd5e1 1.1px, transparent 1.1px)',
+                            backgroundSize: '16px 16px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
