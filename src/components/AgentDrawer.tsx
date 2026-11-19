@@ -19,8 +19,9 @@ import {
   Copy,
   Paperclip
 } from 'lucide-react';
-import { MindMapNode } from '../types';
+import { MindMapNode, Board, AgentMode, AgentOperation } from '../types';
 import { generateWithGemini, GeminiDiagramResult } from '../services/geminiService';
+import { parseMindMapJson, ParsedMindMapResult } from '../services/mindmapJsonService';
 import { MindMapAiPreview } from './MindMapAiPreview';
 
 interface AttachedFile {
@@ -29,6 +30,8 @@ interface AttachedFile {
   type: string;
   isImage: boolean;
   isPdf?: boolean;
+  isMindMapJson?: boolean;
+  parsedMindMap?: ParsedMindMapResult;
   dataUrl?: string;
   textContent?: string;
 }
@@ -44,6 +47,10 @@ interface ChatMessage {
 interface AgentDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  activeBoard?: Board;
+  selectedNodeId?: string | null;
+  selectedNodeIds?: string[];
+  onApplyAgentOperation?: (operation: AgentOperation, title?: string) => void;
   onInsertNodesToCurrentBoard: (nodes: MindMapNode[], title?: string) => void;
   onCreateNewBoardWithNodes: (title: string, nodes: MindMapNode[]) => void;
   theme?: 'dark' | 'light';
@@ -53,12 +60,18 @@ interface AgentDrawerProps {
 export const AgentDrawer: React.FC<AgentDrawerProps> = ({
   isOpen,
   onClose,
+  activeBoard,
+  selectedNodeId,
+  selectedNodeIds,
+  onApplyAgentOperation,
   onInsertNodesToCurrentBoard,
   onCreateNewBoardWithNodes,
   theme = 'light',
   workspaceName = 'teste'
 }) => {
   const [prompt, setPrompt] = useState('');
+  const [mode, setMode] = useState<AgentMode>('create');
+  const [agentStatus, setAgentStatus] = useState<'idle' | 'uploading' | 'analyzing' | 'thinking' | 'executing' | 'complete' | 'error'>('idle');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isHideSuggestions, setIsHideSuggestions] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -123,7 +136,9 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
     const userMsg: ChatMessage = {
       id: userMsgId,
       sender: 'user',
-      text: trimmed || (attachedFile?.isImage ? '(Imagem enviada para análise e estruturação)' : `(Arquivo anexado: ${attachedFile?.name})`),
+      text: trimmed || (attachedFile?.isMindMapJson 
+        ? `(Mapa mental anexado: ${attachedFile.parsedMindMap?.title || attachedFile.name} com ${attachedFile.parsedMindMap?.nodes.length || 0} nós)`
+        : (attachedFile?.isImage ? '(Imagem enviada para análise e estruturação)' : `(Arquivo anexado: ${attachedFile?.name})`)),
       attachedFile: attachedFile || undefined
     };
 
@@ -132,20 +147,49 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
     const currentAttachment = attachedFile;
     setAttachedFile(null);
     setIsGenerating(true);
+    setAgentStatus(currentAttachment?.isImage ? 'analyzing' : 'thinking');
 
     try {
-      // Monta o prompt completo integrando o conteúdo textual se houver arquivo de texto
+      // Monta o prompt completo integrando o contexto de anexo
       let promptWithContext = trimmed;
-      if (currentAttachment && !currentAttachment.isImage && !currentAttachment.isPdf && currentAttachment.textContent) {
+      if (currentAttachment?.isMindMapJson && currentAttachment.parsedMindMap) {
+        const p = currentAttachment.parsedMindMap;
+        promptWithContext = `[Arquivo de Mapa Mental JSON Anexado: "${p.title}" com ${p.nodes.length} nós]\n` +
+          `Estrutura de Nós: ${p.nodes.map(n => `"${n.text}" (id: ${n.id}, pai: ${n.parentId || 'raiz'})`).join(', ')}\n\n` +
+          `Instrução: ${trimmed || 'Analise este mapa mental salvo, valide sua hierarquia e sugira melhorias estratégicas mantendo a consistência.'}`;
+      } else if (currentAttachment && !currentAttachment.isImage && !currentAttachment.isPdf && currentAttachment.textContent) {
         promptWithContext = `[Arquivo Anexado: ${currentAttachment.name}]\nConteúdo:\n${currentAttachment.textContent}\n\nInstrução: ${trimmed || 'Analise este documento, extraia os pilares e estruture um mapa mental completo com perguntas reflexivas.'}`;
       } else if (!trimmed && (currentAttachment?.isImage || currentAttachment?.isPdf)) {
-        promptWithContext = 'Analise a imagem/documento anexado, identifique minuciosamente a hierarquia e recrie o mapa mental visual com fidelidade máxima.';
+        promptWithContext = mode === 'copy'
+          ? 'Analise minuciosamente a imagem anexada e reproduza fielmente cada texto, ramo e hierarquia sem inventar dados.'
+          : 'Analise a imagem anexada, identifique a estrutura e construa o mapa mental correspondente.';
       }
 
-      const result = await generateWithGemini(
-        promptWithContext,
-        (currentAttachment?.isImage || currentAttachment?.isPdf) ? currentAttachment.dataUrl : undefined
-      );
+      const history = messages.slice(-8).map(m => ({
+        role: m.sender === 'user' ? 'user' as const : 'assistant' as const,
+        text: m.text
+      }));
+
+      const result = await generateWithGemini(promptWithContext, {
+        imageBase64: (currentAttachment?.isImage || currentAttachment?.isPdf) ? currentAttachment.dataUrl : undefined,
+        mode,
+        history,
+        currentBoard: activeBoard,
+        selectedNodeIds: selectedNodeIds?.length ? selectedNodeIds : (selectedNodeId ? [selectedNodeId] : undefined)
+      });
+
+      // Executa operação no editor se fornecida e não for apenas modo reflexão
+      if (result.operation && result.operation.type !== 'none' && mode !== 'think') {
+        setAgentStatus('executing');
+        if (onApplyAgentOperation) {
+          onApplyAgentOperation(result.operation, result.title);
+        } else if (result.nodes && result.nodes.length > 0) {
+          onInsertNodesToCurrentBoard(result.nodes, result.title);
+        }
+        setAgentStatus('complete');
+      } else {
+        setAgentStatus('idle');
+      }
 
       const assistantMsg: ChatMessage = {
         id: `assist-${Date.now()}`,
@@ -156,16 +200,18 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
 
       setMessages(prev => [...prev, assistantMsg]);
     } catch (err: any) {
+      setAgentStatus('error');
       setMessages(prev => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           sender: 'assistant',
-          text: 'Houve uma instabilidade temporária ao conectar com a IA, mas uma estrutura base foi organizada.'
+          text: 'Houve uma instabilidade temporária ao conectar com a IA, mas uma estrutura base foi organizada com segurança.'
         }
       ]);
     } finally {
       setIsGenerating(false);
+      setTimeout(() => setAgentStatus('idle'), 2500);
     }
   };
 
@@ -175,6 +221,7 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
 
     const isImg = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isJson = file.name.toLowerCase().endsWith('.json') || file.type === 'application/json';
 
     if (isImg || isPdf) {
       const reader = new FileReader();
@@ -189,8 +236,25 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
         });
       };
       reader.readAsDataURL(file);
+    } else if (isJson) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = typeof reader.result === 'string' ? reader.result : '';
+        const parsed = parseMindMapJson(content, file.name.replace(/\.json$/i, ''));
+        setAttachedFile({
+          name: file.name,
+          size: file.size,
+          type: 'application/json',
+          isImage: false,
+          isPdf: false,
+          isMindMapJson: parsed.success && parsed.nodes.length > 0,
+          parsedMindMap: parsed.success ? parsed : undefined,
+          textContent: content
+        });
+      };
+      reader.readAsText(file);
     } else {
-      // Arquivo de texto (.txt, .md, .json, .csv) ou documento
+      // Arquivo de texto (.txt, .md, .csv) ou documento
       const reader = new FileReader();
       reader.onload = () => {
         setAttachedFile({
@@ -495,9 +559,10 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
             </div>
           ))}
 
-          {/* Indicador de Processamento Gemini */}
+          {/* Indicador de Processamento Gemini com Status do Agente */}
           {isGenerating && (
             <div
+              data-testid="agent-status-badge"
               style={{
                 alignSelf: 'flex-start',
                 backgroundColor: isDark ? '#1a2230' : '#ffffff',
@@ -505,14 +570,20 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
                 padding: '10px 14px',
                 borderRadius: '12px 12px 12px 2px',
                 fontSize: '12.5px',
-                color: '#0d9488',
+                color: agentStatus === 'executing' ? '#7c3aed' : '#0d9488',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px'
               }}
             >
               <Sparkles size={14} className="animate-spin" />
-              <span>O Assistente IA está analisando e estruturando o raciocínio...</span>
+              <span>
+                {agentStatus === 'analyzing'
+                  ? 'Analisando imagem e extraindo estrutura visual...'
+                  : agentStatus === 'executing'
+                  ? 'Executando operações e organizando nós no editor...'
+                  : 'Gemini 3.1 Flash raciocinando e construindo operações...'}
+              </span>
             </div>
           )}
 
@@ -521,35 +592,44 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
 
         {/* Caixa de Entrada Inferior 100% em Português */}
         <div style={{ padding: '12px 16px 16px 16px' }}>
-          {/* Pílulas de Ação Rápida: Ajudar a Pensar / Copiar Diagrama / Criar Mapa */}
+          {/* Pílulas dos Três Modos: Ajudar a Pensar / Copiar da Imagem / Criar Mapa Mental */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
             <button
+              id="btn-mode-think"
+              data-testid="mode-think"
+              type="button"
               onClick={() => {
-                setPrompt('Analise criticamente minha ideia, aponte pontos cegos e me faça 3 perguntas provocativas: ');
+                setMode('think');
+                setPrompt('Analise criticamente minha ideia, aponte pontos cegos e me faça perguntas estratégicas: ');
                 inputRef.current?.focus();
               }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
+                gap: '5px',
+                padding: '5px 10px',
                 borderRadius: '6px',
-                border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
-                backgroundColor: isDark ? '#1a2230' : '#ffffff',
-                color: isDark ? '#e2e8f0' : '#334155',
-                fontSize: '11px',
+                border: mode === 'think' ? '1.5px solid #f59e0b' : (isDark ? '1px solid #2d384b' : '1px solid #e2e8f0'),
+                backgroundColor: mode === 'think' ? 'rgba(245, 158, 11, 0.15)' : (isDark ? '#1a2230' : '#ffffff'),
+                color: mode === 'think' ? '#f59e0b' : (isDark ? '#e2e8f0' : '#334155'),
+                fontSize: '11.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
               }}
-              title="Solicita análise crítica e perguntas para aprofundar seu raciocínio"
+              title="Modo Consultoria: análise estratégica sem modificar o mapa automaticamente"
             >
-              <Lightbulb size={12} color="#f59e0b" />
+              <Lightbulb size={13} color="#f59e0b" />
               <span>Ajudar a Pensar</span>
             </button>
 
             <button
+              id="btn-mode-copy"
+              data-testid="mode-copy"
+              type="button"
               onClick={() => {
+                setMode('copy');
                 setPrompt('Copie exatamente a estrutura e os nós da imagem anexada: ');
                 if (!attachedFile) {
                   fileInputRef.current?.click();
@@ -560,45 +640,51 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
+                gap: '5px',
+                padding: '5px 10px',
                 borderRadius: '6px',
-                border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
-                backgroundColor: isDark ? '#1a2230' : '#ffffff',
-                color: isDark ? '#e2e8f0' : '#334155',
-                fontSize: '11px',
+                border: mode === 'copy' ? '1.5px solid #0284c7' : (isDark ? '1px solid #2d384b' : '1px solid #e2e8f0'),
+                backgroundColor: mode === 'copy' ? 'rgba(2, 132, 199, 0.15)' : (isDark ? '#1a2230' : '#ffffff'),
+                color: mode === 'copy' ? '#0284c7' : (isDark ? '#e2e8f0' : '#334155'),
+                fontSize: '11.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
               }}
-              title="Transcreve fielmente um diagrama ou mapa mental de uma imagem"
+              title="Modo Cópia Fiel: reproduz hierarquias de imagens sem inventar termos"
             >
-              <Copy size={12} color="#0284c7" />
+              <Copy size={13} color="#0284c7" />
               <span>Copiar da Imagem</span>
             </button>
 
             <button
+              id="btn-mode-create"
+              data-testid="mode-create"
+              type="button"
               onClick={() => {
+                setMode('create');
                 setPrompt('Crie um mapa mental estratégico e detalhado sobre: ');
                 inputRef.current?.focus();
               }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '4px 8px',
+                gap: '5px',
+                padding: '5px 10px',
                 borderRadius: '6px',
-                border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
-                backgroundColor: isDark ? '#1a2230' : '#ffffff',
-                color: isDark ? '#e2e8f0' : '#334155',
-                fontSize: '11px',
+                border: mode === 'create' ? '1.5px solid #7c3aed' : (isDark ? '1px solid #2d384b' : '1px solid #e2e8f0'),
+                backgroundColor: mode === 'create' ? 'rgba(124, 58, 237, 0.15)' : (isDark ? '#1a2230' : '#ffffff'),
+                color: mode === 'create' ? '#7c3aed' : (isDark ? '#e2e8f0' : '#334155'),
+                fontSize: '11.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
               }}
-              title="Gera um mapa mental estruturado em pilares lógicos"
+              title="Modo Construção: cria ou expande mapas mentais no editor"
             >
-              <Network size={12} color="#7c3aed" />
+              <Network size={13} color="#7c3aed" />
               <span>Criar Mapa Mental</span>
             </button>
           </div>
@@ -629,7 +715,9 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-                  {attachedFile.isImage ? (
+                  {attachedFile.isMindMapJson ? (
+                    <Layers size={22} color="#7c3aed" />
+                  ) : attachedFile.isImage ? (
                     <img
                       src={attachedFile.dataUrl}
                       alt="Miniatura"
@@ -639,30 +727,57 @@ export const AgentDrawer: React.FC<AgentDrawerProps> = ({
                     <FileText size={18} color="#0284c7" />
                   )}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '240px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
                       {attachedFile.name}
                     </div>
-                    <div style={{ fontSize: '10.5px', color: '#94a3b8' }}>
-                      {attachedFile.isImage ? 'Imagem para análise / cópia' : 'Documento para síntese'} ({(attachedFile.size / 1024).toFixed(1)} KB)
+                    <div style={{ fontSize: '10.5px', color: attachedFile.isMindMapJson ? '#7c3aed' : '#94a3b8', fontWeight: attachedFile.isMindMapJson ? 600 : 400 }}>
+                      {attachedFile.isMindMapJson 
+                        ? `Mapa mental salvo (${attachedFile.parsedMindMap?.nodes.length || 0} nós)` 
+                        : (attachedFile.isImage ? 'Imagem para análise / cópia' : 'Documento para síntese')} ({(attachedFile.size / 1024).toFixed(1)} KB)
                     </div>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => setAttachedFile(null)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#ef4444',
-                    cursor: 'pointer',
-                    padding: '2px',
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                  title="Remover anexo"
-                >
-                  <X size={14} />
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {attachedFile.isMindMapJson && attachedFile.parsedMindMap && (
+                    <button
+                      type="button"
+                      id="btn-open-attached-json-canvas"
+                      onClick={() => {
+                        onInsertNodesToCurrentBoard(attachedFile.parsedMindMap!.nodes, attachedFile.parsedMindMap!.title);
+                        setAttachedFile(null);
+                      }}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: '#7c3aed',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                      title="Insere imediatamente todos os nós deste JSON no canvas"
+                    >
+                      Abrir no Canvas
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setAttachedFile(null)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#ef4444',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                    title="Remover anexo"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
             )}
 

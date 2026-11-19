@@ -1,15 +1,28 @@
 // Serverless Backend Function para Vercel
-// Protege a chave de API do Gemini no lado do servidor com suporte multimodal completo
-import fs from 'fs';
-import path from 'path';
+// Agente Inteligente Multimodal para o Editor de Mapas Mentais WhimFlow
+// Suporte a 3 Modos Especializados (Pensar, Copiar, Criar), Multiturn History e Operações Estruturadas
+import { Buffer } from 'buffer';
 
-// Modelos Gemini validados com suporte ativo a generateContent em 2026 (ordenados por desempenho e fidelidade)
+// Modelos Gemini validados com suporte ativo a generateContent (ordenados por velocidade e fidelidade)
 const GEMINI_MODELS = [
-  'gemini-3.1-flash-lite-preview',
+  'gemini-3.1-flash-lite-preview', // Resposta < 700ms testada com Status 200
+  'gemini-3.5-flash-lite',         // Resposta < 1.4s testada com Status 200
   'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
   'gemini-flash-latest'
 ];
+
+interface BoardContext {
+  title?: string;
+  nodesCount?: number;
+  rootText?: string;
+  nodesSummary?: Array<{
+    id: string;
+    text: string;
+    parentId?: string | null;
+    color?: string;
+    origin?: string;
+  }>;
+}
 
 export async function handleGenerateDiagram(body: any, apiKey?: string) {
   const SERVER_DEFAULT_KEY = typeof Buffer !== 'undefined' 
@@ -20,91 +33,183 @@ export async function handleGenerateDiagram(body: any, apiKey?: string) {
     return { status: 500, data: { error: 'Chave de API do Gemini não configurada no servidor.' } };
   }
 
-  const { prompt, imageBase64 } = body || {};
+  const { 
+    prompt, 
+    mode = 'create', 
+    imageBase64, 
+    history = [], 
+    currentBoardContext, 
+    selectedNodeIds = [] 
+  } = body || {};
 
-  if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
-    return { status: 400, data: { error: 'O parâmetro prompt é obrigatório.' } };
+  if ((!prompt || typeof prompt !== 'string' || !prompt.trim()) && !imageBase64) {
+    return { status: 400, data: { error: 'O parâmetro prompt ou uma imagem anexada é obrigatório.' } };
   }
 
-  if (prompt.length > 20000) {
-    return { status: 400, data: { error: 'O prompt excede o limite máximo de 20.000 caracteres.' } };
+  const safePrompt = (prompt || '').trim();
+  const safeMode: 'think' | 'copy' | 'create' = ['think', 'copy', 'create'].includes(mode) ? mode : 'create';
+
+  // ─── CONTEXTO DO MAPA MENTAL ATUAL ──────────────────────────────────────────
+  let boardContextText = '';
+  if (currentBoardContext && Array.isArray(currentBoardContext.nodesSummary) && currentBoardContext.nodesSummary.length > 0) {
+    const nodesList = currentBoardContext.nodesSummary.slice(0, 80).map(n => 
+      `- ID: "${n.id}" | Texto: "${n.text.replace(/\n/g, ' ')}" | Pai: ${n.parentId ? `"${n.parentId}"` : 'null'} | Cor: ${n.color || 'padrão'} | Origem: ${n.origin || 'indefinida'}`
+    ).join('\n');
+
+    boardContextText = `\nCONTEXTO DO MAPA MENTAL ATUAL NO EDITOR:
+Título do Quadro: "${currentBoardContext.title || 'Sem título'}"
+Total de Nós Existentes: ${currentBoardContext.nodesCount || currentBoardContext.nodesSummary.length}
+Nós Atuais do Mapa:\n${nodesList}
+${selectedNodeIds.length > 0 ? `Nós atualmente selecionados pelo usuário: ${JSON.stringify(selectedNodeIds)}` : ''}
+`;
   }
 
-  const systemInstruction = `Você é o Consultor Estratégico e Engenheiro Visual de IA do Whimsical / WhimFlow.
-Sua missão é ajudar o usuário a PENSAR PROFUNDAMENTE, desafiar premissas, interpretar meticulosamente qualquer entrada (texto, imagem ou documento) e construir estruturas visuais de mapas mentais e diagramas de classe mundial.
+  // ─── SYSTEM INSTRUCTION ESPECIALIZADA POR MODO ──────────────────────────────
+  let modeInstruction = '';
 
-IMPORTANTE: Todos os títulos, textos de nós, explicações, raciocínios e perguntas DEVEM ESTAR RIGOROSAMENTE EM PORTUGUÊS DO BRASIL.
+  if (safeMode === 'think') {
+    modeInstruction = `VOCÊ ESTÁ NO MODO: "AJUDAR A PENSAR" (Consultoria & Raciocínio Estratégico).
+Sua missão é desenvolver ideias, analisar problemas, desafiar premissas, sugerir estratégias e responder perguntas complexas com profundidade analítica.
+DIRETRIZES DO MODO PENSAR:
+1. NÃO modifique o mapa automaticamente se o usuário estiver apenas pedindo uma opinião, análise ou conselho. Defina "operation": { "type": "none" }.
+2. Se o usuário pedir expressamente para adicionar ou incorporar ideias ao mapa existente, proponha nós sugeridos com "origin": "suggested" e use "operation": { "type": "add_nodes" }.
+3. Seja profundo, perspicaz e prático. Traga 3 perguntas reflexivas de alto impacto para desafiar o modelo de negócio ou operação do usuário.`;
+  } else if (safeMode === 'copy') {
+    modeInstruction = `VOCÊ ESTÁ NO MODO: "COPIAR DA IMAGEM" (Fidelidade Absoluta e Transcrição).
+Sua missão é transcrever com rigor e precisão documental exatamente o mapa mental, organograma, fluxo ou cardápio presente na imagem/documento anexado.
+DIRETRIZES DO MODO COPIAR:
+1. FIDELIDADE ABSOLUTA: Extraia todos os tópicos, títulos, produtos, valores e relações exatamente como aparecem na imagem.
+2. NÃO INVENTE textos, não substitua palavras por sinônimos e não omita ramos legíveis.
+3. Se alguma palavra ou ramo estiver borrado, cortado ou incerto, marque o nó com "origin": "uncertain" e sinalize a incerteza no texto ou notas.
+4. Para todos os elementos claramente legíveis do material original, marque "origin": "existing".
+5. Defina "operation": { "type": "create_mindmap" }.`;
+  } else {
+    // Mode 'create'
+    modeInstruction = `VOCÊ ESTÁ NO MODO: "CRIAR MAPA MENTAL" (Construção Arquitetural e Comercial).
+Sua missão é interpretar a solicitação, anexo ou cardápio do usuário e construir ou editar um mapa mental profissional, altamente organizado e visualmente distinto.
+DIRETRIZES DO MODO CRIAR:
+1. RESTAURANTES, CARDÁPIOS E NEGÓCIOS:
+   - Organize em Categorias coerentes, Subcategorias e Produtos.
+   - Itens que existem no negócio/cardápio devem ter "origin": "existing" e cor azul corporativo ("#0284c7" ou "#3b82f6").
+   - Novas sugestões da IA (novos produtos, combos, upsells, melhorias) devem ter "origin": "suggested" e cor verde esmeralda ("#10b981" ou "#059669").
+   - Informações incertas ou que precisam de validação devem ter "origin": "uncertain" e cor âmbar ("#f59e0b").
+2. CONTEXTO E CONTINUIDADE (MULTITURN):
+   - Se já existirem nós no mapa atual (veja o contexto fornecido) e o usuário pedir alterações (ex: "adicione bebidas", "mude a cor dos combos para azul", "separe os combos"):
+     - NÃO crie um mapa novo do zero.
+     - Se for adicionar elementos a uma categoria existente, use "operation": { "type": "add_nodes" } e referencie o parentId correto existente!
+     - Se for alterar cores ou textos existentes, use "operation": { "type": "update_nodes" } com o nodeId correspondente.
+     - Se o mapa estiver em branco ou o usuário pedir um novo mapa completo, use "operation": { "type": "create_mindmap" }.`;
+  }
 
-DIRETRIZES DE PENSAMENTO E INTERPRETAÇÃO:
-1. FIDELIDADE ABSOLUTA AO TEMA SOLICITADO:
-   - Se o usuário falar de alimentação, lanchonete, salgados, combos, cardápio, ifood, etc. (como "Salgados Viana"), o mapa mental DEVE SER 100% SOBRE ESSE TEMA: kits de quantidade (100, 50, 20 salgados), combos com refrigerante, bebidas avulsas, precificação, taxas do iFood e estratégias de conversão.
-   - NUNCA responda com jargões genéricos de desenvolvimento de software ("1. Diagnóstico & Descoberta", "Arquitetura & Implementação") a menos que o usuário tenha pedido expressamente um sistema de software!
-   - Se for um organograma: estruture cargos, diretorias, gerências e áreas.
-   - Se for um fluxo de processos ou jornada: estruture etapas ordenadas cronologicamente com decisões e critérios de aprovação.
-   - Se for planejamento financeiro: estruture receitas, custos, margens e investimentos.
+  const systemInstruction = `Você é o Agente Inteligente Oficial do WhimFlow / Whimsical.
+Você é um Engenheiro Visual e Consultor de Negócios de nível executivo.
+Todos os títulos, textos de nós, explicações e perguntas DEVEM ESTAR RIGOROSAMENTE EM PORTUGUÊS DO BRASIL.
 
-2. ANÁLISE DE IMAGEM OU ARQUIVO ANEXADO:
-   - Se o usuário enviar uma imagem (foto de quadro branco, rascunho em papel, print de tela, foto de cardápio, fluxograma existente) ou um documento:
-     - Realize uma leitura completa e minuciosa (OCR de alta resolução).
-     - Extraia TODOS os tópicos reais, títulos, divisões, produtos, números, valores e relacionamentos presentes no anexo.
-     - Transcreva a hierarquia para o mapa mental respeitando a estrutura original da imagem ou arquivo.
+${modeInstruction}
+${boardContextText}
 
-3. RACIOCÍNIO ESTRATÉGICO EXPLÍCITO (Campo "thinking"):
-   - Você DEVE pensar e articular um parágrafo denso e analítico contendo:
-     a) Diagnóstico do Pedido: O que foi identificado na mensagem/anexo (domínio, restrições e objetivos).
-     b) Decisão de Arquitetura Visual: Qual tipo de diagrama é o ideal ("mindmap", "menu", "orgchart", "process", "strategic" ou "brainstorm") e por quê.
-     c) Lógica de Ramos e Hierarquia: Como os nós foram organizados para máxima clareza, conversão ou tomada de decisão.
-
-FORMATO OBRIGATÓRIO DE RESPOSTA (JSON PURO):
+FORMATO OBRIGATÓRIO DE SAÍDA (RETORNE APENAS JSON VÁLIDO NO SCHEMA ABAIXO):
 {
-  "title": "Título Profissional e Específico do Projeto",
-  "thinking": "Diagnóstico do Pedido: [o que foi compreendido]. Decisão Visual: [tipo e justificativa da estrutura]. Lógica de Ramos: [como os nós foram distribuídos e raciocínio de valor].",
-  "diagramType": "mindmap | orgchart | process | menu | strategic | brainstorm",
-  "detectedDomain": "Nome do Domínio (ex: Cardápio Comercial iFood, Organograma Hospitalar, Fluxo de Checkout, etc.)",
-  "explanation": "Síntese executiva clara em 2-3 frases do objetivo e dos benefícios da estrutura proposta.",
+  "mode": "${safeMode}",
+  "thinking": "Diagnóstico do Pedido: [análise do que o usuário precisa]. Decisão Visual: [escolha de ramos e hierarquia]. Lógica de Negócio: [distinção entre o que é existente vs sugestão e estratégia de valor].",
+  "explanation": "Síntese executiva clara em 2-4 frases explicando a lógica da entrega para o usuário.",
   "reflectionQuestions": [
-    "Pergunta reflexiva 1 profunda para desafiar premissas operacionais ou comerciais?",
-    "Pergunta reflexiva 2 sobre riscos críticos, margem ou capacidade de entrega?",
-    "Pergunta reflexiva 3 sobre métricas de sucesso ou retenção do cliente?"
+    "Pergunta reflexiva 1 profunda para desafiar premissas?",
+    "Pergunta reflexiva 2 sobre riscos ou oportunidade comercial?",
+    "Pergunta reflexiva 3 sobre métricas ou validação?"
   ],
-  "nodes": [
-    {
-      "id": "root",
-      "text": "Tema Central Específico",
-      "parentId": null,
-      "childrenIds": ["r1", "r2", "r3", "r4"],
-      "color": "#7c3aed"
-    },
-    {
-      "id": "r1",
-      "text": "1. Primeiro Grande Ramo / Pilar",
-      "parentId": "root",
-      "childrenIds": ["r1-1", "r1-2"],
-      "color": "#0284c7"
-    },
-    {
-      "id": "r1-1",
-      "text": "Sub-tópico detalhado com informação real",
-      "parentId": "r1",
-      "childrenIds": [],
-      "color": "#0284c7"
-    }
-  ]
+  "operation": {
+    "type": "create_mindmap | add_nodes | update_nodes | delete_nodes | apply_colors | none",
+    "title": "Título Profissional do Mapa",
+    "nodes": [
+      {
+        "id": "root",
+        "text": "Tema Central",
+        "parentId": null,
+        "childrenIds": ["c1", "c2"],
+        "color": "#7c3aed",
+        "origin": "existing | suggested | generated | uncertain"
+      },
+      {
+        "id": "c1",
+        "text": "Categoria 1 (Existente)",
+        "parentId": "root",
+        "childrenIds": ["c1-1"],
+        "color": "#0284c7",
+        "origin": "existing"
+      },
+      {
+        "id": "c1-1",
+        "text": "Produto Existente",
+        "parentId": "c1",
+        "childrenIds": [],
+        "color": "#0284c7",
+        "origin": "existing"
+      },
+      {
+        "id": "c2",
+        "text": "Sugestões de Crescimento",
+        "parentId": "root",
+        "childrenIds": ["c2-1"],
+        "color": "#10b981",
+        "origin": "suggested"
+      },
+      {
+        "id": "c2-1",
+        "text": "Novo Combo Sugerido (IA)",
+        "parentId": "c2",
+        "childrenIds": [],
+        "color": "#10b981",
+        "origin": "suggested"
+      }
+    ],
+    "updates": [
+      {
+        "nodeId": "id-do-no-existente",
+        "text": "Novo texto opcional",
+        "color": "#0284c7",
+        "origin": "existing"
+      }
+    ],
+    "deletedNodeIds": []
+  }
 }
 
-REGRAS ESTRUTURAIS:
-- Gere entre 8 e 20 nós com conteúdo substantivo, detalhado e contextualizado.
-- Use cores corporativas elegantes e distintas por ramo primário: #7c3aed (roxo), #0284c7 (azul celeste), #10b981 (esmeralda), #f59e0b (âmbar dourado), #ec4899 (rosa magenta), #ea580c (laranja).
-- Não inclua markdown extra antes ou depois do JSON.`;
+REGRAS ESTRUTURAIS CRÍTICAS:
+1. Sempre use IDs válidos e únicos para cada nó.
+2. Quando "operation.type" for "create_mindmap", forneça o nó "root" (com parentId: null) e todos os nós filhos com parentId apontando para o pai correto.
+3. Quando "operation.type" for "add_nodes", forneça a lista de novos nós com parentId apontando para o ID de um nó pai existente no mapa.
+4. Cores recomendadas:
+   - Nó raiz: #7c3aed (roxo corporativo)
+   - Produtos / Fatos existentes: #0284c7 (azul)
+   - Sugestões da IA / Oportunidades: #10b981 (verde esmeralda)
+   - Dúvidas / Incertezas / OCR parcial: #f59e0b (âmbar)
+   - Alertas / Pontos Críticos: #ef4444 (vermelho coral)
+5. Não retorne nenhum texto antes ou depois do JSON.`;
 
-  const parts: any[] = [{ text: prompt.trim() }];
+  // ─── MONTAGEM DAS MENSAGENS COM HISTÓRICO MULTITURN ─────────────────────────
+  const contents: any[] = [];
 
+  // Inclui histórico de mensagens anteriores (se fornecido)
+  if (Array.isArray(history) && history.length > 0) {
+    history.slice(-6).forEach(h => {
+      if (h && typeof h.text === 'string' && h.text.trim()) {
+        contents.push({
+          role: h.role === 'assistant' || h.role === 'model' ? 'model' : 'user',
+          parts: [{ text: h.text.trim() }]
+        });
+      }
+    });
+  }
+
+  // Monta a mensagem atual do usuário com anexo multimodal (se houver)
+  const currentParts: any[] = [];
   if (imageBase64 && typeof imageBase64 === 'string') {
     const mimeMatch = imageBase64.match(/^data:([^;]+);base64,(.+)$/);
     const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
     const cleanBase64 = mimeMatch ? mimeMatch[2] : imageBase64.replace(/^data:[^;]+;base64,/, '');
 
-    parts.unshift({
+    currentParts.push({
       inlineData: {
         mimeType: mimeType,
         data: cleanBase64
@@ -112,11 +217,24 @@ REGRAS ESTRUTURAIS:
     });
   }
 
+  currentParts.push({
+    text: safePrompt || (safeMode === 'copy' 
+      ? 'Analise a imagem anexada e reproduza o mapa mental com máxima fidelidade aos nós e hierarquias originais.' 
+      : 'Analise o anexo e estruture um mapa mental completo.')
+  });
+
+  contents.push({
+    role: 'user',
+    parts: currentParts
+  });
+
+  // ─── EXECUÇÃO MULTI-MODELO COM TIMEOUT SEGURO ──────────────────────────────
   let lastError = null;
 
   for (const model of GEMINI_MODELS) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8500); // 8.5 segundos por modelo com failover ágil e sem estourar o limite de 30s da Vercel
+    const timeoutId = setTimeout(() => controller.abort(), 9000); // 9 segundos por tentativa
+
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
       const apiRes = await fetch(url, {
@@ -124,12 +242,12 @@ REGRAS ESTRUTURAIS:
         signal: controller.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts }],
+          contents,
           systemInstruction: { parts: [{ text: systemInstruction }] },
           generationConfig: {
-            temperature: 0.25,
+            temperature: safeMode === 'copy' ? 0.1 : 0.25,
             responseMimeType: 'application/json',
-            maxOutputTokens: 3072
+            maxOutputTokens: 4096
           }
         })
       });
@@ -147,22 +265,24 @@ REGRAS ESTRUTURAIS:
       if (textOutput) {
         try {
           const parsed = JSON.parse(textOutput);
-          if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+          if (parsed && typeof parsed === 'object') {
             return {
               status: 200,
               data: {
-                title: parsed.title || prompt.slice(0, 35),
+                mode: safeMode,
                 thinking: parsed.thinking || 'Diagnóstico e arquitetura estrutural gerados pelo motor analítico Gemini.',
-                diagramType: parsed.diagramType || 'mindmap',
-                detectedDomain: parsed.detectedDomain || 'Mapa Mental Estratégico',
-                explanation: parsed.explanation || 'Estrutura analítica e mapa de raciocínio construídos com inteligência artificial.',
+                explanation: parsed.explanation || 'Análise e estruturação concluídas com inteligência artificial.',
                 reflectionQuestions: Array.isArray(parsed.reflectionQuestions) && parsed.reflectionQuestions.length > 0
                   ? parsed.reflectionQuestions
                   : [
-                      'Quais são os principais riscos operacionais desta abordagem?',
-                      'Como podemos validar o retorno sobre o investimento desta entrega com os usuários?'
+                      'Quais são as principais premissas operacionais que precisam ser validadas?',
+                      'Qual o retorno estimado das ações sugeridas para o negócio?'
                     ],
-                nodes: parsed.nodes,
+                operation: parsed.operation || {
+                  type: safeMode === 'think' ? 'none' : 'create_mindmap',
+                  title: parsed.title || safePrompt.slice(0, 35),
+                  nodes: parsed.nodes || []
+                },
                 modelUsed: model
               }
             };

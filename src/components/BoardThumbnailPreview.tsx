@@ -91,6 +91,13 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
       if (y + h > maxY) maxY = y + h;
     });
 
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      minX = 0;
+      minY = 0;
+      maxX = 200;
+      maxY = 140;
+    }
+
     const padX = Math.max(20, (maxX - minX) * 0.08);
     const padY = Math.max(16, (maxY - minY) * 0.1);
     const boxW = Math.max(100, maxX - minX + 2 * padX);
@@ -172,6 +179,13 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
       if (x + width > maxX) maxX = x + width;
       if (y + height > maxY) maxY = y + height;
     });
+
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      minX = 0;
+      minY = 0;
+      maxX = 200;
+      maxY = 120;
+    }
 
     const padX = Math.max(24, (maxX - minX) * 0.08);
     const padY = Math.max(18, (maxY - minY) * 0.1);
@@ -460,13 +474,17 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
     const isExcessivelyVertical = viewHeight > viewWidth * 1.25;
     if (isExcessivelyVertical) {
       const rootPos = nodePositions.get(rootNode?.id || '');
-      const rootY = rootPos ? rootPos.y + rootPos.h / 2 : minY;
+      const rootY = rootPos && isFinite(rootPos.y) ? rootPos.y + (rootPos.h || 40) / 2 : minY;
       
       viewHeight = viewWidth * 1.10;
       viewMinY = Math.max(minY - padY, rootY - viewHeight * 0.35);
     }
 
-    const viewBox = `${viewMinX} ${viewMinY} ${viewWidth} ${viewHeight}`;
+    const safeMinX = isFinite(viewMinX) ? viewMinX : -150;
+    const safeMinY = isFinite(viewMinY) ? viewMinY : -80;
+    const safeW = isFinite(viewWidth) && viewWidth > 0 ? viewWidth : 300;
+    const safeH = isFinite(viewHeight) && viewHeight > 0 ? viewHeight : 160;
+    const viewBox = `${safeMinX} ${safeMinY} ${safeW} ${safeH}`;
 
     // Agrupamento pai -> filhos para linhas conectoras limpas
     const parentChildrenMap = new Map<string, MindMapNode[]>();
@@ -598,7 +616,7 @@ export const BoardThumbnailPreview: React.FC<BoardThumbnailPreviewProps> = ({ bo
         {/* 4. Nós do Mapa Mental (100% Sem Cards Artificiais) */}
         {effectiveNodes.map(node => {
           const pos = nodePositions.get(node.id);
-          if (!pos) return null;
+          if (!pos || !isFinite(pos.x) || !isFinite(pos.y)) return null;
 
           // Nó Raiz Principal: Cápsula Executiva Sólida com Texto Nítido e Alto Contraste
           if (pos.isRoot) {

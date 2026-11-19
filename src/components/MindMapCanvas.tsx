@@ -1139,19 +1139,29 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const textColor = 'var(--text-primary)';
 
         const isConnectingSource = connectingSourceId === node.id;
+        const isUncertain = node.origin === 'uncertain' || node.confidence === 'low';
+        const isSuggested = node.origin === 'suggested';
 
-        // ESTILO DO CARD (Normal vs Edição)
+        // ESTILO DO CARD (Normal vs Edição vs Sugestão/Incerteza)
         // Quando em edição: fundo sólido corporativo de alto contraste, borda viva, sombra elegante
         const nodeBg = isEditing
           ? 'var(--bg-surface, #1e222a)'
           : isSelected
           ? 'rgba(56, 189, 248, 0.08)'
+          : isUncertain
+          ? 'rgba(245, 158, 11, 0.06)'
+          : isSuggested
+          ? 'rgba(16, 185, 129, 0.06)'
           : (isHovered ? 'rgba(255, 255, 255, 0.04)' : 'transparent');
 
         const nodeBorder = isEditing
           ? `1.5px solid ${nodeColor}`
           : isSelected
           ? `1.5px solid ${nodeColor}`
+          : isUncertain
+          ? '1.5px dashed #f59e0b'
+          : isSuggested
+          ? '1.5px solid #10b981'
           : (isHovered ? '1.5px solid rgba(255, 255, 255, 0.12)' : '1.5px solid transparent');
 
         const nodeBoxShadow = isEditing
@@ -1213,6 +1223,54 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             {node.icon && (
               <span style={{ marginRight: '6px', fontSize: '14px', verticalAlign: 'middle', userSelect: 'none' }}>
                 {node.icon}
+              </span>
+            )}
+
+            {/* Badges de Origem da IA (Sugestão vs Incerto) */}
+            {!isEditing && isSuggested && (
+              <span
+                data-testid={`badge-suggested-${node.id}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  fontSize: '9.5px',
+                  fontWeight: 600,
+                  backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                  color: '#10b981',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  marginRight: '6px',
+                  userSelect: 'none',
+                  lineHeight: '1.2'
+                }}
+                title="Sugestão gerada pela IA"
+              >
+                Sugestão
+              </span>
+            )}
+            {!isEditing && isUncertain && (
+              <span
+                data-testid={`badge-uncertain-${node.id}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  padding: '1px 5px',
+                  borderRadius: '3px',
+                  fontSize: '9.5px',
+                  fontWeight: 600,
+                  backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                  color: '#f59e0b',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  marginRight: '6px',
+                  userSelect: 'none',
+                  lineHeight: '1.2'
+                }}
+                title="Informação incerta ou ambígua detectada pela IA"
+              >
+                Incerto
               </span>
             )}
 

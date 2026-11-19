@@ -48,6 +48,8 @@ import { QuickSparkModal } from './components/QuickSparkModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 import { TemplateItem } from './constants/templatesData';
 import { calculateMindMapLayout } from './utils/treeLayout';
+import { applyAgentOperation } from './services/agentEngine';
+import { readJsonFile } from './services/mindmapJsonService';
 import { useCanvasNavigation } from './hooks/useCanvasNavigation';
 import { useBoardStorage } from './hooks/useBoardStorage';
 import { useBoardOperations } from './hooks/useBoardOperations';
@@ -833,6 +835,29 @@ export const App: React.FC = () => {
     }, 120);
   };
 
+  const handleImportMindMapJson = useCallback(async (file: File) => {
+    try {
+      const parsed = await readJsonFile(file);
+      if (!parsed.success || parsed.nodes.length === 0) {
+        showToast(parsed.error || 'O arquivo JSON não contém um mapa mental válido.', 'error');
+        return;
+      }
+
+      if (parsed.boards && parsed.boards.length > 0) {
+        setBoards(prev => [...parsed.boards!, ...prev]);
+        setActiveBoardId(parsed.boards[0].id);
+        routerNavigate(`/board/${encodeURIComponent(parsed.boards[0].id)}`);
+        showToast(`Backup com ${parsed.boards.length} quadros importado com sucesso!`, 'success');
+        return;
+      }
+
+      handleGenerateFromAgent(parsed.title, parsed.title, parsed.nodes);
+      showToast(`Mapa mental "${parsed.title}" importado com sucesso (${parsed.nodes.length} nós)!`, 'success');
+    } catch (err: any) {
+      showToast(`Falha ao importar JSON: ${err.message || 'Erro desconhecido'}`, 'error');
+    }
+  }, [handleGenerateFromAgent, routerNavigate, showToast]);
+
   // Alinhamento em Lote dos Nós com Cálculo Geométrico e Fixação de Coordenadas Visuais
   const handleBatchAlignNodes = (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-v' | 'distribute-h') => {
     if (selectedNodeIds.length <= 1) return;
@@ -1018,6 +1043,7 @@ export const App: React.FC = () => {
           onRenameWorkspace={handleRenameWorkspace}
           onCreateWorkspace={handleCreateWorkspace}
           onExportBackup={handleExportBackup}
+          onImportJson={handleImportMindMapJson}
         />
       )}
 
@@ -1444,6 +1470,27 @@ export const App: React.FC = () => {
       <AgentDrawer
         isOpen={isAgentDrawerOpen}
         onClose={() => setIsAgentDrawerOpen(false)}
+        activeBoard={activeBoard}
+        selectedNodeId={selectedNodeId}
+        selectedNodeIds={selectedNodeIds}
+        onApplyAgentOperation={(operation, diagramTitle) => {
+          let updatedNodes: MindMapNode[] = [];
+          let executionSummary = '';
+          updateActiveBoard(b => {
+            const result = applyAgentOperation(b, operation);
+            const updatedBoard = { ...result.board };
+            if (diagramTitle && (!b.title || b.title === 'Sem título' || b.title === 'untitled' || b.title === 'Quadro sem título')) {
+              updatedBoard.title = diagramTitle;
+            }
+            updatedNodes = updatedBoard.mindMapNodes;
+            executionSummary = result.summary;
+            return updatedBoard;
+          });
+          setTimeout(() => {
+            if (updatedNodes.length > 0) fitView(updatedNodes);
+          }, 120);
+          showToast(executionSummary || 'Alteração aplicada no mapa mental com sucesso!', 'success');
+        }}
         onInsertNodesToCurrentBoard={(newNodes, diagramTitle) => {
           if (!newNodes || newNodes.length === 0) return;
 
@@ -1548,6 +1595,24 @@ export const App: React.FC = () => {
         activeBoard={activeBoard}
         theme={theme}
         onShowToast={showToast}
+        onImportJsonToBoard={async (file) => {
+          try {
+            const parsed = await readJsonFile(file);
+            if (!parsed.success || parsed.nodes.length === 0) {
+              showToast(parsed.error || 'Arquivo JSON sem mapa mental válido.', 'error');
+              return;
+            }
+            updateActiveBoard(b => ({
+              ...b,
+              title: parsed.title && parsed.title !== 'Sem título' ? parsed.title : b.title,
+              mindMapNodes: parsed.nodes
+            }));
+            setTimeout(() => fitView(parsed.nodes), 120);
+            showToast(`Mapa mental restaurado com sucesso (${parsed.nodes.length} nós)!`, 'success');
+          } catch (err: any) {
+            showToast(`Erro ao restaurar JSON: ${err.message}`, 'error');
+          }
+        }}
       />
 
       {/* Modal de Templates */}

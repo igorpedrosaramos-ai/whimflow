@@ -1,4 +1,4 @@
-import { MindMapNode } from '../types';
+import { MindMapNode, Board, AgentMode, AgentOperation } from '../types';
 
 export interface GeminiDiagramResult {
   title: string;
@@ -9,6 +9,16 @@ export interface GeminiDiagramResult {
   thinking?: string;
   diagramType?: 'mindmap' | 'orgchart' | 'process' | 'menu' | 'strategic' | 'brainstorm';
   detectedDomain?: string;
+  mode?: AgentMode;
+  operation?: AgentOperation;
+}
+
+export interface GenerateAgentOptions {
+  mode?: AgentMode;
+  imageBase64?: string;
+  history?: Array<{ role: 'user' | 'assistant'; text: string }>;
+  currentBoard?: Board;
+  selectedNodeIds?: string[];
 }
 
 // Presets de alta fidelidade 100% em Português com perguntas reflexivas
@@ -233,9 +243,30 @@ export function layoutNodesTree(rawNodes: Array<{ id: string; text: string; pare
  * Gerador de fallback semântico contextualizado em português
  * Nunca entrega stubs vazios ou genéricos: analisa o prompt do usuário e constrói ramos pertinentes
  */
-export function generateDynamicFallback(prompt: string): GeminiDiagramResult {
+export function generateDynamicFallback(prompt: string, mode: AgentMode = 'create'): GeminiDiagramResult {
   const cleanPrompt = prompt.trim();
   const lower = cleanPrompt.toLowerCase();
+
+  // Modo "Ajudar a Pensar" em fallback: consultoria estratégica sem forçar alteração no mapa
+  if (mode === 'think') {
+    return {
+      title: 'Análise Estratégica & Reflexão',
+      thinking: `Diagnóstico do Pedido: O usuário solicitou consultoria analítica para aprofundar seu raciocínio sobre "${cleanPrompt.slice(0, 50)}". Decisão Visual: Modo de reflexão conceitual sem alteração destrutiva do mapa mental existente. Lógica: Apresentar perspectivas críticas de viabilidade, gargalos operacionais e oportunidades de diferenciação.`,
+      explanation: `Analisei sua solicitação com foco em estratégia e viabilidade. Para estruturar este projeto com solidez, recomendo focar na validação da proposta de valor, no mapeamento do fluxo operacional e nas métricas de retenção antes de expandir.`,
+      reflectionQuestions: [
+        `Qual é o principal diferencial que fará seu cliente escolher esta solução em vez de concorrentes já consolidados?`,
+        `Qual é o gargalo operacional ou financeiro mais crítico nos primeiros 90 dias de operação?`,
+        `Como você medirá concretamente se o cliente percebeu o valor prometido logo na primeira entrega?`
+      ],
+      nodes: [],
+      mode: 'think',
+      operation: {
+        type: 'none',
+        title: 'Análise Estratégica'
+      },
+      modelUsed: 'gemini-consultant-fallback'
+    };
+  }
 
   // Caso especializado: alimentação / salgados / ifood / combos / festa / delivery
   if (
@@ -246,37 +277,60 @@ export function generateDynamicFallback(prompt: string): GeminiDiagramResult {
     lower.includes('combo') || 
     lower.includes('lanche') || 
     lower.includes('restaurante') ||
+    lower.includes('sushi') ||
     lower.includes('coca')
   ) {
-    const rawNodes = [
-      { id: 'root', text: 'Salgados Viana\nEstratégia & Conversão iFood', parentId: null, color: '#7c3aed' },
-      { id: 'c1', text: '1. Kits Festa Padronizados', parentId: 'root', color: '#0284c7' },
-      { id: 'c1-1', text: 'Kit 100 Salgados (Festas & Eventos - Alto Volume)', parentId: 'c1', color: '#0284c7' },
-      { id: 'c1-2', text: 'Kit 50 Salgados (Reuniões & Pequenos Grupos)', parentId: 'c1', color: '#0284c7' },
-      { id: 'c1-3', text: 'Kit 20 Salgados (Consumo Imediato / Familiar)', parentId: 'c1', color: '#0284c7' },
-      { id: 'c2', text: '2. Combos Promocionais com Bebida', parentId: 'root', color: '#10b981' },
-      { id: 'c2-1', text: 'Combo Festa: 100 ou 50 Salgados + Coca-Cola 2L', parentId: 'c2', color: '#10b981' },
-      { id: 'c2-2', text: 'Combo Individual: 20 Salgados + Refrigerante Lata', parentId: 'c2', color: '#10b981' },
-      { id: 'c3', text: '3. Bebidas Avulsas & Upsell no iFood', parentId: 'root', color: '#f59e0b' },
-      { id: 'c3-1', text: 'Refrigerantes Gelados Avulsos (Coca-Cola, Guaraná, Fanta)', parentId: 'c3', color: '#f59e0b' },
-      { id: 'c3-2', text: 'Adicionais de Alta Margem: Molhos Especiais & Doces', parentId: 'c3', color: '#f59e0b' },
-      { id: 'c4', text: '4. Otimização de Conversão no iFood', parentId: 'root', color: '#ec4899' },
-      { id: 'c4-1', text: 'Fotos Reais Iluminadas destacando Crocância e Recheio', parentId: 'c4', color: '#ec4899' },
-      { id: 'c4-2', text: 'Combos Âncora no Topo e Promoção de Frete Grátis', parentId: 'c4', color: '#ec4899' }
+    const isSushi = lower.includes('sushi') || lower.includes('oriental') || lower.includes('onegai') || lower.includes('orion');
+    const rootTitle = isSushi ? 'Cardápio Estratégico Oriental' : 'Salgados Viana\nEstratégia & Conversão iFood';
+
+    const rawNodes = isSushi ? [
+      { id: 'root', text: rootTitle, parentId: null, color: '#7c3aed', origin: 'existing' as const },
+      { id: 'c1', text: '1. Clássicos & Pratos Existentes', parentId: 'root', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c1-1', text: 'Sashimi Misto Salmão & Atum', parentId: 'c1', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c1-2', text: 'Temaki Philadélfia Completo', parentId: 'c1', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c1-3', text: 'Uramaki Especial do Chef', parentId: 'c1', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c2', text: '2. Sugestões de Crescimento (IA)', parentId: 'root', color: '#10b981', origin: 'suggested' as const },
+      { id: 'c2-1', text: 'Combo Executivo Almoço (Ticket Médio Controlado)', parentId: 'c2', color: '#10b981', origin: 'suggested' as const },
+      { id: 'c2-2', text: 'Combo Degustação Premium com Sobremesa', parentId: 'c2', color: '#10b981', origin: 'suggested' as const },
+      { id: 'c3', text: '3. Bebidas Lucrativas & Upsell', parentId: 'root', color: '#10b981', origin: 'suggested' as const },
+      { id: 'c3-1', text: 'Chás Artesanais Gelados & Sake Drinks', parentId: 'c3', color: '#10b981', origin: 'suggested' as const }
+    ] : [
+      { id: 'root', text: 'Salgados Viana\nEstratégia & Conversão iFood', parentId: null, color: '#7c3aed', origin: 'existing' as const },
+      { id: 'c1', text: '1. Kits Festa Padronizados (Existentes)', parentId: 'root', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c1-1', text: 'Kit 100 Salgados (Festas & Eventos - Alto Volume)', parentId: 'c1', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c1-2', text: 'Kit 50 Salgados (Reuniões & Pequenos Grupos)', parentId: 'c1', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c1-3', text: 'Kit 20 Salgados (Consumo Imediato / Familiar)', parentId: 'c1', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c2', text: '2. Combos Promocionais com Bebida (Sugestão IA)', parentId: 'root', color: '#10b981', origin: 'suggested' as const },
+      { id: 'c2-1', text: 'Combo Festa: 100 Salgados + Coca-Cola 2L', parentId: 'c2', color: '#10b981', origin: 'suggested' as const },
+      { id: 'c2-2', text: 'Combo Individual: 20 Salgados + Refrigerante Lata', parentId: 'c2', color: '#10b981', origin: 'suggested' as const },
+      { id: 'c3', text: '3. Bebidas Avulsas & Upsell no iFood', parentId: 'root', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c3-1', text: 'Refrigerantes Gelados Avulsos (Coca-Cola, Guaraná, Fanta)', parentId: 'c3', color: '#0284c7', origin: 'existing' as const },
+      { id: 'c3-2', text: 'Sugestão: Adicionais de Alta Margem (Molhos Especiais & Doces)', parentId: 'c3', color: '#10b981', origin: 'suggested' as const },
+      { id: 'c4', text: '4. Otimização de Conversão no iFood', parentId: 'root', color: '#7c3aed', origin: 'generated' as const },
+      { id: 'c4-1', text: 'Fotos Reais Iluminadas destacando Crocância e Recheio', parentId: 'c4', color: '#7c3aed', origin: 'generated' as const },
+      { id: 'c4-2', text: 'Combos Âncora no Topo e Promoção de Frete Grátis', parentId: 'c4', color: '#7c3aed', origin: 'generated' as const }
     ];
 
+    const formattedNodes = layoutNodesTree(rawNodes);
+
     return {
-      title: 'Salgados Viana: Estratégia de Cardápio & Vendas no iFood',
-      thinking: 'Diagnóstico do Pedido: Cardápio comercial focado em delivery iFood para a loja Salgados Viana, exigindo kits festa (100, 50, 20 unidades), combos com refrigerante e upsell avulso. Decisão Visual: Formato de Cardápio Estratégico Bi-direcional, dividindo produtos em pacotes de volume de um lado e combos/bebidas de alta margem do outro. Lógica de Ramos: Ancoragem de valor no kit 100, conveniência no combo familiar e bebidas avulsas para elevar o ticket médio.',
+      title: isSushi ? 'Cardápio Estratégico Oriental' : 'Salgados Viana: Estratégia de Cardápio & Vendas no iFood',
+      thinking: 'Diagnóstico do Pedido: Cardápio comercial focado em delivery iFood, separando claramente itens existentes (azul) de oportunidades e combos sugeridos (verde). Decisão Visual: Arquitetura bi-direcional estruturada por categorias e pacotes de alto volume. Lógica de Ramos: Ancoragem de valor no kit/combo principal e bebidas de alta margem para alavancar ticket médio.',
       diagramType: 'menu',
-      detectedDomain: 'Gastronomia & Delivery iFood',
-      explanation: 'Estrutura estratégica e comercial focada em conversão no iFood para Salgados Viana: kits festa (100, 50 e 20 unidades), combos com Coca-Cola e bebidas avulsas de alta margem.',
+      detectedDomain: 'Gastronomia & Delivery Comercial',
+      explanation: 'Estrutura estratégica e comercial organizada com distinção cromática: produtos existentes em azul corporativo e recomendações inovadoras em verde esmeralda.',
       reflectionQuestions: [
-        'Qual a margem de contribuição líquida dos combos de 50 e 100 salgados considerando a taxa cobrada pelo iFood?',
-        'Qual é a capacidade de fritura e expedição em horários de pico para não gerar atrasos no delivery?',
-        'Como as embalagens térmicas e seladas podem garantir que os salgados cheguem crocantes e quentes para obter nota 5 estrelas?'
+        'Qual a margem de contribuição líquida dos combos de maior volume considerando as taxas das plataformas de entrega?',
+        'Qual é a capacidade de expedição e montagem em horários de pico para não gerar atrasos?',
+        'Como as embalagens térmicas e seladas podem garantir que os produtos cheguem na temperatura e textura ideais?'
       ],
-      nodes: layoutNodesTree(rawNodes),
+      nodes: formattedNodes,
+      mode: 'create',
+      operation: {
+        type: 'create_mindmap',
+        title: isSushi ? 'Cardápio Estratégico Oriental' : 'Salgados Viana: Estratégia de Cardápio',
+        nodes: formattedNodes
+      },
       modelUsed: 'gemini-intelligent-engine'
     };
   }
@@ -331,35 +385,62 @@ export function generateDynamicFallback(prompt: string): GeminiDiagramResult {
  */
 export async function generateWithGemini(
   prompt: string,
-  imageBase64?: string
+  optionsOrImage?: string | GenerateAgentOptions
 ): Promise<GeminiDiagramResult> {
+  const options: GenerateAgentOptions = typeof optionsOrImage === 'string'
+    ? { imageBase64: optionsOrImage }
+    : (optionsOrImage || {});
+
+  const mode = options.mode || 'create';
+  const imageBase64 = options.imageBase64;
+  const history = options.history;
+  const currentBoard = options.currentBoard;
+  const selectedNodeIds = options.selectedNodeIds || [];
+
   // Verifica presets rápidos se for um dos 5 try it out exatos (compatível em PT e EN)
   const lower = prompt.toLowerCase();
   if (lower.includes('sequence diagram of payment') || lower.includes('payment processing') || lower.includes('fluxo de pagamento') || lower.includes('diagrama de sequência')) {
     const p = TRY_IT_OUT_PRESETS['sequence-diagram'];
-    return { ...p, modelUsed: 'preset-instant' };
+    return { ...p, modelUsed: 'preset-instant', mode };
   }
   if (lower.includes('wireframe of a budgeting') || lower.includes('budgeting app') || lower.includes('controle financeiro') || lower.includes('app de controle')) {
     const p = TRY_IT_OUT_PRESETS['wireframe-budgeting'];
-    return { ...p, modelUsed: 'preset-instant' };
+    return { ...p, modelUsed: 'preset-instant', mode };
   }
   if (lower.includes('user flow of checkout') || lower.includes('checkout flow') || lower.includes('checkout e conversão') || lower.includes('fluxo de usuário')) {
     const p = TRY_IT_OUT_PRESETS['user-flow-checkout'];
-    return { ...p, modelUsed: 'preset-instant' };
+    return { ...p, modelUsed: 'preset-instant', mode };
   }
   if (lower.includes('startup building tips') || lower.includes('mind map of startup') || lower.includes('validação de startups') || lower.includes('passos para criar uma startup')) {
     const p = TRY_IT_OUT_PRESETS['mind-map-startup'];
-    return { ...p, modelUsed: 'preset-instant' };
+    return { ...p, modelUsed: 'preset-instant', mode };
   }
   if (lower.includes('sticky note brainstorm') || lower.includes('marketing ideas') || lower.includes('ideias de marketing') || lower.includes('brainstorm em notas')) {
     const p = TRY_IT_OUT_PRESETS['sticky-notes-marketing'];
-    return { ...p, modelUsed: 'preset-instant' };
+    return { ...p, modelUsed: 'preset-instant', mode };
   }
 
-  // Chama o backend seguro em /api/generate-diagram com timeout ampliado de 25s
+  // Prepara o contexto do quadro atual se disponível
+  let currentBoardContext = undefined;
+  if (currentBoard && Array.isArray(currentBoard.mindMapNodes) && currentBoard.mindMapNodes.length > 0) {
+    currentBoardContext = {
+      title: currentBoard.title,
+      nodesCount: currentBoard.mindMapNodes.length,
+      rootText: currentBoard.mindMapNodes.find(n => !n.parentId)?.text || '',
+      nodesSummary: currentBoard.mindMapNodes.slice(0, 60).map(n => ({
+        id: n.id,
+        text: n.text,
+        parentId: n.parentId,
+        color: n.color,
+        origin: n.origin
+      }))
+    };
+  }
+
+  // Chama o backend seguro em /api/generate-diagram com timeout de 20s
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     const response = await fetch('/api/generate-diagram', {
       method: 'POST',
@@ -369,31 +450,43 @@ export async function generateWithGemini(
       },
       body: JSON.stringify({
         prompt,
-        imageBase64
+        mode,
+        imageBase64,
+        history,
+        currentBoardContext,
+        selectedNodeIds
       })
     });
     clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
-      if (data && Array.isArray(data.nodes) && data.nodes.length > 0) {
-        const formattedNodes = layoutNodesTree(data.nodes);
-        return {
-          title: data.title || (prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt),
-          thinking: data.thinking || 'Diagnóstico e arquitetura estrutural gerados pelo motor analítico Gemini.',
-          diagramType: data.diagramType || 'mindmap',
-          detectedDomain: data.detectedDomain || 'Mapa Mental Estratégico',
-          explanation: data.explanation || 'Estrutura conceitual e mapa de raciocínio gerado pelo Gemini.',
-          reflectionQuestions: Array.isArray(data.reflectionQuestions) && data.reflectionQuestions.length > 0
-            ? data.reflectionQuestions
-            : [
-                'Quais premissas ou riscos operacionais precisamos validar antes de iniciar?',
-                'Qual indicador chave demonstrará o sucesso desta iniciativa para os clientes?'
-              ],
-          nodes: formattedNodes,
-          modelUsed: data.modelUsed || 'gemini-secure-backend'
-        };
-      }
+      const rawNodes = data.operation?.nodes || data.nodes || [];
+      const formattedNodes = Array.isArray(rawNodes) && rawNodes.length > 0
+        ? layoutNodesTree(rawNodes)
+        : [];
+
+      return {
+        title: data.operation?.title || data.title || (prompt.length > 30 ? prompt.slice(0, 30) + '...' : prompt),
+        thinking: data.thinking || 'Diagnóstico e arquitetura estrutural gerados pelo motor analítico Gemini.',
+        diagramType: data.diagramType || 'mindmap',
+        detectedDomain: data.detectedDomain || 'Mapa Mental Estratégico',
+        explanation: data.explanation || 'Estrutura conceitual e mapa de raciocínio gerado pelo Gemini.',
+        reflectionQuestions: Array.isArray(data.reflectionQuestions) && data.reflectionQuestions.length > 0
+          ? data.reflectionQuestions
+          : [
+              'Quais premissas ou riscos operacionais precisamos validar antes de iniciar?',
+              'Qual indicador chave demonstrará o sucesso desta iniciativa para os clientes?'
+            ],
+        nodes: formattedNodes,
+        mode: data.mode || mode,
+        operation: data.operation || {
+          type: mode === 'think' ? 'none' : 'create_mindmap',
+          title: data.title || prompt.slice(0, 35),
+          nodes: rawNodes
+        },
+        modelUsed: data.modelUsed || 'gemini-secure-backend'
+      };
     } else {
       console.warn(`[Backend AI] Resposta com status ${response.status}`);
     }

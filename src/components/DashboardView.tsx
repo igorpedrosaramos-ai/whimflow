@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Plus, 
   Clock, 
@@ -22,7 +22,8 @@ import {
   Copy,
   Trash,
   Pencil,
-  Tag
+  Tag,
+  Layers
 } from 'lucide-react';
 import { Board, BoardCategory, Workspace } from '../types';
 import { CategoryModal } from './CategoryModal';
@@ -59,6 +60,7 @@ interface DashboardViewProps {
   onRenameWorkspace?: (id: string, newName: string) => void;
   onCreateWorkspace?: (name: string) => void;
   onExportBackup?: () => void;
+  onImportJson?: (file: File) => void;
   theme?: 'dark' | 'light';
 }
 
@@ -91,8 +93,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onRenameWorkspace,
   onCreateWorkspace,
   onExportBackup,
+  onImportJson,
   theme = 'light'
 }) => {
+  const jsonFileInputRef = useRef<HTMLInputElement>(null);
   const [displayMode, setDisplayMode] = useState<'grid' | 'list'>('grid');
   const [isDownloadCardDismissed, setIsDownloadCardDismissed] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
@@ -960,6 +964,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             >
               <Layout size={26} color="#ffffff" />
               <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Criar de Modelo</span>
+            </button>
+
+            {/* 5. + Importar JSON (Indigo #4f46e5) */}
+            <input
+              type="file"
+              ref={jsonFileInputRef}
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  onImportJson?.(file);
+                  e.target.value = '';
+                }
+              }}
+            />
+            <button
+              id="btn-dashboard-action-import-json"
+              data-testid="btn-dashboard-import-json"
+              onClick={() => jsonFileInputRef.current?.click()}
+              title="Abrir arquivo JSON com mapa mental salvo e importar no sistema"
+              style={{
+                width: '172px',
+                height: '100px',
+                borderRadius: '8px',
+                backgroundColor: '#4f46e5',
+                border: 'none',
+                color: '#ffffff',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 4px 14px rgba(79, 70, 229, 0.28)',
+                transition: 'transform 0.15s, box-shadow 0.15s'
+              }}
+              onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-2px)')}
+              onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(0)')}
+            >
+              <Layers size={26} color="#ffffff" />
+              <span style={{ fontSize: '13.5px', fontWeight: 700 }}>+ Importar JSON</span>
             </button>
           </div>
 

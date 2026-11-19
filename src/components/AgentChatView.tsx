@@ -21,8 +21,9 @@ import {
   Layers,
   ArrowRight
 } from 'lucide-react';
-import { MindMapNode } from '../types';
+import { MindMapNode, AgentMode } from '../types';
 import { generateWithGemini, GeminiDiagramResult } from '../services/geminiService';
+import { parseMindMapJson, ParsedMindMapResult } from '../services/mindmapJsonService';
 import { MindMapAiPreview } from './MindMapAiPreview';
 
 interface AgentChatViewProps {
@@ -32,18 +33,23 @@ interface AgentChatViewProps {
   workspaceName?: string;
 }
 
+interface AttachedFile {
+  name: string;
+  size: number;
+  type: string;
+  isImage: boolean;
+  isPdf?: boolean;
+  isMindMapJson?: boolean;
+  parsedMindMap?: ParsedMindMapResult;
+  dataUrl?: string;
+  textContent?: string;
+}
+
 interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
-  attachedFile?: {
-    name: string;
-    size: number;
-    type: string;
-    isImage: boolean;
-    isPdf?: boolean;
-    dataUrl?: string;
-  };
+  attachedFile?: AttachedFile;
   generatedDiagram?: GeminiDiagramResult;
 }
 
@@ -54,18 +60,11 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
   workspaceName = 'teste'
 }) => {
   const [prompt, setPrompt] = useState('');
+  const [mode, setMode] = useState<AgentMode>('create');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isHideSuggestions, setIsHideSuggestions] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [attachedFile, setAttachedFile] = useState<{
-    name: string;
-    size: number;
-    type: string;
-    isImage: boolean;
-    isPdf?: boolean;
-    dataUrl?: string;
-    textContent?: string;
-  } | null>(null);
+  const [attachedFile, setAttachedFile] = useState<AttachedFile | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -119,6 +118,7 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
 
     const isImg = file.type.startsWith('image/');
     const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isJson = file.name.toLowerCase().endsWith('.json') || file.type === 'application/json';
 
     if (isImg || isPdf) {
       const reader = new FileReader();
@@ -133,6 +133,23 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
         });
       };
       reader.readAsDataURL(file);
+    } else if (isJson) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = typeof reader.result === 'string' ? reader.result : '';
+        const parsed = parseMindMapJson(content, file.name.replace(/\.json$/i, ''));
+        setAttachedFile({
+          name: file.name,
+          size: file.size,
+          type: 'application/json',
+          isImage: false,
+          isPdf: false,
+          isMindMapJson: parsed.success && parsed.nodes.length > 0,
+          parsedMindMap: parsed.success ? parsed : undefined,
+          textContent: content
+        });
+      };
+      reader.readAsText(file);
     } else {
       const reader = new FileReader();
       reader.onload = () => {
@@ -158,15 +175,10 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
       sender: 'user',
-      text: textToSend || (currentAttachment?.isImage ? '(Imagem anexada para análise e estruturação de mapa mental)' : `(Arquivo anexado: ${currentAttachment?.name})`),
-      attachedFile: currentAttachment ? {
-        name: currentAttachment.name,
-        size: currentAttachment.size,
-        type: currentAttachment.type,
-        isImage: currentAttachment.isImage,
-        isPdf: currentAttachment.isPdf,
-        dataUrl: currentAttachment.dataUrl
-      } : undefined
+      text: textToSend || (currentAttachment?.isMindMapJson 
+        ? `(Mapa mental anexado: ${currentAttachment.parsedMindMap?.title || currentAttachment.name} com ${currentAttachment.parsedMindMap?.nodes.length || 0} nós)`
+        : (currentAttachment?.isImage ? '(Imagem anexada para análise e estruturação de mapa mental)' : `(Arquivo anexado: ${currentAttachment?.name})`)),
+      attachedFile: currentAttachment || undefined
     };
 
     setMessages(prev => [...prev, userMsg]);
@@ -175,17 +187,30 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
     setIsGenerating(true);
 
     let finalPrompt = textToSend;
-    if (currentAttachment && !currentAttachment.isImage && !currentAttachment.isPdf && currentAttachment.textContent) {
+    if (currentAttachment?.isMindMapJson && currentAttachment.parsedMindMap) {
+      const p = currentAttachment.parsedMindMap;
+      finalPrompt = `[Arquivo de Mapa Mental JSON Anexado: "${p.title}" com ${p.nodes.length} nós]\n` +
+        `Estrutura: ${p.nodes.map(n => `"${n.text}" (id: ${n.id}, pai: ${n.parentId || 'raiz'})`).join(', ')}\n\n` +
+        `Instrução: ${textToSend || 'Analise este mapa mental salvo, valide sua hierarquia e sugira melhorias estratégicas mantendo a consistência.'}`;
+    } else if (currentAttachment && !currentAttachment.isImage && !currentAttachment.isPdf && currentAttachment.textContent) {
       finalPrompt = `[Documento Anexado: ${currentAttachment.name}]\nConteúdo:\n${currentAttachment.textContent}\n\nInstrução: ${textToSend || 'Estruture um mapa mental completo com reflexões estratégicas.'}`;
     } else if (!textToSend && (currentAttachment?.isImage || currentAttachment?.isPdf)) {
-      finalPrompt = 'Analise a imagem/documento anexado com máxima atenção aos detalhes, identifique a hierarquia e recrie o mapa mental visual correspondente.';
+      finalPrompt = mode === 'copy'
+        ? 'Analise minuciosamente a imagem anexada e reproduza fielmente cada texto, ramo e hierarquia sem inventar dados.'
+        : 'Analise a imagem anexada, identifique a estrutura e construa o mapa mental correspondente.';
     }
 
+    const history = messages.slice(-8).map(m => ({
+      role: m.sender === 'user' ? 'user' as const : 'assistant' as const,
+      text: m.text
+    }));
+
     try {
-      const result = await generateWithGemini(
-        finalPrompt,
-        (currentAttachment?.isImage || currentAttachment?.isPdf) ? currentAttachment.dataUrl : undefined
-      );
+      const result = await generateWithGemini(finalPrompt, {
+        imageBase64: (currentAttachment?.isImage || currentAttachment?.isPdf) ? currentAttachment.dataUrl : undefined,
+        mode,
+        history
+      });
 
       const assistantMsg: ChatMessage = {
         id: `assist-${Date.now()}`,
@@ -553,68 +578,84 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
           {/* Pílulas de Modos Rápidos */}
           <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
             <button
-              onClick={() => setPrompt('Analise criticamente minha ideia, aponte pontos cegos e me faça 3 perguntas provocativas: ')}
+              type="button"
+              id="btn-chatview-mode-think"
+              onClick={() => {
+                setMode('think');
+                setPrompt('Analise criticamente minha ideia, aponte pontos cegos e me faça perguntas estratégicas: ');
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '3px 8px',
-                borderRadius: '5px',
-                border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
-                backgroundColor: isDark ? '#141a24' : '#f8fafc',
-                color: isDark ? '#e2e8f0' : '#475569',
-                fontSize: '11px',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: mode === 'think' ? '1.5px solid #f59e0b' : (isDark ? '1px solid #2d384b' : '1px solid #e2e8f0'),
+                backgroundColor: mode === 'think' ? 'rgba(245, 158, 11, 0.15)' : (isDark ? '#141a24' : '#f8fafc'),
+                color: mode === 'think' ? '#f59e0b' : (isDark ? '#e2e8f0' : '#475569'),
+                fontSize: '11.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
               }}
             >
-              <Lightbulb size={12} color="#f59e0b" />
+              <Lightbulb size={13} color="#f59e0b" />
               <span>Ajudar a Pensar</span>
             </button>
 
             <button
+              type="button"
+              id="btn-chatview-mode-copy"
               onClick={() => {
+                setMode('copy');
                 setPrompt('Copie exatamente os nós, produtos e hierarquias da imagem anexada: ');
                 if (!attachedFile) fileInputRef.current?.click();
               }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '3px 8px',
-                borderRadius: '5px',
-                border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
-                backgroundColor: isDark ? '#141a24' : '#f8fafc',
-                color: isDark ? '#e2e8f0' : '#475569',
-                fontSize: '11px',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: mode === 'copy' ? '1.5px solid #0284c7' : (isDark ? '1px solid #2d384b' : '1px solid #e2e8f0'),
+                backgroundColor: mode === 'copy' ? 'rgba(2, 132, 199, 0.15)' : (isDark ? '#141a24' : '#f8fafc'),
+                color: mode === 'copy' ? '#0284c7' : (isDark ? '#e2e8f0' : '#475569'),
+                fontSize: '11.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
               }}
             >
-              <Copy size={12} color="#0284c7" />
+              <Copy size={13} color="#0284c7" />
               <span>Copiar da Imagem</span>
             </button>
 
             <button
-              onClick={() => setPrompt('Crie um mapa mental estratégico e detalhado sobre: ')}
+              type="button"
+              id="btn-chatview-mode-create"
+              onClick={() => {
+                setMode('create');
+                setPrompt('Crie um mapa mental estratégico e detalhado sobre: ');
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '3px 8px',
-                borderRadius: '5px',
-                border: isDark ? '1px solid #2d384b' : '1px solid #e2e8f0',
-                backgroundColor: isDark ? '#141a24' : '#f8fafc',
-                color: isDark ? '#e2e8f0' : '#475569',
-                fontSize: '11px',
+                gap: '5px',
+                padding: '4px 10px',
+                borderRadius: '6px',
+                border: mode === 'create' ? '1.5px solid #7c3aed' : (isDark ? '1px solid #2d384b' : '1px solid #e2e8f0'),
+                backgroundColor: mode === 'create' ? 'rgba(124, 58, 237, 0.15)' : (isDark ? '#141a24' : '#f8fafc'),
+                color: mode === 'create' ? '#7c3aed' : (isDark ? '#e2e8f0' : '#475569'),
+                fontSize: '11.5px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
               }}
             >
-              <Network size={12} color="#7c3aed" />
+              <Network size={13} color="#7c3aed" />
               <span>Criar Mapa Mental</span>
             </button>
           </div>
@@ -626,23 +667,63 @@ export const AgentChatView: React.FC<AgentChatViewProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '4px 8px',
+                padding: '6px 10px',
                 borderRadius: '6px',
                 backgroundColor: isDark ? '#232d3f' : '#f1f5f9',
                 fontSize: '12px'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                {attachedFile.isImage ? <ImageIcon size={14} color="#0284c7" /> : <FileText size={14} color="#0284c7" />}
-                <span style={{ fontWeight: 600 }}>{attachedFile.name}</span>
-                <span style={{ color: '#94a3b8', fontSize: '11px' }}>({(attachedFile.size / 1024).toFixed(1)} KB)</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {attachedFile.isMindMapJson ? (
+                  <Layers size={16} color="#7c3aed" />
+                ) : attachedFile.isImage ? (
+                  <ImageIcon size={15} color="#0284c7" />
+                ) : (
+                  <FileText size={15} color="#0284c7" />
+                )}
+                <div>
+                  <span style={{ fontWeight: 600 }}>{attachedFile.name}</span>
+                  <span style={{ color: attachedFile.isMindMapJson ? '#7c3aed' : '#94a3b8', fontSize: '11px', marginLeft: '6px', fontWeight: attachedFile.isMindMapJson ? 600 : 400 }}>
+                    {attachedFile.isMindMapJson 
+                      ? `Mapa mental (${attachedFile.parsedMindMap?.nodes.length || 0} nós)` 
+                      : `(${(attachedFile.size / 1024).toFixed(1)} KB)`}
+                  </span>
+                </div>
               </div>
-              <button
-                onClick={() => setAttachedFile(null)}
-                style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}
-              >
-                <X size={13} />
-              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {attachedFile.isMindMapJson && attachedFile.parsedMindMap && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onGenerateBoard(
+                        attachedFile.parsedMindMap!.title,
+                        attachedFile.parsedMindMap!.title,
+                        attachedFile.parsedMindMap!.nodes
+                      );
+                      setAttachedFile(null);
+                    }}
+                    style={{
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: '#7c3aed',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Abrir como Novo Quadro
+                  </button>
+                )}
+                <button
+                  onClick={() => setAttachedFile(null)}
+                  style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer' }}
+                >
+                  <X size={13} />
+                </button>
+              </div>
             </div>
           )}
 

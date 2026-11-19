@@ -88,6 +88,13 @@ export const MindMapAiPreview: React.FC<MindMapAiPreviewProps> = ({
     if (y + h > maxY) maxY = y + h;
   });
 
+  if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+    minX = -120;
+    minY = -60;
+    maxX = 120;
+    maxY = 60;
+  }
+
   const spanX = Math.max(200, maxX - minX);
   const spanY = Math.max(120, maxY - minY);
   const padX = Math.max(30, spanX * 0.1);
@@ -326,18 +333,31 @@ export const MindMapAiPreview: React.FC<MindMapAiPreviewProps> = ({
 
       {/* 4. CONTEÚDO DA PRÉVIA */}
       {activeTab === 'visual' ? (
-        <div
-          style={{
-            height: '185px',
-            backgroundColor: isDark ? '#0f141d' : '#f8fafc',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '8px',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-        >
+        nodes.length === 0 ? (
+          <div
+            style={{
+              padding: '16px',
+              backgroundColor: isDark ? '#0f141d' : '#f8fafc',
+              textAlign: 'center',
+              color: '#94a3b8',
+              fontSize: '12px'
+            }}
+          >
+            Análise e consultoria estratégica concluída. Veja as perguntas reflexivas abaixo.
+          </div>
+        ) : (
+          <div
+            style={{
+              height: '185px',
+              backgroundColor: isDark ? '#0f141d' : '#f8fafc',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '8px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
           <svg
             viewBox={viewBox}
             preserveAspectRatio="xMidYMid meet"
@@ -421,6 +441,7 @@ export const MindMapAiPreview: React.FC<MindMapAiPreviewProps> = ({
             })}
           </svg>
         </div>
+        )
       ) : (
         /* ÁRVORE HIERÁRQUICA ESTRUTURADA EM TEXTO */
         <div

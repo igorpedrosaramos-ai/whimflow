@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Share2, 
   Copy, 
   Check, 
   Download, 
+  Upload,
   FileText, 
   X, 
   Globe, 
@@ -26,6 +27,7 @@ interface ShareModalProps {
   activeBoard: Board;
   theme?: 'dark' | 'light';
   onShowToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
+  onImportJsonToBoard?: (file: File) => void;
 }
 
 export const ShareModal: React.FC<ShareModalProps> = ({
@@ -33,8 +35,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   onClose,
   activeBoard,
   theme = 'light',
-  onShowToast
+  onShowToast,
+  onImportJsonToBoard
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isExportingPPTX, setIsExportingPPTX] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
@@ -542,6 +546,48 @@ export const ShareModal: React.FC<ShareModalProps> = ({
                   </div>
                 </div>
                 <Download size={15} color="#94a3b8" />
+              </div>
+
+              {/* Opção 7: Importar / Restaurar Mapa Mental (.json) */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".json,application/json"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    onImportJsonToBoard?.(file);
+                    onClose();
+                  }
+                }}
+              />
+              <div
+                id="btn-share-modal-import-json"
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  borderRadius: '6px',
+                  border: isDark ? '1px solid #273142' : '1px solid #e2e8f0',
+                  backgroundColor: isDark ? '#18202d' : '#f8fafc',
+                  cursor: 'pointer'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Layers size={18} color="#10b981" />
+                  <div>
+                    <div style={{ fontSize: '13.5px', fontWeight: 600 }}>
+                      Restaurar de Arquivo JSON (.json)
+                    </div>
+                    <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>
+                      Carregar nós salvos de um arquivo JSON diretamente para este quadro
+                    </div>
+                  </div>
+                </div>
+                <Upload size={15} color="#10b981" />
               </div>
             </div>
           </div>

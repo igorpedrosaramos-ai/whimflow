@@ -33,6 +33,9 @@ export interface MindMapNode {
   link?: string; // URL externa associada
   notes?: string; // Notas ou descrição complementar
   side?: 'left' | 'right' | 'root' | 'top' | 'bottom';
+  origin?: 'existing' | 'suggested' | 'generated' | 'uncertain'; // Origem da informação (Documental, IA, Usuário ou Incerto)
+  confidence?: 'high' | 'medium' | 'low';
+  agentMetadata?: Record<string, any>;
 }
 
 export type ShapeType = 'rectangle' | 'rounded' | 'diamond' | 'pill' | 'circle' | 'card';
@@ -167,3 +170,61 @@ export interface Workspace {
   name: string;
   isPrivate?: boolean;
 }
+
+// ─── DEFINIÇÕES DO AGENTE INTELIGENTE WHIMFLOW ──────────────────────────────────
+export type AgentMode = 'think' | 'copy' | 'create';
+
+export type AgentOperationType = 
+  | 'none'
+  | 'create_mindmap'
+  | 'add_nodes'
+  | 'update_nodes'
+  | 'delete_nodes'
+  | 'apply_colors'
+  | 'reorganize_layout';
+
+export interface AgentNodeData {
+  id: string;
+  text: string;
+  parentId?: string | null;
+  childrenIds?: string[];
+  color?: string;
+  origin?: 'existing' | 'suggested' | 'generated' | 'uncertain';
+  notes?: string;
+  borderStyle?: 'accent' | 'border' | 'fill' | 'text';
+}
+
+export interface AgentNodeUpdate {
+  nodeId: string;
+  text?: string;
+  color?: string;
+  origin?: 'existing' | 'suggested' | 'generated' | 'uncertain';
+  borderStyle?: 'accent' | 'border' | 'fill' | 'text';
+  collapsed?: boolean;
+}
+
+export interface AgentOperation {
+  type: AgentOperationType;
+  title?: string;
+  nodes?: AgentNodeData[];
+  updates?: AgentNodeUpdate[];
+  deletedNodeIds?: string[];
+  colorsByOrigin?: {
+    existing?: string;
+    suggested?: string;
+    uncertain?: string;
+    generated?: string;
+  };
+  explanation?: string;
+}
+
+export interface AgentResponse {
+  mode: AgentMode;
+  thinking: string;
+  explanation: string;
+  reflectionQuestions?: string[];
+  operation: AgentOperation;
+  modelUsed?: string;
+  error?: string;
+}
+
