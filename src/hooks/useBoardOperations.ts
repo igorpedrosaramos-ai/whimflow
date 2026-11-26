@@ -397,7 +397,22 @@ export function useBoardOperations({
       const validMovingIds = movingIds.filter(mid => !isDescendant(mid, targetId));
       if (validMovingIds.length === 0) return board;
 
+      // Helper para propagar o lado ('left' | 'right') aos nós movidos e seus descendentes
+      const collectSubtreeIds = (rootIds: string[]) => {
+        const set = new Set<string>();
+        const walk = (id: string) => {
+          if (set.has(id)) return;
+          set.add(id);
+          const item = board.mindMapNodes.find(x => x.id === id);
+          if (item?.childrenIds) item.childrenIds.forEach(walk);
+        };
+        rootIds.forEach(walk);
+        return set;
+      };
+      const subtreeIds = collectSubtreeIds(validMovingIds);
+
       if (position === 'inside') {
+        const inheritedSide = (targetNode.side === 'left' || targetNode.side === 'right') ? targetNode.side : undefined;
         return {
           ...board,
           mindMapNodes: board.mindMapNodes.map(n => {
@@ -420,9 +435,13 @@ export function useBoardOperations({
                 ...n,
                 parentId: targetId,
                 color: targetNode.color || n.color,
+                side: inheritedSide || n.side,
                 offsetX: 0,
                 offsetY: 0
               };
+            }
+            if (inheritedSide && subtreeIds.has(n.id) && n.side !== 'root') {
+              return { ...n, side: inheritedSide };
             }
             return n;
           })
@@ -434,6 +453,10 @@ export function useBoardOperations({
 
       const newParent = board.mindMapNodes.find(n => n.id === newParentId);
       if (!newParent) return board;
+
+      const siblingSide = (targetNode.side === 'left' || targetNode.side === 'right')
+        ? targetNode.side
+        : (newParent.side === 'left' || newParent.side === 'right' ? newParent.side : undefined);
 
       let newChildren = newParent.childrenIds.filter(cid => !validMovingIds.includes(cid));
       const targetIndex = newChildren.indexOf(targetId);
@@ -462,9 +485,13 @@ export function useBoardOperations({
               ...n,
               parentId: newParentId,
               color: newParent.color || n.color,
+              side: siblingSide || n.side,
               offsetX: 0,
               offsetY: 0
             };
+          }
+          if (siblingSide && subtreeIds.has(n.id) && n.side !== 'root') {
+            return { ...n, side: siblingSide };
           }
           return n;
         })
@@ -492,27 +519,44 @@ export function useBoardOperations({
     const oldParentId = child.parentId;
     if (oldParentId === newParentId) return;
 
-    updateActiveBoard(board => ({
-      ...board,
-      mindMapNodes: board.mindMapNodes.map(n => {
-        if (oldParentId && n.id === oldParentId) {
-          return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== childId) };
-        }
-        if (n.id === newParentId) {
-          return { ...n, childrenIds: [...n.childrenIds.filter(cid => cid !== childId), childId], collapsed: false };
-        }
-        if (n.id === childId) {
-          return {
-            ...n,
-            parentId: newParentId,
-            color: newParent.color || n.color,
-            offsetX: 0,
-            offsetY: 0
-          };
-        }
-        return n;
-      })
-    }));
+    const inheritedSide = (newParent.side === 'left' || newParent.side === 'right') ? newParent.side : undefined;
+
+    updateActiveBoard(board => {
+      const subtreeIds = new Set<string>();
+      const walk = (id: string) => {
+        if (subtreeIds.has(id)) return;
+        subtreeIds.add(id);
+        const item = board.mindMapNodes.find(x => x.id === id);
+        if (item?.childrenIds) item.childrenIds.forEach(walk);
+      };
+      walk(childId);
+
+      return {
+        ...board,
+        mindMapNodes: board.mindMapNodes.map(n => {
+          if (oldParentId && n.id === oldParentId) {
+            return { ...n, childrenIds: n.childrenIds.filter(cid => cid !== childId) };
+          }
+          if (n.id === newParentId) {
+            return { ...n, childrenIds: [...n.childrenIds.filter(cid => cid !== childId), childId], collapsed: false };
+          }
+          if (n.id === childId) {
+            return {
+              ...n,
+              parentId: newParentId,
+              color: newParent.color || n.color,
+              side: inheritedSide || n.side,
+              offsetX: 0,
+              offsetY: 0
+            };
+          }
+          if (inheritedSide && subtreeIds.has(n.id) && n.side !== 'root') {
+            return { ...n, side: inheritedSide };
+          }
+          return n;
+        })
+      };
+    });
 
     setSelectedNodeId(childId);
   }, [activeBoard.mindMapNodes, updateActiveBoard, setSelectedNodeId]);

@@ -101,8 +101,8 @@ export const App: React.FC = () => {
   const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
 
   // Seleções
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>('root');
-  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>(['root']);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [selectedStickyId, setSelectedStickyId] = useState<string | null>(null);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
@@ -282,24 +282,24 @@ export const App: React.FC = () => {
   // Atualização dinâmica do título da página no navegador de acordo com a rota e o quadro
   useEffect(() => {
     if (route.type === 'board') {
-      document.title = `${activeBoard.title || 'Quadro'} | WhimFlow`;
+      document.title = `${activeBoard.title || 'Quadro'} | Mapa Mental`;
     } else if (route.type === 'doc') {
-      document.title = `${activeBoard.title || 'Documento'} (Doc) | WhimFlow`;
+      document.title = `${activeBoard.title || 'Documento'} (Doc) | Mapa Mental`;
     } else if (route.type === 'agent') {
-      document.title = 'Assistente IA | WhimFlow';
+      document.title = 'Assistente IA | Mapa Mental';
     } else if (route.type === 'templates') {
-      document.title = 'Templates & Temas | WhimFlow';
+      document.title = 'Templates & Temas | Mapa Mental';
     } else if (route.type === 'trash') {
-      document.title = 'Lixeira | WhimFlow';
+      document.title = 'Lixeira | Mapa Mental';
     } else if (route.type === 'presentation') {
-      document.title = `Apresentação: ${activeBoard.title || 'Quadro'} | WhimFlow`;
+      document.title = `Apresentação: ${activeBoard.title || 'Quadro'} | Mapa Mental`;
     } else if (route.type === 'recent') {
-      document.title = 'Recentes | WhimFlow';
+      document.title = 'Recentes | Mapa Mental';
     } else if (route.type === 'category' && route.categoryId) {
       const cat = categories.find(c => c.id === route.categoryId);
-      document.title = `${cat?.name || 'Categoria'} | WhimFlow`;
+      document.title = `${cat?.name || 'Categoria'} | Mapa Mental`;
     } else {
-      document.title = 'Dashboard | WhimFlow';
+      document.title = 'Dashboard | Mapa Mental';
     }
   }, [route.type, route.categoryId, categories, activeBoard.title]);
 
@@ -389,6 +389,12 @@ export const App: React.FC = () => {
 
   // Abertura de Quadro com Roteamento Real
   const handleOpenBoard = useCallback((boardId: string) => {
+    setSelectedNodeId(null);
+    setSelectedNodeIds([]);
+    setSelectedStickyId(null);
+    setSelectedShapeId(null);
+    setEditingNodeId(null);
+    setConnectingSourceId(null);
     openBoardInStorage(boardId);
     routerNavigate(`/board/${encodeURIComponent(boardId)}`);
   }, [openBoardInStorage, routerNavigate]);
@@ -639,10 +645,11 @@ export const App: React.FC = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const currentStrokeRef = useRef<DrawingStroke | null>(null);
 
-  // Retângulo de Seleção Múltipla (Lasso / Marquee)
+  // Retângulo de Seleção Múltipla (Lasso / Marquee) e Rastreamento de Clique no Fundo
   const [marqueeRect, setMarqueeRect] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
   const isMarqueeActiveRef = useRef(false);
+  const panClickStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const activeNodesRef = useRef(activeBoard.mindMapNodes);
   activeNodesRef.current = activeBoard.mindMapNodes;
@@ -650,6 +657,21 @@ export const App: React.FC = () => {
   panRef.current = pan;
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
+  const canvasAreaRef = useRef<HTMLDivElement>(null);
+  const handleWheelRef = useRef(handleWheel);
+  handleWheelRef.current = handleWheel;
+
+  useEffect(() => {
+    const el = canvasAreaRef.current;
+    if (!el) return;
+    const onNativeWheel = (e: WheelEvent) => {
+      handleWheelRef.current(e, el);
+    };
+    el.addEventListener('wheel', onNativeWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', onNativeWheel);
+    };
+  }, [currentView, isPresentationOpen]);
 
   useEffect(() => {
     let rAFId: number | null = null;
@@ -673,17 +695,18 @@ export const App: React.FC = () => {
 
       setMarqueeRect({ x1, y1, x2, y2 });
 
-      // Otimização de Performance: Cálculo matemático direto no espaço do canvas
-      // Zero Layout Thrashing (zero getBoundingClientRect) com throttle via requestAnimationFrame
+      // Otimização de Performance: Cálculo matemático direto no espaço real do canvas
       if (rAFId !== null) cancelAnimationFrame(rAFId);
 
       rAFId = requestAnimationFrame(() => {
         const curPan = panRef.current;
-        const curZoom = zoomRef.current;
-        const canvasX1 = (x1 - curPan.x) / curZoom;
-        const canvasY1 = (y1 - curPan.y) / curZoom;
-        const canvasX2 = (x2 - curPan.x) / curZoom;
-        const canvasY2 = (y2 - curPan.y) / curZoom;
+        const curZoom = zoomRef.current > 0 ? zoomRef.current : 1;
+        const mainArea = document.getElementById('main-canvas-area');
+        const areaRect = mainArea ? mainArea.getBoundingClientRect() : { left: 0, top: 0 };
+        const canvasX1 = (x1 - areaRect.left - curPan.x) / curZoom;
+        const canvasY1 = (y1 - areaRect.top - curPan.y) / curZoom;
+        const canvasX2 = (x2 - areaRect.left - curPan.x) / curZoom;
+        const canvasY2 = (y2 - areaRect.top - curPan.y) / curZoom;
 
         const hitIds: string[] = [];
         activeNodesRef.current.forEach(node => {
@@ -700,13 +723,13 @@ export const App: React.FC = () => {
         setSelectedNodeIds(hitIds);
         if (hitIds.length === 1) {
           setSelectedNodeId(hitIds[0]);
-        } else if (hitIds.length === 0) {
+        } else {
           setSelectedNodeId(null);
         }
       });
     };
 
-    const handleWindowMouseUp = () => {
+    const handleWindowMouseUp = (e: MouseEvent) => {
       if (rAFId !== null) {
         cancelAnimationFrame(rAFId);
         rAFId = null;
@@ -715,6 +738,19 @@ export const App: React.FC = () => {
         isMarqueeActiveRef.current = false;
         marqueeStartRef.current = null;
         setMarqueeRect(null);
+      }
+      // Se estava no modo Pan e deu apenas um clique simples no fundo (sem arrastar), fecha a seleção
+      if (panClickStartRef.current) {
+        const dx = Math.abs(e.clientX - panClickStartRef.current.x);
+        const dy = Math.abs(e.clientY - panClickStartRef.current.y);
+        panClickStartRef.current = null;
+        if (dx <= 4 && dy <= 4) {
+          setSelectedNodeId(null);
+          setSelectedNodeIds([]);
+          setSelectedStickyId(null);
+          setSelectedShapeId(null);
+          setEditingNodeId(null);
+        }
       }
     };
 
@@ -727,21 +763,34 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Helper para converter coordenada de viewport em coordenada real do canvas
+  const toCanvasCoords = (clientX: number, clientY: number) => {
+    const mainArea = document.getElementById('main-canvas-area');
+    const areaRect = mainArea ? mainArea.getBoundingClientRect() : { left: 0, top: 0 };
+    const safeZoom = zoom > 0 ? zoom : 1;
+    return {
+      x: (clientX - areaRect.left - pan.x) / safeZoom,
+      y: (clientY - areaRect.top - pan.y) / safeZoom
+    };
+  };
+
   // Eventos de Mouse no Canvas
   const handleMouseDownCanvas = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     const isInteractive = target.closest(
-      '.mindmap-node-card, .sticky-note, .flowchart-shape, .node-context-menu, .toolbar-container, .top-nav, button, input, textarea, a'
+      '.mindmap-node-card, .sticky-note-card, .sticky-note, .flowchart-shape, .node-context-menu, .canvas-vertical-toolbar, .toolbar-container, .top-navbar, .top-nav, .batch-actions-toolbar, .bottom-controls, [data-floating-ui="true"], button, input, textarea, select, a'
     );
     const isCanvasBg = !isInteractive;
 
     if (e.button === 1 || isSpacePressed.current || currentTool === 'hand') {
       setIsPanning(true);
       panStartRef.current = { x: e.clientX, y: e.clientY };
+      if (isCanvasBg && e.button === 0) {
+        panClickStartRef.current = { x: e.clientX, y: e.clientY };
+      }
     } else if (currentTool === 'draw') {
       setIsDrawing(true);
-      const canvasX = (e.clientX - pan.x) / zoom;
-      const canvasY = (e.clientY - pan.y) / zoom;
+      const { x: canvasX, y: canvasY } = toCanvasCoords(e.clientX, e.clientY);
       currentStrokeRef.current = {
         id: `stroke-${Date.now()}`,
         points: [{ x: canvasX, y: canvasY }],
@@ -749,26 +798,39 @@ export const App: React.FC = () => {
         strokeWidth: 3
       };
     } else if (currentTool === 'sticky' && isCanvasBg) {
-      const canvasX = (e.clientX - pan.x) / zoom;
-      const canvasY = (e.clientY - pan.y) / zoom;
+      const { x: canvasX, y: canvasY } = toCanvasCoords(e.clientX, e.clientY);
       handleAddSticky(canvasX - 90, canvasY - 70);
+      setSelectedNodeId(null);
+      setSelectedNodeIds([]);
       setCurrentTool('select');
     } else if (currentTool === 'text' && isCanvasBg) {
-      const canvasX = (e.clientX - pan.x) / zoom;
-      const canvasY = (e.clientY - pan.y) / zoom;
+      const { x: canvasX, y: canvasY } = toCanvasCoords(e.clientX, e.clientY);
       handleAddText(canvasX - 60, canvasY - 15);
+      setSelectedNodeId(null);
+      setSelectedNodeIds([]);
       setCurrentTool('select');
     } else if (currentTool === 'connect' && isCanvasBg) {
       if (connectingSourceId) {
         setConnectingSourceId(null);
         showToast('Conexão cancelada.', 'info');
       }
+      setSelectedNodeId(null);
+      setSelectedNodeIds([]);
     } else if (currentTool === 'wireframe' && isCanvasBg) {
-      const canvasX = (e.clientX - pan.x) / zoom;
-      const canvasY = (e.clientY - pan.y) / zoom;
+      const { x: canvasX, y: canvasY } = toCanvasCoords(e.clientX, e.clientY);
       handleAddWireframe('card', canvasX - 120, canvasY - 60);
+      setSelectedNodeId(null);
+      setSelectedNodeIds([]);
       setCurrentTool('select');
     } else if (e.button === 0 && isCanvasBg) {
+      // Clique simples no fundo do canvas fecha imediatamente seleções e barras flutuantes
+      if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        setSelectedNodeId(null);
+        setSelectedNodeIds([]);
+        setSelectedStickyId(null);
+        setSelectedShapeId(null);
+        setEditingNodeId(null);
+      }
       isMarqueeActiveRef.current = true;
       marqueeStartRef.current = { x: e.clientX, y: e.clientY };
       setMarqueeRect(null);
@@ -777,8 +839,7 @@ export const App: React.FC = () => {
 
   const handleMouseMoveCanvas = (e: React.MouseEvent) => {
     if (isDrawing && currentStrokeRef.current) {
-      const canvasX = (e.clientX - pan.x) / zoom;
-      const canvasY = (e.clientY - pan.y) / zoom;
+      const { x: canvasX, y: canvasY } = toCanvasCoords(e.clientX, e.clientY);
       currentStrokeRef.current.points.push({ x: canvasX, y: canvasY });
       updateActiveBoard(b => ({
         ...b,
@@ -1005,7 +1066,7 @@ export const App: React.FC = () => {
   const currentBoardSnapshots = activeBoard.historySnapshots || [];
 
   return (
-    <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ width: '100%', height: '100%', minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: 'var(--bg-canvas)' }}>
       {/* 1. Visão de Dashboard */}
       {currentView === 'dashboard' && (
         <DashboardView
@@ -1133,7 +1194,7 @@ export const App: React.FC = () => {
             workspaceName={activeWorkspace.name}
           />
 
-          <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden' }}>
+          <div style={{ flex: 1, minWidth: 0, minHeight: 0, width: '100%', height: '100%', display: 'flex', position: 'relative', overflow: 'hidden', backgroundColor: 'var(--bg-canvas)' }}>
         <Sidebar
           isOpen={sidebarOpen}
           boards={boards}
@@ -1172,10 +1233,10 @@ export const App: React.FC = () => {
 
         {/* Canvas Principal com Toolbar Flutuante Embutida */}
         <div
+          ref={canvasAreaRef}
           id="main-canvas-area"
-          style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+          style={{ flex: 1, minWidth: 0, minHeight: 0, width: '100%', height: '100%', position: 'relative', overflow: 'hidden', backgroundColor: 'var(--bg-canvas)' }}
           className={`canvas-container ${isPanning || currentTool === 'hand' ? 'panning' : currentTool === 'draw' ? 'drawing' : currentTool === 'connect' ? 'connecting' : currentTool === 'sticky' ? 'sticky-mode' : currentTool === 'text' ? 'text-mode' : ''}`}
-          onWheel={handleWheel}
           onMouseDown={handleMouseDownCanvas}
           onMouseMove={handleMouseMoveCanvas}
           onMouseUp={handleMouseUpCanvas}
@@ -1194,21 +1255,34 @@ export const App: React.FC = () => {
             onAddShape={() => handleAddFloatingTopic()}
           />
 
-          {/* Fundo Infinito Corporativo Sincronizado com Pan e Zoom */}
+          {/* Fundo Infinito Corporativo Sincronizado com Pan e Zoom (Pattern SVG nativo GPU-safe) */}
           {(() => {
-            let baseGrid = 24 * zoom;
-            while (baseGrid < 16) baseGrid *= 2;
-            while (baseGrid > 64) baseGrid /= 2;
-            const bgPosX = pan.x % baseGrid;
-            const bgPosY = pan.y % baseGrid;
+            const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+            const safePanX = Number.isFinite(pan.x) ? pan.x : 0;
+            const safePanY = Number.isFinite(pan.y) ? pan.y : 0;
+            let baseGrid = 24 * safeZoom;
+            for (let i = 0; i < 8 && baseGrid < 16; i++) baseGrid *= 2;
+            for (let i = 0; i < 8 && baseGrid > 64; i++) baseGrid /= 2;
+            const offsetX = ((safePanX % baseGrid) + baseGrid) % baseGrid;
+            const offsetY = ((safePanY % baseGrid) + baseGrid) % baseGrid;
             return (
-              <div
-                className="canvas-background"
-                style={{
-                  backgroundPosition: `${bgPosX}px ${bgPosY}px`,
-                  backgroundSize: `${baseGrid}px ${baseGrid}px`
-                }}
-              />
+              <div className="canvas-background" aria-hidden="true">
+                <svg width="100%" height="100%" style={{ display: 'block' }}>
+                  <defs>
+                    <pattern
+                      id="canvas-dot-grid-pattern"
+                      x={offsetX}
+                      y={offsetY}
+                      width={baseGrid}
+                      height={baseGrid}
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <circle cx={1.5} cy={1.5} r={1.15} fill="var(--canvas-dot, #cbd5e1)" />
+                    </pattern>
+                  </defs>
+                  <rect width="100%" height="100%" fill="url(#canvas-dot-grid-pattern)" />
+                </svg>
+              </div>
             );
           })()}
 
@@ -1216,9 +1290,10 @@ export const App: React.FC = () => {
           <div
             style={{
               position: 'absolute',
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: '0 0',
-              willChange: 'transform'
+              top: 0,
+              left: 0,
+              transform: `translate3d(${Number.isFinite(pan.x) ? pan.x : 0}px, ${Number.isFinite(pan.y) ? pan.y : 0}px, 0) scale(${Number.isFinite(zoom) && zoom > 0 ? zoom : 1})`,
+              transformOrigin: '0 0'
             }}
           >
             <FreehandCanvas drawings={activeBoard.drawings} />
@@ -1235,14 +1310,33 @@ export const App: React.FC = () => {
               selectedNodeIds={selectedNodeIds}
               editingNodeId={editingNodeId}
               layoutType={activeBoard.layoutType}
+              isOverlayOpen={
+                isAgentDrawerOpen ||
+                isShareModalOpen ||
+                isSearchModalOpen ||
+                isTemplateModalOpen ||
+                isVersionHistoryOpen ||
+                isBoardStatsOpen ||
+                isShortcutsModalOpen ||
+                isQuickSparkOpen ||
+                isTrashModalOpen
+              }
               onClearEditingNodeId={() => setEditingNodeId(null)}
               onSelectNode={(id) => {
                 setSelectedNodeId(id);
                 setSelectedNodeIds(id ? [id] : []);
+                if (id) {
+                  setSelectedStickyId(null);
+                  setSelectedShapeId(null);
+                }
               }}
               onSelectMultipleNodes={(ids) => {
                 setSelectedNodeIds(ids);
                 setSelectedNodeId(ids.length === 1 ? ids[0] : null);
+                if (ids.length > 0) {
+                  setSelectedStickyId(null);
+                  setSelectedShapeId(null);
+                }
               }}
               onUpdateNodeText={handleUpdateNodeText}
               onToggleCollapse={handleToggleCollapse}
@@ -1266,7 +1360,14 @@ export const App: React.FC = () => {
             <StickyNotesCanvas
               stickies={activeBoard.stickies || []}
               selectedId={selectedStickyId}
-              onSelect={setSelectedStickyId}
+              onSelect={(id) => {
+                setSelectedStickyId(id);
+                if (id) {
+                  setSelectedNodeId(null);
+                  setSelectedNodeIds([]);
+                  setSelectedShapeId(null);
+                }
+              }}
               onUpdateText={(id, text) => updateActiveBoard(b => ({
                 ...b,
                 stickies: (b.stickies || []).map(s => s.id === id ? { ...s, text } : s)
@@ -1286,7 +1387,14 @@ export const App: React.FC = () => {
               wireframes={activeBoard.wireframes || []}
               texts={activeBoard.texts || []}
               selectedId={selectedShapeId}
-              onSelect={setSelectedShapeId}
+              onSelect={(id) => {
+                setSelectedShapeId(id);
+                if (id) {
+                  setSelectedNodeId(null);
+                  setSelectedNodeIds([]);
+                  setSelectedStickyId(null);
+                }
+              }}
               onUpdateShapeText={(id, text) => updateActiveBoard(b => ({
                 ...b,
                 shapes: (b.shapes || []).map(s => s.id === id ? { ...s, text } : s)

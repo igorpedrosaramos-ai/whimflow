@@ -51,6 +51,8 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
 
   return (
     <div
+      data-floating-ui="true"
+      onMouseDown={(e) => e.stopPropagation()}
       style={{
         position: 'fixed',
         bottom: '24px',
@@ -267,7 +269,7 @@ export const ZoomControls: React.FC<ZoomControlsProps> = ({
           justifyContent: 'center',
           cursor: 'pointer'
         }}
-        title="Whimflow Spark: Criador Relâmpago e Text-to-Map (Ctrl+J)"
+        title="Criação Relâmpago e Text-to-Map (Ctrl+J)"
       >
         <Zap size={14} />
       </button>

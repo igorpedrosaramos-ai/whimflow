@@ -119,11 +119,14 @@ export function measureNodeText(node: MindMapNode): { width: number; height: num
   const horizontalPadding = 24;
   const iconPadding = node.icon ? 22 : 0;
   const linkPadding = node.link ? 20 : 0;
+  const isUncertain = node.origin === 'uncertain' || node.confidence === 'low';
+  const isSuggested = node.origin === 'suggested';
+  const badgePadding = isSuggested ? 58 : (isUncertain ? 48 : 0);
 
-  // Largura total: o texto real medido + respiro interno + ícone/link
+  // Largura total: o texto real medido + respiro interno + ícone/link/badge
   const totalWidth = Math.max(
     isRoot ? 90 : 44,
-    maxLineWidth + horizontalPadding + iconPadding + linkPadding
+    maxLineWidth + horizontalPadding + iconPadding + linkPadding + badgePadding
   );
 
   // Altura total: linha única vs parágrafo

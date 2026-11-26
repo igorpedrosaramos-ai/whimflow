@@ -106,69 +106,99 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
 
   const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState<{ left: number; top: number; isVisible: boolean }>({
-    left: -9999,
-    top: -9999,
+    left: 0,
+    top: 0,
     isVisible: false
   });
 
+  // Fecha popovers internos ao clicar fora da barra ou pressionar Escape
+  useEffect(() => {
+    if (!activePopover) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActivePopover(null);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setActivePopover(null);
+      }
+    };
+    window.addEventListener('mousedown', handleOutside, true);
+    window.addEventListener('keydown', handleEsc, true);
+    return () => {
+      window.removeEventListener('mousedown', handleOutside, true);
+      window.removeEventListener('keydown', handleEsc, true);
+    };
+  }, [activePopover]);
+
   const updatePosition = useCallback(() => {
     const nodeEl = document.getElementById(`node-${node.id}`);
+    const mainCanvasArea = document.getElementById('main-canvas-area');
     const menuEl = menuRef.current;
 
-    const menuWidth = menuEl ? menuEl.offsetWidth : 440;
-    const menuHeight = menuEl ? menuEl.offsetHeight : 36;
+    if (!nodeEl) {
+      setCoords(prev => (prev.isVisible ? { ...prev, isVisible: false } : prev));
+      return;
+    }
+
+    const canvasBounds = mainCanvasArea
+      ? mainCanvasArea.getBoundingClientRect()
+      : { left: 0, top: 52, right: window.innerWidth, bottom: window.innerHeight, width: window.innerWidth, height: window.innerHeight - 52 };
+
+    const rect = nodeEl.getBoundingClientRect();
+
+    // Oculta imediatamente se o nó estiver fora da área útil do canvas (ex.: atrás da Sidebar ou fora da tela)
+    const isVisibleInCanvas =
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.right >= canvasBounds.left + 8 &&
+      rect.left <= canvasBounds.right - 8 &&
+      rect.bottom >= canvasBounds.top + 8 &&
+      rect.top <= canvasBounds.bottom - 8;
+
+    if (!isVisibleInCanvas) {
+      setCoords(prev => (prev.isVisible ? { ...prev, isVisible: false } : prev));
+      return;
+    }
+
+    const menuWidth = menuEl && menuEl.offsetWidth > 0 ? menuEl.offsetWidth : 490;
+    const menuHeight = menuEl && menuEl.offsetHeight > 0 ? menuEl.offsetHeight : 36;
     const halfMenu = menuWidth / 2;
 
-    let targetCenterX: number;
-    let targetNodeTop: number;
-    let targetNodeBottom: number;
-    let isVisibleInScreen = true;
+    const targetCenterX = rect.left + rect.width / 2;
+    const targetNodeTop = rect.top;
+    const targetNodeBottom = rect.bottom;
 
-    if (nodeEl) {
-      const rect = nodeEl.getBoundingClientRect();
-      targetCenterX = rect.left + rect.width / 2;
-      targetNodeTop = rect.top;
-      targetNodeBottom = rect.bottom;
+    // Clamping estrito dentro da área útil real do canvas (#main-canvas-area)
+    const safeLeftMargin = canvasBounds.left + halfMenu + 12;
+    const safeRightMargin = canvasBounds.right - halfMenu - 12;
+    const clampedCenterX = safeRightMargin < safeLeftMargin
+      ? Math.round(canvasBounds.left + canvasBounds.width / 2)
+      : Math.max(safeLeftMargin, Math.min(safeRightMargin, targetCenterX));
 
-      // Se o nó estiver totalmente fora da área visível do viewport, oculta graciosamente
-      if (rect.bottom < 40 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
-        isVisibleInScreen = false;
-      }
-    } else {
-      const mainCanvasArea = document.getElementById('main-canvas-area');
-      const canvasRect = mainCanvasArea ? mainCanvasArea.getBoundingClientRect() : { left: 0, top: 0 };
-      const z = zoom || 1;
-      const pX = pan?.x || 0;
-      const pY = pan?.y || 0;
-      targetCenterX = canvasRect.left + (position.x + position.width / 2) * z + pX;
-      targetNodeTop = canvasRect.top + position.y * z + pY;
-      targetNodeBottom = targetNodeTop + position.height * z;
-    }
-
-    // CLAMPING HORIZONTAL (Impede que a barra transborde para fora da tela nas laterais)
-    const minLeft = halfMenu + 12;
-    const maxLeft = Math.max(minLeft, window.innerWidth - halfMenu - 12);
-    const clampedCenterX = Math.max(minLeft, Math.min(maxLeft, targetCenterX));
-
-    // POSICIONAMENTO VERTICAL INTELIGENTE (Flip):
-    // TopNav tem altura de ~56px.
-    const spaceAbove = targetNodeTop - 56;
+    // Flip vertical inteligente caso o nó esteja muito perto do topo do canvas
+    const spaceAbove = targetNodeTop - canvasBounds.top;
     const isNearTop = spaceAbove < (menuHeight + 14);
+    const targetTop = isNearTop ? (targetNodeBottom + 10) : (targetNodeTop - menuHeight - 10);
 
-    let targetTop: number;
-    if (isNearTop) {
-      targetTop = targetNodeBottom + 10;
-    } else {
-      targetTop = targetNodeTop - menuHeight - 10;
-    }
+    const minTop = canvasBounds.top + 8;
+    const maxTop = Math.max(minTop, canvasBounds.bottom - menuHeight - 12);
+    const clampedTop = Math.max(minTop, Math.min(maxTop, targetTop));
 
-    // Clamping vertical seguro contra cortes na borda da tela
-    const clampedTop = Math.max(60, Math.min(window.innerHeight - menuHeight - 12, targetTop));
+    const nextLeft = Math.round(clampedCenterX);
+    const nextTop = Math.round(clampedTop);
 
-    setCoords({
-      left: Math.round(clampedCenterX),
-      top: Math.round(clampedTop),
-      isVisible: isVisibleInScreen
+    setCoords(prev => {
+      if (prev.left === nextLeft && prev.top === nextTop && prev.isVisible) {
+        return prev;
+      }
+      return {
+        left: nextLeft,
+        top: nextTop,
+        isVisible: true
+      };
     });
   }, [node.id, position.x, position.y, position.width, position.height, pan?.x, pan?.y, zoom]);
 
@@ -177,9 +207,9 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
   }, [updatePosition]);
 
   useEffect(() => {
-    let rafId: number;
+    let rafId: number | null = null;
     const handleSync = () => {
-      cancelAnimationFrame(rafId);
+      if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(updatePosition);
     };
 
@@ -187,18 +217,20 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
     window.addEventListener('scroll', handleSync, true);
     window.addEventListener('wheel', handleSync, { passive: true });
 
-    // Observa redimensionamento do card do nó no DOM
     const nodeEl = document.getElementById(`node-${node.id}`);
+    const mainCanvasArea = document.getElementById('main-canvas-area');
     let ro: ResizeObserver | null = null;
-    if (nodeEl && typeof ResizeObserver !== 'undefined') {
+    if (typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(() => {
         handleSync();
       });
-      ro.observe(nodeEl);
+      if (nodeEl) ro.observe(nodeEl);
+      if (mainCanvasArea) ro.observe(mainCanvasArea);
+      if (menuRef.current) ro.observe(menuRef.current);
     }
 
     return () => {
-      cancelAnimationFrame(rafId);
+      if (rafId !== null) cancelAnimationFrame(rafId);
       window.removeEventListener('resize', handleSync);
       window.removeEventListener('scroll', handleSync, true);
       window.removeEventListener('wheel', handleSync);
@@ -206,18 +238,21 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
     };
   }, [updatePosition, node.id]);
 
+  const popoverFlipUp = coords.top > (typeof window !== 'undefined' ? window.innerHeight - 230 : 600);
+
   const menu = (
     <div
       ref={menuRef}
       className="node-context-menu"
+      data-floating-ui="true"
       style={{
         position: 'fixed',
         left: `${coords.left}px`,
         top: `${coords.top}px`,
         transform: 'translateX(-50%)',
+        visibility: coords.isVisible ? 'visible' : 'hidden',
         opacity: coords.isVisible ? 1 : 0,
         pointerEvents: coords.isVisible ? 'auto' : 'none',
-        transition: 'opacity 0.12s ease',
         backgroundColor: 'var(--bg-elevated, #181d28)',
         border: '1.5px solid var(--border-strong, #333d4e)',
         borderRadius: '8px',
@@ -412,7 +447,7 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '30px',
+              ...(popoverFlipUp ? { bottom: '32px' } : { top: '30px' }),
               left: '50%',
               transform: 'translateX(-50%)',
               backgroundColor: 'var(--bg-elevated, #181d28)',
@@ -516,7 +551,7 @@ export const NodeContextMenu: React.FC<NodeContextMenuProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '30px',
+              ...(popoverFlipUp ? { bottom: '32px' } : { top: '30px' }),
               left: '50%',
               transform: 'translateX(-50%)',
               backgroundColor: 'var(--bg-elevated, #181d28)',

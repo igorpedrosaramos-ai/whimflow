@@ -118,7 +118,7 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
                 Atalhos do Teclado & Guia Rápido
               </h3>
               <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
-                Todos os comandos para máxima produtividade no Whimflow
+                Todos os comandos para máxima produtividade no Mapa Mental
               </p>
             </div>
           </div>
@@ -225,7 +225,7 @@ export const KeyboardShortcutsModal: React.FC<KeyboardShortcutsModalProps> = ({
           }}
         >
           <span>Pressione <strong style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>ESC</strong> a qualquer momento para fechar</span>
-          <span style={{ color: '#0d9488', fontWeight: 600 }}>⚡ Whimflow Pro</span>
+          <span style={{ color: '#0d9488', fontWeight: 600 }}>⚡ Mapa Mental Pro</span>
         </div>
       </div>
     </div>

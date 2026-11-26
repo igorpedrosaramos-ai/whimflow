@@ -556,7 +556,7 @@ export function exportBoardAsSVG(board: Board) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${board.title.replace(/\s+/g, '_')}_whimflow.svg`;
+  a.download = `${board.title.replace(/\s+/g, '_')}_mapa_mental.svg`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -698,7 +698,7 @@ export function exportBoardAsMarkdown(board: Board) {
   const lines: string[] = [];
   lines.push(`# ${board.title}`);
   lines.push('');
-  lines.push(`> Exportado em ${new Date().toLocaleDateString('pt-BR')} • Whimflow (Exportação Pro Sem Marca D'Água)`);
+  lines.push(`> Exportado em ${new Date().toLocaleDateString('pt-BR')} • Mapa Mental (Exportação Pro Sem Marca D'Água)`);
   lines.push('');
 
   // 1. Documento embutido (se houver)

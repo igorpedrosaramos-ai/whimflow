@@ -356,7 +356,7 @@ export const QuickSparkModal: React.FC<QuickSparkModalProps> = ({
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 700, letterSpacing: '-0.01em' }}>
-                Whimflow Spark: Central de Criação Relâmpago
+                Criação Relâmpago — Mapa Mental
               </h2>
               <span style={{ fontSize: '12px', color: '#94a3b8' }}>
                 Transforme ideias, anotações de reunião ou frameworks em mapas mentais instantâneos
@@ -859,7 +859,7 @@ export const QuickSparkModal: React.FC<QuickSparkModalProps> = ({
           <span>Pressione <strong style={{ color: isDark ? '#f8fafc' : '#0f172a' }}>ESC</strong> para fechar</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f59e0b', fontWeight: 600 }}>
             <Zap size={13} />
-            Whimflow Spark Pro
+            Mapa Mental Pro
           </span>
         </div>
       </div>

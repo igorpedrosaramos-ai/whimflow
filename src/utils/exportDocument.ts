@@ -62,8 +62,8 @@ function renderBoardToDataUrl(board: Board, theme: 'light' | 'dark' = 'light'): 
 export async function exportBoardAsPPTX(board: Board): Promise<void> {
   const pres = new pptxgen();
   pres.layout = 'LAYOUT_16x9';
-  pres.author = 'Whimflow Professional';
-  pres.company = 'Whimflow';
+  pres.author = 'Mapa Mental Professional';
+  pres.company = 'Mapa Mental';
   pres.title = board.title;
 
   const nodes = board.mindMapNodes || [];
@@ -102,7 +102,7 @@ export async function exportBoardAsPPTX(board: Board): Promise<void> {
     align: 'left'
   });
 
-  slideCover.addText(`Gerado em ${new Date().toLocaleDateString('pt-BR')} • Whimflow Exportação Executiva`, {
+  slideCover.addText(`Gerado em ${new Date().toLocaleDateString('pt-BR')} • Mapa Mental Exportação Executiva`, {
     x: 0.8,
     y: 4.8,
     w: 8.4,

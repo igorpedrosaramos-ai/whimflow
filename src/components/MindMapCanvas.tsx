@@ -41,6 +41,7 @@ interface MindMapCanvasProps {
   onDuplicateNode: (nodeId: string) => void;
   pan?: { x: number; y: number };
   zoom?: number;
+  isOverlayOpen?: boolean;
 }
 
 export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
@@ -74,7 +75,8 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
   onUpdateNodeStyle,
   onDuplicateNode,
   pan,
-  zoom = 1
+  zoom = 1,
+  isOverlayOpen = false
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -328,6 +330,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
   // ─── DRAG: início ────────────────────────────────────────────────────────────
   const handleMouseDown = (node: MindMapNode, e: React.MouseEvent) => {
+    if (currentTool === 'hand') return;
     if (editingId === node.id) return;
     if (e.button !== 0) return;
     e.stopPropagation();
@@ -337,13 +340,31 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       onSelectNode(node.id);
     }
 
-    if (node.side === 'root') return;
+    if (node.side === 'root' || currentTool === 'connect') return;
 
     dragPendingRef.current = { id: node.id, clientX: e.clientX, clientY: e.clientY };
   };
 
-  // ─── DRAG: mouse move + mouse up (global) ────────────────────────────────────
+  // ─── DRAG: mouse move + mouse up + cancelamento seguro (global) ──────────────
   useEffect(() => {
+    const resetDragState = () => {
+      dragPendingRef.current = null;
+      draggingIdRef.current = null;
+      dragSourceScreenPosRef.current = null;
+      dragCursorRef.current = null;
+      dropTargetRef.current = { id: null, pos: 'inside' };
+
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+
+      setDraggingNodeId(null);
+      setDropTargetNodeId(null);
+      setDropPosition('inside');
+      setDragCursorPos(null);
+    };
+
     const handleMouseMove = (e: MouseEvent) => {
       // Ativa o arraste somente após threshold de 4px
       if (dragPendingRef.current && !draggingIdRef.current) {
@@ -353,7 +374,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           const pendingId = dragPendingRef.current.id;
           draggingIdRef.current = pendingId;
 
-          // Captura síncronamente o centro do card no viewport
           const el = document.getElementById(`node-${pendingId}`);
           if (el) {
             const rect = el.getBoundingClientRect();
@@ -365,7 +385,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             dragSourceScreenPosRef.current = { x: e.clientX, y: e.clientY };
           }
 
-          // Dispara o re-render para mostrar o ghost
           setDraggingNodeId(pendingId);
           setDragCursorPos({ x: e.clientX, y: e.clientY });
         }
@@ -373,7 +392,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
 
       if (!draggingIdRef.current) return;
 
-      // Atualiza posição via RAF — evita re-renders desnecessários em 60fps
       dragCursorRef.current = { x: e.clientX, y: e.clientY };
       if (rafRef.current === null) {
         rafRef.current = requestAnimationFrame(() => {
@@ -384,7 +402,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         });
       }
 
-      // Helper para verificar ciclos na árvore (não permite soltar em descendentes)
       const isDescendant = (ancestorId: string, candidateId: string): boolean => {
         const ancestor = nodeMap.get(ancestorId);
         if (!ancestor || !ancestor.childrenIds) return false;
@@ -392,7 +409,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         return ancestor.childrenIds.some(cid => isDescendant(cid, candidateId));
       };
 
-      // 1. Detecção direta sob o cursor
       const elements = document.elementsFromPoint(e.clientX, e.clientY);
       const targetCard = elements.find(el =>
         el.classList.contains('mindmap-node-card') &&
@@ -411,7 +427,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           const relY = (e.clientY - rect.top) / rect.height;
           const targetNode = nodeMap.get(tid);
 
-          if (targetNode?.side === 'root' || e.clientX > rect.right - 25) {
+          if (targetNode?.side === 'root') {
+            foundPos = 'inside';
+          } else if (targetNode?.side === 'left' && e.clientX < rect.left + 25) {
+            foundPos = 'inside';
+          } else if (targetNode?.side !== 'left' && e.clientX > rect.right - 25) {
             foundPos = 'inside';
           } else if (relY < 0.20) {
             foundPos = 'before';
@@ -423,7 +443,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         }
       }
 
-      // 2. Detecção magnética por proximidade (facilita muito conectar à direita de qualquer nó)
+      // Detecção magnética bidirecional (suporta nós do lado esquerdo e direito)
       if (!foundId) {
         let bestDist = Infinity;
         const allCards = document.querySelectorAll<HTMLElement>('.mindmap-node-card:not(.drag-ghost-card)');
@@ -433,10 +453,14 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           if (!draggingIdRef.current || cid === draggingIdRef.current || isDescendant(draggingIdRef.current, cid)) return;
 
           const rect = card.getBoundingClientRect();
-          // Zona magnética generosa: até 140px à direita (onde filhos vivem) e 25px em torno
+          const candidateNode = nodeMap.get(cid);
+          const isLeftBranch = candidateNode?.side === 'left';
+          const leftBound = isLeftBranch ? rect.left - 140 : rect.left - 20;
+          const rightBound = isLeftBranch ? rect.right + 20 : rect.right + 140;
+
           const inMagneticZone = (
-            e.clientX >= rect.left - 20 &&
-            e.clientX <= rect.right + 140 &&
+            e.clientX >= leftBound &&
+            e.clientX <= rightBound &&
             e.clientY >= rect.top - 25 &&
             e.clientY <= rect.bottom + 25
           );
@@ -449,7 +473,9 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
             if (dist < bestDist) {
               bestDist = dist;
               foundId = cid;
-              if (e.clientX > rect.right - 15) {
+              if (candidateNode?.side === 'root') {
+                foundPos = 'inside';
+              } else if ((isLeftBranch && e.clientX < rect.left + 15) || (!isLeftBranch && e.clientX > rect.right - 15)) {
                 foundPos = 'inside';
               } else {
                 const relY = (e.clientY - rect.top) / rect.height;
@@ -474,8 +500,6 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
     };
 
     const handleMouseUp = () => {
-      dragPendingRef.current = null;
-
       const dragId = draggingIdRef.current;
       const { id: targetId, pos } = dropTargetRef.current;
 
@@ -486,8 +510,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           onReparentNode(dragId, targetId);
         }
       } else if (dragId && !targetId && dragSourceScreenPosRef.current && dragCursorRef.current) {
-        // Solto no espaço livre do canvas: modelagem e posicionamento livre!
-        const curZoom = zoom || 1;
+        const curZoom = zoom > 0 ? zoom : 1;
         const deltaX = (dragCursorRef.current.x - dragSourceScreenPosRef.current.x) / curZoom;
         const deltaY = (dragCursorRef.current.y - dragSourceScreenPosRef.current.y) / curZoom;
         if (Math.hypot(deltaX, deltaY) > 8 && onMoveNodeFree) {
@@ -495,30 +518,26 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         }
       }
 
-      // Reset completo do estado de drag
-      draggingIdRef.current = null;
-      dragSourceScreenPosRef.current = null;
-      dragCursorRef.current = null;
-      dropTargetRef.current = { id: null, pos: 'inside' };
+      resetDragState();
+    };
 
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
+    const handleCancelKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (draggingIdRef.current || dragPendingRef.current)) {
+        resetDragState();
       }
-
-      setDraggingNodeId(null);
-      setDropTargetNodeId(null);
-      setDropPosition('inside');
-      setDragCursorPos(null);
     };
 
     window.addEventListener('mousemove', handleMouseMove, { passive: true });
     window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('blur', resetDragState);
+    window.addEventListener('keydown', handleCancelKey);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('blur', resetDragState);
+      window.removeEventListener('keydown', handleCancelKey);
     };
-  }, [onReparentNode, onReorderInsertNode, nodeMap]);
+  }, [onReparentNode, onReorderInsertNode, onMoveNodeFree, nodeMap, zoom]);
 
   // ─── CONECTORES SVG ──────────────────────────────────────────────────────────
   const renderConnectors = () => {
@@ -640,7 +659,11 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
           }
         } else {
           // Conexão Horizontal / Bi-direcional
-          const isChildOnLeft = (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
+          const hasSignificantOffset = Math.abs(child.offsetX || 0) >= 20;
+          const isChildOnLeft =
+            effectiveLayout === 'bidirectional' && !hasSignificantOffset && (child.side === 'left' || child.side === 'right')
+              ? child.side === 'left'
+              : (cPos.x + cPos.width / 2) < (pPos.x + pPos.width / 2);
           // No estilo Whimsical oficial, todos os ramos filhos partem do mesmo centro do pai
           const startX = isChildOnLeft ? pPos.x : pPos.x + pPos.width;
           const startY = pPos.y + pPos.height / 2;
@@ -771,17 +794,37 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       );
     });
 
+    // Calcula o bounding box dinâmico real apenas do conteúdo visível (elimina buffer fixo 10000x10000 na GPU)
+    let minSvgX = Infinity;
+    let minSvgY = Infinity;
+    let maxSvgX = -Infinity;
+    let maxSvgY = -Infinity;
+
+    effectiveNodes.forEach(n => {
+      if (!isNodeVisible(n)) return;
+      const p = getNodePos(n);
+      if (p.x < minSvgX) minSvgX = p.x;
+      if (p.y < minSvgY) minSvgY = p.y;
+      if (p.x + p.width > maxSvgX) maxSvgX = p.x + p.width;
+      if (p.y + p.height > maxSvgY) maxSvgY = p.y + p.height;
+    });
+
+    const svgX = isFinite(minSvgX) ? Math.floor(minSvgX - 260) : -600;
+    const svgY = isFinite(minSvgY) ? Math.floor(minSvgY - 260) : -400;
+    const svgW = isFinite(minSvgX) ? Math.max(200, Math.ceil(maxSvgX - minSvgX + 520)) : 1200;
+    const svgH = isFinite(minSvgY) ? Math.max(200, Math.ceil(maxSvgY - minSvgY + 520)) : 800;
+
     return (
       <svg
-        width="10000"
-        height="10000"
-        viewBox="-5000 -5000 10000 10000"
+        width={svgW}
+        height={svgH}
+        viewBox={`${svgX} ${svgY} ${svgW} ${svgH}`}
         style={{
           position: 'absolute',
-          top: -5000,
-          left: -5000,
-          width: 10000,
-          height: 10000,
+          top: svgY,
+          left: svgX,
+          width: svgW,
+          height: svgH,
           pointerEvents: 'none',
           overflow: 'visible',
           zIndex: 5
@@ -867,9 +910,10 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
         const tColor = targetNode.color || '#6366f1';
 
         if (dropPosition === 'inside') {
-          const portX = tRect.right;
+          const attachLeft = targetNode.side === 'left';
+          const portX = attachLeft ? tRect.left : tRect.right;
           const portY = tRect.top + tRect.height / 2;
-          const endX = Math.max(portX + 15, cx - 80);
+          const endX = attachLeft ? Math.min(portX - 15, cx + 80) : Math.max(portX + 15, cx - 80);
           const endY = cy;
           const cpx = portX + (endX - portX) * 0.5;
           const bezierD = `M ${portX} ${portY} C ${cpx} ${portY}, ${cpx} ${endY}, ${endX} ${endY}`;
@@ -1087,8 +1131,14 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
       {/* Camada Vetorial Global de Linhas */}
       {renderConnectors()}
 
-      {/* Menu Contextual Flutuante Superior (Block UI Oficial Whimsical) */}
-      {selectedNode && selectedPos && (
+      {/* Menu Contextual Flutuante Superior (oculto durante arraste, edição, overlay, multisseleção ou ramo recolhido) */}
+      {!isOverlayOpen &&
+        !draggingNodeId &&
+        !editingId &&
+        selectedNode &&
+        selectedPos &&
+        isNodeVisible(selectedNode) &&
+        (!selectedNodeIds || selectedNodeIds.length <= 1) && (
         <NodeContextMenu
           node={selectedNode}
           position={selectedPos}
@@ -1197,6 +1247,7 @@ export const MindMapCanvas: React.FC<MindMapCanvasProps> = ({
               transition: isDraggingThis ? 'none' : 'background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease'
             }}
             onClick={(e) => {
+              if (currentTool === 'hand') return;
               e.stopPropagation();
               if (currentTool === 'connect') {
                 onConnectNode?.(node.id);

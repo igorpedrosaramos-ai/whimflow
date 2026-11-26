@@ -7,6 +7,7 @@ export interface FitViewElements {
   stickies?: StickyNote[];
   wireframes?: WireframeItem[];
   shapes?: FlowShape[];
+  layoutType?: 'bidirectional' | 'right' | 'orgchart' | 'flowchart' | 'timeline' | 'free';
 }
 
 interface UseCanvasNavigationProps {
@@ -37,6 +38,7 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
     let targetStickies: StickyNote[] = [];
     let targetWireframes: WireframeItem[] = [];
     let targetShapes: FlowShape[] = [];
+    let targetLayoutType: FitViewElements['layoutType'] = undefined;
 
     if (Array.isArray(elementsToFit)) {
       targetNodes = elementsToFit;
@@ -45,6 +47,7 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
       targetStickies = elementsToFit.stickies || [];
       targetWireframes = elementsToFit.wireframes || [];
       targetShapes = elementsToFit.shapes || [];
+      targetLayoutType = elementsToFit.layoutType;
     } else {
       targetNodes = nodes || [];
     }
@@ -56,9 +59,10 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
       const root = targetNodes.find(n => n.side === 'root') || targetNodes[0];
       const layout = calculateMindMapLayout(targetNodes, root.id, {
         horizontalGap: 100,
-        verticalGap: 18,
+        verticalGap: targetLayoutType === 'orgchart' ? 56 : 18,
         rootX: 0,
-        rootY: 0
+        rootY: 0,
+        layoutType: targetLayoutType
       });
 
       targetNodes.forEach(node => {
@@ -129,17 +133,18 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
       return;
     }
 
-    const width = window.innerWidth;
-    const height = window.innerHeight;
-    const isMobile = width <= 768;
+    const mainAreaEl = typeof document !== 'undefined' ? document.getElementById('main-canvas-area') : null;
+    const width = mainAreaEl && mainAreaEl.clientWidth > 0 ? mainAreaEl.clientWidth : window.innerWidth;
+    const height = mainAreaEl && mainAreaEl.clientHeight > 0 ? mainAreaEl.clientHeight : (window.innerHeight - 48);
+    const isMobile = window.innerWidth <= 768;
 
     const mapWidth = Math.max(maxX - minX, 260);
     const mapHeight = Math.max(maxY - minY, 160);
 
-    const padLeft = sidebarOpen && !isMobile ? 320 : (isMobile ? 24 : 80);
+    const padLeft = isMobile ? 24 : 84;
     const padRight = isMobile ? 24 : 80;
-    const padTop = isMobile ? 65 : 90;
-    const padBottom = isMobile ? 50 : 70;
+    const padTop = isMobile ? 55 : 64;
+    const padBottom = isMobile ? 50 : 72;
 
     const availWidth = Math.max(160, width - padLeft - padRight);
     const availHeight = Math.max(160, height - padTop - padBottom);
@@ -215,9 +220,11 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
     };
   }, [isPanning]);
 
-  // Zoom pelo mouse wheel centrado no cursor
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
+  // Zoom pelo mouse wheel centrado no cursor (suporta listener nativo passive: false)
+  const handleWheel = useCallback((e: WheelEvent | React.WheelEvent, targetEl?: HTMLElement | null) => {
+    if (e.cancelable) {
+      e.preventDefault();
+    }
 
     if (e.shiftKey) {
       setPan(prev => ({ ...prev, x: prev.x - e.deltaY }));
@@ -230,8 +237,13 @@ export function useCanvasNavigation({ nodes, sidebarOpen, activeBoardId }: UseCa
     const newZoom = isZoomIn ? currentSafeZoom * zoomFactor : currentSafeZoom / zoomFactor;
     const clampedZoom = Math.min(Math.max(newZoom, 0.2), 2.5);
 
-    const mouseX = isFinite(e.clientX) ? e.clientX : 0;
-    const mouseY = isFinite(e.clientY) ? e.clientY : 0;
+    const el = targetEl || (e.currentTarget as HTMLElement);
+    const rect = el?.getBoundingClientRect?.();
+    const offsetLeft = rect ? rect.left : 0;
+    const offsetTop = rect ? rect.top : 0;
+
+    const mouseX = isFinite(e.clientX) ? (e.clientX - offsetLeft) : 0;
+    const mouseY = isFinite(e.clientY) ? (e.clientY - offsetTop) : 0;
 
     const newPanX = mouseX - (mouseX - pan.x) * (clampedZoom / currentSafeZoom);
     const newPanY = mouseY - (mouseY - pan.y) * (clampedZoom / currentSafeZoom);

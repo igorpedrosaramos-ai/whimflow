@@ -499,17 +499,36 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
       });
     });
 
+    let minSvgX = Infinity;
+    let minSvgY = Infinity;
+    let maxSvgX = -Infinity;
+    let maxSvgY = -Infinity;
+
+    slideNodes.forEach(n => {
+      if (!isNodeVisible(n)) return;
+      const p = getNodePos(n);
+      if (p.x < minSvgX) minSvgX = p.x;
+      if (p.y < minSvgY) minSvgY = p.y;
+      if (p.x + p.width > maxSvgX) maxSvgX = p.x + p.width;
+      if (p.y + p.height > maxSvgY) maxSvgY = p.y + p.height;
+    });
+
+    const svgX = isFinite(minSvgX) ? Math.floor(minSvgX - 240) : -600;
+    const svgY = isFinite(minSvgY) ? Math.floor(minSvgY - 240) : -400;
+    const svgW = isFinite(minSvgX) ? Math.max(200, Math.ceil(maxSvgX - minSvgX + 480)) : 1200;
+    const svgH = isFinite(minSvgY) ? Math.max(200, Math.ceil(maxSvgY - minSvgY + 480)) : 800;
+
     return (
       <svg
-        width="10000"
-        height="10000"
-        viewBox="-5000 -5000 10000 10000"
+        width={svgW}
+        height={svgH}
+        viewBox={`${svgX} ${svgY} ${svgW} ${svgH}`}
         style={{
           position: 'absolute',
-          top: -5000,
-          left: -5000,
-          width: 10000,
-          height: 10000,
+          top: svgY,
+          left: svgX,
+          width: svgW,
+          height: svgH,
           pointerEvents: 'none',
           overflow: 'visible',
           zIndex: 5
@@ -795,10 +814,11 @@ export const PresentationView: React.FC<PresentationViewProps> = ({
         {/* Camada com Transição Suave de Câmera */}
         <div style={{
           position: 'absolute',
-          transform: `translate(${cameraTransform.panX}px, ${cameraTransform.panY}px) scale(${cameraTransform.zoom})`,
+          top: 0,
+          left: 0,
+          transform: `translate3d(${cameraTransform.panX}px, ${cameraTransform.panY}px, 0) scale(${cameraTransform.zoom})`,
           transformOrigin: '0 0',
-          transition: isDraggingCanvasRef.current ? 'none' : 'transform 0.45s cubic-bezier(0.2, 0.9, 0.2, 1)',
-          willChange: 'transform'
+          transition: isDraggingCanvasRef.current ? 'none' : 'transform 0.45s cubic-bezier(0.2, 0.9, 0.2, 1)'
         }}>
           {/* Conectores com portas distribuídas */}
           {renderConnectors()}

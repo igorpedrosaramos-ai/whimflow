@@ -1822,7 +1822,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               e.currentTarget.style.transform = 'scale(1)';
               e.currentTarget.style.borderColor = isDark ? '#333f52' : '#e2e8f0';
             }}
-            title="Whimflow Spark: Criação Relâmpago, Text-to-Map e Frameworks (Ctrl+J)"
+            title="Criação Relâmpago, Text-to-Map e Frameworks (Ctrl+J)"
           >
             ⚡
           </button>

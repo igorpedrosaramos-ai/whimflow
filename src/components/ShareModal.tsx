@@ -61,7 +61,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   if (!isOpen) return null;
 
   const isDark = theme === 'dark';
-  const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://whimflow.vercel.app';
+  const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://mapamentalturbine.vercel.app';
 
   const notify = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
     if (onShowToast) {
