@@ -1,37 +1,40 @@
 // Handler serverless para persistência e recuperação em nuvem do Mapa Mental Turbine
-import { MIGRATED_WHIMFLOW_BOARDS } from '../src/constants/migratedBoards';
 
-// Armazenamento em memória do worker (com fallback para requisições de mesma sessão)
-let inMemoryBoardsCache: any[] = [...MIGRATED_WHIMFLOW_BOARDS];
+let inMemoryBoardsCache: any[] = [];
 let inMemoryCategoriesCache: any[] = [];
 let inMemoryWorkspacesCache: any[] = [];
 
 export default async function handler(req: any, res: any) {
-  const method = req.method;
-  const url = new URL(req.url || '/', `http://${req.headers?.host || 'localhost'}`);
-  const type = url.searchParams.get('type') || req.body?.type || 'boards';
-
-  // Configuração CORS segura
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (method === 'OPTIONS') {
-    res.statusCode = 200;
-    res.end();
-    return;
+  if (req.method === 'OPTIONS') {
+    return res.status ? res.status(200).end() : (res.statusCode = 200, res.end());
   }
 
+  const queryType = req.query?.type || (req.url && req.url.includes('type=categories') ? 'categories' : (req.url && req.url.includes('type=workspaces') ? 'workspaces' : 'boards'));
+
   try {
-    if (method === 'POST') {
-      const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    if (req.method === 'POST') {
+      let body = req.body;
+      if (typeof body === 'string') {
+        try {
+          body = JSON.parse(body);
+        } catch {
+          if (res.status) return res.status(400).json({ error: 'JSON de requisição inválido.' });
+          res.statusCode = 400;
+          return res.end(JSON.stringify({ error: 'JSON de requisição inválido.' }));
+        }
+      }
+
+      const type = body?.type || queryType;
       const payload = body?.payload;
 
       if (!Array.isArray(payload)) {
+        if (res.status) return res.status(400).json({ error: 'Payload deve ser um array válido.' });
         res.statusCode = 400;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ error: 'Payload deve ser um array válido' }));
-        return;
+        return res.end(JSON.stringify({ error: 'Payload deve ser um array válido.' }));
       }
 
       if (type === 'boards') {
@@ -42,38 +45,44 @@ export default async function handler(req: any, res: any) {
         inMemoryWorkspacesCache = payload;
       }
 
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
-        success: true,
-        count: payload.length,
-        syncedAt: new Date().toISOString()
-      }));
-      return;
-    }
-
-    if (method === 'GET') {
-      let data: any[] = [];
-      if (type === 'boards') data = inMemoryBoardsCache;
-      else if (type === 'categories') data = inMemoryCategoriesCache;
-      else if (type === 'workspaces') data = inMemoryWorkspacesCache;
-
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({
+      const responsePayload = {
         success: true,
         type,
-        data,
-        timestamp: new Date().toISOString()
-      }));
-      return;
+        count: payload.length,
+        syncedAt: new Date().toISOString()
+      };
+
+      if (res.status) return res.status(200).json(responsePayload);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify(responsePayload));
     }
 
+    if (req.method === 'GET') {
+      let data: any[] = [];
+      if (queryType === 'boards') data = inMemoryBoardsCache;
+      else if (queryType === 'categories') data = inMemoryCategoriesCache;
+      else if (queryType === 'workspaces') data = inMemoryWorkspacesCache;
+
+      const responsePayload = {
+        success: true,
+        type: queryType,
+        data,
+        timestamp: new Date().toISOString()
+      };
+
+      if (res.status) return res.status(200).json(responsePayload);
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify(responsePayload));
+    }
+
+    if (res.status) return res.status(405).json({ error: 'Método não suportado. Utilize GET ou POST.' });
     res.statusCode = 405;
-    res.end(JSON.stringify({ error: 'Método não suportado' }));
+    return res.end(JSON.stringify({ error: 'Método não suportado.' }));
   } catch (err: any) {
+    if (res.status) return res.status(500).json({ error: err.message || 'Erro interno de sincronização.' });
     res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ error: err.message || 'Erro interno de sincronização' }));
+    return res.end(JSON.stringify({ error: err.message || 'Erro interno de sincronização.' }));
   }
 }
