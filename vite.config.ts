@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { handleGenerateDiagram } from './api/generate-diagram';
+import dbHandler from './api/db-sync';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -12,6 +13,17 @@ export default defineConfig(({ mode }) => {
         name: 'api-generate-diagram-middleware',
         configureServer(server) {
           const apiHandler = async (req: any, res: any, next: any) => {
+            if (req.url?.startsWith('/api/db-sync')) {
+              let bodyStr = '';
+              req.on('data', (chunk: any) => {
+                bodyStr += chunk;
+              });
+              req.on('end', async () => {
+                req.body = bodyStr ? JSON.parse(bodyStr) : undefined;
+                await dbHandler(req, res);
+              });
+              return;
+            }
             if (req.url?.startsWith('/api/generate-diagram') && req.method === 'POST') {
               let bodyStr = '';
               req.on('data', (chunk: any) => {
@@ -39,6 +51,17 @@ export default defineConfig(({ mode }) => {
         },
         configurePreviewServer(server) {
           server.middlewares.use(async (req: any, res: any, next: any) => {
+            if (req.url?.startsWith('/api/db-sync')) {
+              let bodyStr = '';
+              req.on('data', (chunk: any) => {
+                bodyStr += chunk;
+              });
+              req.on('end', async () => {
+                req.body = bodyStr ? JSON.parse(bodyStr) : undefined;
+                await dbHandler(req, res);
+              });
+              return;
+            }
             if (req.url?.startsWith('/api/generate-diagram') && req.method === 'POST') {
               let bodyStr = '';
               req.on('data', (chunk: any) => {

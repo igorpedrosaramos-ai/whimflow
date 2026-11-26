@@ -63,6 +63,7 @@ import {
   loadActiveWorkspaceId,
   saveActiveWorkspaceId
 } from './services/storageService';
+import { pushCategoriesToCloud, pushWorkspacesToCloud } from './services/cloudSyncService';
 import { useRouter } from './router';
 
 export const App: React.FC = () => {
@@ -159,6 +160,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     saveCategories(categories);
+    pushCategoriesToCloud(categories).catch(() => {});
   }, [categories]);
 
   const handleSaveCategory = useCallback((cat: { id?: string; name: string; color: string }) => {
@@ -210,6 +212,7 @@ export const App: React.FC = () => {
     setWorkspaces(prev => {
       const updated = prev.map(w => w.id === id ? { ...w, name: newName } : w);
       saveWorkspaces(updated);
+      pushWorkspacesToCloud(updated).catch(() => {});
       return updated;
     });
     showToast(`Espaço de trabalho renomeado para "${newName}"!`, 'success');
@@ -223,6 +226,7 @@ export const App: React.FC = () => {
     setWorkspaces(prev => {
       const updated = [...prev, newWs];
       saveWorkspaces(updated);
+      pushWorkspacesToCloud(updated).catch(() => {});
       return updated;
     });
     setActiveWorkspaceId(newWs.id);

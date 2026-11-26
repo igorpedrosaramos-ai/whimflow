@@ -1,4 +1,5 @@
 import { Board, MindMapNode, BoardCategory, Workspace } from '../types';
+import { pushBoardsToCloud } from './cloudSyncService';
 
 export const STORAGE_KEY = 'whimflow_boards_v7';
 export const LEGACY_STORAGE_KEY = 'whimflow_boards_v6';
@@ -175,6 +176,11 @@ export async function saveBoards(boards: Board[]): Promise<void> {
       }
     }
   }
+
+  // 3. Sincronização em segundo plano com o banco de dados dedicado na nuvem
+  try {
+    pushBoardsToCloud(boards).catch(() => {});
+  } catch {}
 }
 
 /**

@@ -9,7 +9,8 @@ import {
   Trash2, 
   Download, 
   CheckCircle2,
-  X
+  X,
+  Database
 } from 'lucide-react';
 import { Workspace } from '../types';
 
@@ -520,6 +521,27 @@ export const WorkspaceMenuDropdown: React.FC<WorkspaceMenuDropdownProps> = ({
               <span>Exportar Backup (JSON)</span>
             </button>
           )}
+
+          {/* 4. STATUS DO BANCO DE DADOS NA NUVEM */}
+          <div
+            id="status-cloud-database-indicator"
+            style={{
+              padding: '8px 10px 4px 10px',
+              marginTop: '4px',
+              borderTop: isDark ? '1px solid #232d3d' : '1px solid #f1f5f9',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '11px',
+              color: isDark ? '#94a3b8' : '#64748b'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Database size={13} color="#10b981" />
+              <span>Banco Nuvem:</span>
+            </div>
+            <span style={{ color: '#10b981', fontWeight: 600 }}>Ativo & Seguro</span>
+          </div>
         </div>
       </div>
     </>

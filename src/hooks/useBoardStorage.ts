@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Board, BoardVersionSnapshot } from '../types';
-import { INITIAL_BOARDS, BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD } from '../constants/initialData';
+import { INITIAL_BOARDS, BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD, MIGRATED_WHIMFLOW_BOARDS } from '../constants/initialData';
 import { parseRoute } from '../router';
 import {
   loadBoards,
@@ -10,17 +10,21 @@ import {
   loadActiveBoardId,
   cleanAndNormalizeMindMap
 } from '../services/storageService';
+import { fetchBoardsFromCloud } from '../services/cloudSyncService';
 
 export function useBoardStorage(onBoardOpened?: (board: Board) => void) {
   // Estado inicial dos quadros com recuperação em camadas (IndexedDB + LocalStorage)
   const [boards, setBoards] = useState<Board[]>(() => {
     const loaded = loadBoardsSync();
     if (loaded && loaded.length > 0) {
-      const hasOnegai = loaded.some((b: Board) => b.id === 'board-onegai');
-      const hasOrion = loaded.some((b: Board) => b.id === 'board-orion-sushi');
+      const existingIds = new Set(loaded.map((b: Board) => b.id));
       const list = [...loaded];
-      if (!hasOnegai) list.push({ ...ONEGAI_BOARD, mindMapNodes: cleanAndNormalizeMindMap(ONEGAI_BOARD.mindMapNodes) });
-      if (!hasOrion) list.push({ ...ORION_SUSHI_BOARD, mindMapNodes: cleanAndNormalizeMindMap(ORION_SUSHI_BOARD.mindMapNodes) });
+      MIGRATED_WHIMFLOW_BOARDS.forEach(mb => {
+        if (!existingIds.has(mb.id)) {
+          list.push({ ...mb, mindMapNodes: cleanAndNormalizeMindMap(mb.mindMapNodes) });
+          existingIds.add(mb.id);
+        }
+      });
       return list;
     }
     return INITIAL_BOARDS.map(b => ({
@@ -29,13 +33,28 @@ export function useBoardStorage(onBoardOpened?: (board: Board) => void) {
     }));
   });
 
-  // Sincronização inicial assíncrona com IndexedDB
+  // Sincronização inicial assíncrona com IndexedDB e Nuvem
   useEffect(() => {
     loadBoards().then(dbBoards => {
       if (dbBoards && dbBoards.length > 0) {
         setBoards(dbBoards);
       }
     });
+
+    // Consulta assíncrona ao banco na nuvem
+    fetchBoardsFromCloud().then(cloudBoards => {
+      if (cloudBoards && cloudBoards.length > 0) {
+        setBoards(prev => {
+          // Se não há quadros locais ou a nuvem tem mais/novos quadros, mescla com segurança
+          const existingIds = new Set(prev.map(b => b.id));
+          const newFromCloud = cloudBoards.filter(cb => !existingIds.has(cb.id));
+          if (newFromCloud.length > 0) {
+            return [...newFromCloud, ...prev];
+          }
+          return prev;
+        });
+      }
+    }).catch(() => {});
   }, []);
 
   const [activeBoardId, setActiveBoardId] = useState<string>(() => {

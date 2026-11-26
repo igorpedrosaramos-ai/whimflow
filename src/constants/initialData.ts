@@ -1,6 +1,7 @@
 import { Board, Workspace } from '../types';
 import { ONEGAI_BOARD } from './onegaiData';
 import { ORION_SUSHI_BOARD } from './orionData';
+import { MIGRATED_WHIMFLOW_BOARDS } from './migratedBoards';
 
 export const INITIAL_WORKSPACES: Workspace[] = [
   { id: 'ws-default', name: 'Meu Espaço de Trabalho' }
@@ -39,6 +40,8 @@ export const BLANK_BOARD: Board = {
   drawings: []
 };
 
-export { ONEGAI_BOARD, ORION_SUSHI_BOARD };
+export { ONEGAI_BOARD, ORION_SUSHI_BOARD, MIGRATED_WHIMFLOW_BOARDS };
 
-export const INITIAL_BOARDS: Board[] = [BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD];
+export const INITIAL_BOARDS: Board[] = MIGRATED_WHIMFLOW_BOARDS.length > 0 
+  ? MIGRATED_WHIMFLOW_BOARDS 
+  : [BLANK_BOARD, ONEGAI_BOARD, ORION_SUSHI_BOARD];
